@@ -1,0 +1,203 @@
+use crate::chunks::left_edge;
+use crate::pipeline::best;
+use crate::{
+    neural::{Matrix, Scorer},
+    Doc, Error, Model, Result, Span, TokenIndex,
+};
+use serde_json::Value;
+impl Model {
+    pub(crate) fn parse(&self, d: &mut Doc, x: &Matrix) -> Result<()> {
+        self.parse_traced(d, x, None)
+    }
+    pub(crate) fn parse_traced(
+        &self,
+        d: &mut Doc,
+        x: &Matrix,
+        mut trace: Option<&mut Vec<Value>>,
+    ) -> Result<()> {
+        let n = d.tokens.len();
+        let scorer = Scorer::new(self, &self.config["parser"], x);
+        let actions = self.config["parser"]["actions"].as_array().unwrap();
+        let mut stack = Vec::<usize>::new();
+        let mut rebuffer = vec![];
+        let mut at = 0;
+        let mut heads: Vec<Option<usize>> = vec![None; n];
+        let mut deps = vec!["ROOT".to_string(); n];
+        let mut unshift = vec![false; n];
+        let mut starts = vec![false; n];
+        if n > 0 {
+            starts[0] = true
+        }
+        let mut left: Vec<Vec<usize>> = vec![vec![]; n];
+        let mut right = left.clone();
+        let mut steps = 0;
+        while at < n || !rebuffer.is_empty() || !stack.is_empty() {
+            steps += 1;
+            if steps > n.saturating_mul(n + 10).saturating_mul(4) {
+                return Err(Error::Model("parser transition limit".into()));
+            }
+            let b = |i: usize| {
+                if i < rebuffer.len() {
+                    Some(rebuffer[rebuffer.len() - 1 - i])
+                } else {
+                    let k = at + i - rebuffer.len();
+                    (k < n).then_some(k)
+                }
+            };
+            let b0 = b(0);
+            let b1 = b(1);
+            let s0 = stack.last().copied();
+            let s1 = stack.iter().rev().nth(1).copied();
+            let s2 = stack.iter().rev().nth(2).copied();
+            let child =
+                |arcs: &Vec<Vec<usize>>, h: Option<usize>| h.and_then(|h| arcs[h].last().copied());
+            let ids = [
+                b0,
+                b1,
+                s0,
+                s1,
+                s2,
+                child(&left, b0),
+                child(&left, s0),
+                child(&right, s0),
+            ];
+            let scores = scorer.scores(&ids);
+            let valid: Vec<bool> = (0..scores.len())
+                .map(|i| {
+                    let action = actions[i].as_str().unwrap();
+                    match action.as_bytes()[0] {
+                        b'S' => {
+                            stack.is_empty()
+                                || (b1.is_some() && !starts[b0.unwrap()] && !unshift[b0.unwrap()])
+                        }
+                        b'D' => !stack.is_empty(),
+                        b'L' | b'R' => s0.is_some() && b0.is_some_and(|v| !starts[v]),
+                        b'B' => b1.is_some_and(|v| Some(v) == b0.map(|u| u + 1) && !starts[v]),
+                        _ => false,
+                    }
+                })
+                .collect();
+            let a = best(&scores, |i| valid[i])?;
+            if let Some(t) = trace.as_mut() {
+                t.push(serde_json::json!({"ids":ids.map(|v|v.map_or(-1,|i|i as i64)),"scores":scores,"valid":valid,"action":a}));
+            }
+            let action = actions[a].as_str().unwrap();
+            match action.as_bytes()[0] {
+                b'S' => {
+                    let v = rebuffer.pop().unwrap_or_else(|| {
+                        let v = at;
+                        at += 1;
+                        v
+                    });
+                    stack.push(v)
+                }
+                b'D' => {
+                    let v = stack.pop().unwrap();
+                    if heads[v].is_none() && !stack.is_empty() {
+                        rebuffer.push(v);
+                        unshift[v] = true
+                    }
+                }
+                b'L' | b'R' => {
+                    let (h, c) = if action.starts_with('L') {
+                        (b0.unwrap(), s0.unwrap())
+                    } else {
+                        (s0.unwrap(), b0.unwrap())
+                    };
+                    if let Some(old) = heads[c] {
+                        let arcs = if old > c {
+                            &mut left[old]
+                        } else {
+                            &mut right[old]
+                        };
+                        arcs.retain(|v| *v != c)
+                    }
+                    heads[c] = Some(h);
+                    deps[c] = action[2..].into();
+                    if h > c {
+                        left[h].push(c)
+                    } else {
+                        right[h].push(c)
+                    }
+                    if action.starts_with('L') {
+                        unshift[b0.unwrap()] = false;
+                        stack.pop();
+                    } else {
+                        let v = rebuffer.pop().unwrap_or_else(|| {
+                            let v = at;
+                            at += 1;
+                            v
+                        });
+                        stack.push(v)
+                    }
+                }
+                b'B' => starts[b1.unwrap()] = true,
+                _ => unreachable!(),
+            }
+        }
+        for i in 0..n {
+            d.tokens[i].head = Some(TokenIndex(heads[i].unwrap_or(i)));
+            d.tokens[i].dep = Some(deps[i].clone());
+        }
+        // Pseudo-projective HEAD decoding, breadth first with ordered children.
+        for i in 0..n {
+            if let Some((dep, label)) = d.tokens[i].dep.clone().unwrap().split_once("||") {
+                let old = d.tokens[i].head.unwrap().0;
+                let mut queue = std::collections::VecDeque::from([old]);
+                let mut visited = vec![false; n];
+                let mut found = None;
+                while let Some(h) = queue.pop_front() {
+                    if visited[h] {
+                        continue;
+                    }
+                    visited[h] = true;
+                    for j in 0..n {
+                        if j != h
+                            && j != i
+                            && d.tokens[j].head == Some(TokenIndex(h))
+                            && !d
+                                .token_text(TokenIndex(j))?
+                                .chars()
+                                .all(crate::tokenizer::is_space)
+                        {
+                            if d.tokens[j].dep.as_deref() == Some(label) {
+                                found = Some(j);
+                                break;
+                            }
+                            queue.push_back(j)
+                        }
+                    }
+                    if found.is_some() {
+                        break;
+                    }
+                }
+                d.tokens[i].head = Some(TokenIndex(found.unwrap_or(old)));
+                d.tokens[i].dep = Some(dep.into());
+            }
+        }
+        let mut sentence_starts = vec![];
+        for i in 0..n {
+            d.tokens[i].sentence_start = Some(false);
+            if d.tokens[i].head == Some(TokenIndex(i)) {
+                sentence_starts.push(left_edge(d, i));
+            }
+        }
+        sentence_starts.sort_unstable();
+        sentence_starts.dedup();
+        for &i in &sentence_starts {
+            d.tokens[i].sentence_start = Some(true)
+        }
+        d.sentences = Some(
+            sentence_starts
+                .iter()
+                .enumerate()
+                .map(|(j, &i)| Span {
+                    start: TokenIndex(i),
+                    end: TokenIndex(*sentence_starts.get(j + 1).unwrap_or(&n)),
+                    label: String::new(),
+                })
+                .collect(),
+        );
+        Ok(())
+    }
+}

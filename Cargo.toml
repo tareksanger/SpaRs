@@ -1,0 +1,20 @@
+[package]
+name = "spars"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Experimental native Rust inference for official spaCy models"
+license = "MIT"
+readme = "README.md"
+include = ["src/**", "examples/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "docs/**", "licenses/**", "fixtures/hash.expected.json", "reference/source-lock.json"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+fancy-regex = "0.16"
+sha2 = "0.10"
+safetensors = "0.6"
+
+[profile.release]
+debug = 1

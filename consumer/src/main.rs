@@ -1,0 +1,30 @@
+use spars::{Doc, Model, TokenIndex};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load(std::env::args().nth(1).expect("model directory"))?;
+    let doc = model.process("Alice works at Microsoft in New York.")?;
+    assert!(doc.tokens().iter().all(|t| t.tag.is_some()
+        && t.pos.is_some()
+        && t.morphology.is_some()
+        && t.lemma.is_some()
+        && t.head.is_some()
+        && t.dep.is_some()
+        && t.sentence_start.is_some()
+        && t.entity_iob.is_some()));
+    assert!(doc.entities().is_some());
+    assert!(doc.sentences().is_some());
+    assert!(doc.noun_chunks().is_some());
+    assert_eq!(model.document_vector(&doc).len(), 300);
+    assert!(model.vector("Microsoft").is_some());
+    assert_eq!(Doc::from_json(&doc.to_json()?)?, doc);
+    for (i, t) in doc.tokens().iter().enumerate() {
+        println!(
+            "{}\t{}\t{}\t{}\t{}",
+            doc.token_text(TokenIndex(i))?,
+            t.tag.as_deref().unwrap(),
+            t.lemma.as_deref().unwrap(),
+            t.head.unwrap().0,
+            t.dep.as_deref().unwrap()
+        );
+    }
+    Ok(())
+}
