@@ -1,40 +1,15 @@
 # Third-party attribution
 
-This is an independent, experimental port, not an Explosion product. spaCy and
-Thinc names identify compatibility targets, not affiliation. This project is named SpaRs (`spars` in Cargo).
+This is an independent, experimental port, not an Explosion product. spaCy and Thinc names identify compatibility targets, not affiliation. This project is named SpaRs (`spars` in Cargo).
 
-Native algorithms are translated from official spaCy 3.8.14 and Thinc 8.3.13
-source distributed in their official Python wheels. Copyright notices and full
-MIT texts are retained in licenses/spacy-MIT.txt and licenses/thinc-MIT.txt.
-reference/source-lock.json records source hashes verified against wheel RECORD.
-Source repositories: https://github.com/explosion/spaCy and
-https://github.com/explosion/thinc.
+Native algorithms are translated from official spaCy 3.8.14 and Thinc 8.3.13 source distributed in their official Python wheels. Copyright notices and full MIT texts are retained in licenses/spacy-MIT.txt and licenses/thinc-MIT.txt. reference/source-lock.json records source hashes verified against wheel RECORD. Source repositories: https://github.com/explosion/spaCy and https://github.com/explosion/thinc.
 
-Relevant translations: tokenizer.pyx; strings.pyx; lang/lex_attrs.py;
-lang/en/lex_attrs.py and lemmatizer.py and syntax_iterators.py;
-ml/models/tok2vec.py and parser.py; ml/_precomputable_affine.py and parser_model.pyx;
-pipeline/_parser_internals/{_state.pxd,arc_eager.pyx,ner.pyx,nonproj.pyx};
-pipeline/{attributeruler.py,lemmatizer.py}; Thinc layers/{hashembed,maxout,
-layernorm,expand_window,with_array,residual}.py and backends/numpy_ops.pyx.
+Relevant translations: tokenizer.pyx; strings.pyx; lang/lex_attrs.py; lang/en/lex_attrs.py and lemmatizer.py and syntax_iterators.py; ml/models/tok2vec.py and parser.py; ml/_precomputable_affine.py and parser_model.pyx; pipeline/_parser_internals/{_state.pxd,arc_eager.pyx,ner.pyx,nonproj.pyx}; pipeline/{attributeruler.py,lemmatizer.py}; Thinc layers/{hashembed,maxout, layernorm,expand_window,with_array,residual}.py and backends/numpy_ops.pyx.
 
-MurmurHash was written by Austin Appleby and placed in the public domain.
-The Thinc uint64 specialization is translated from its MIT source; despite its
-x86_128 function name, the actual operations mix two 64-bit words.
+MurmurHash was written by Austin Appleby and placed in the public domain. The Thinc uint64 specialization is translated from its MIT source; despite its x86_128 function name, the actual operations mix two 64-bit words.
 
-The official en_core_web_md 3.8.0 model metadata declares MIT. Its own LICENSE and
-LICENSES_SOURCES are preserved under licenses/ and copied into every model export.
-The source notices include WordNet 3.0 (Princeton license) and Explosion vectors
-(CC0), plus training-source attributions. Training-source licenses must not be
-confused with the model package license. The exporter copies resources from the
-official model, including lemma lookups; it does not redistribute training data.
-Official release: https://github.com/explosion/spacy-models/releases/tag/en_core_web_md-3.8.0.
+The official en_core_web_md 3.8.0 model metadata declares MIT. Its own LICENSE and LICENSES_SOURCES are preserved under licenses/ and copied into every model export. The source notices include WordNet 3.0 (Princeton license) and Explosion vectors (CC0), plus training-source attributions. Training-source licenses must not be confused with the model package license. The exporter copies resources from the official model, including lemma lookups; it does not redistribute training data. Official release: https://github.com/explosion/spacy-models/releases/tag/en_core_web_md-3.8.0.
 
-Unicode classification ranges are exported from Python's Unicode database;
-its version is recorded in each model. Python and Unicode notices are provided
-in licenses/ when distributing these resources. Rust dependency licenses are
-identified by Cargo metadata and Cargo.lock; they are separate upstream projects.
+Unicode classification ranges are exported from Python's Unicode database; its version is recorded in each model. Python and Unicode notices are provided in licenses/ when distributing these resources. Rust dependency licenses are identified by Cargo metadata and Cargo.lock; they are separate upstream projects.
 
-The optional secondary WASM harness executes a user-acquired reference only.
-Its HTML/binary/weights are excluded from the crate and source distribution and
-are never used by the production runtime or official exporter. No license for
-redistributing that binary is assumed.
+The optional secondary WASM harness executes a user-acquired reference only. Its HTML/binary/weights are excluded from the crate and source distribution and are never used by the production runtime or official exporter. No license for redistributing that binary is assumed.

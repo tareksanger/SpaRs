@@ -1,7 +1,6 @@
 # spaCy compatibility inventory
 
-Implemented means native code exists; only the evidence column establishes its
-verified scope. Partial does not mean arbitrary configurations are supported.
+Implemented means native code exists; only the evidence column establishes its verified scope. Partial does not mean arbitrary configurations are supported.
 
 | Surface | State | Evidence / missing work |
 |---|---|---|
@@ -34,11 +33,6 @@ verified scope. Partial does not mean arbitrary configurations are supported.
 | Scorer / training Examples / alignment | Unimplemented | Development parity harness only |
 | displaCy / projects / CLI ecosystem | Unimplemented | Standalone export and example tools only |
 
-Completing one pipeline is not completing spaCy. Additional architectures,
-languages, matching, mutable docs, serialization and training remain substantial
-work and must receive their own acceptance suites.
+Completing one pipeline is not completing spaCy. Additional architectures, languages, matching, mutable docs, serialization and training remain substantial work and must receive their own acceptance suites.
 
-Declared English suite: 44 documents / 1,035 tokens; exact discrete outputs.
-The recorded acceptance run passes all verification gates. See
-[implementation status](PROGRESS.md) and the
-[verification report](../reports/verification.json) for commands and boundaries.
+Declared English suite: 44 documents / 1,035 tokens; exact discrete outputs. The recorded acceptance run passes all verification gates. See [implementation status](PROGRESS.md) and the [verification report](../reports/verification.json) for commands and boundaries.
