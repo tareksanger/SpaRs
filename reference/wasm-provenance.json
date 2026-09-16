@@ -1,0 +1,26 @@
+{
+  "url": "https://raw.githubusercontent.com/maymay-wa/spacy-wasm/refs/heads/main/spacy-rt-demo.html",
+  "html_sha256": "8a60c2df6e88676970143455b72641c07d3a7e30b106517c3d4df178d8fa70c7",
+  "assets": {
+    "WASM": {
+      "size": 1549954,
+      "sha256": "07516d20f75afd9448b42c56a98f3eac042a3bac065d639a7ae0e6bbb3ee533a"
+    },
+    "MAN": {
+      "size": 2254368,
+      "sha256": "822995c521f2b8c97908719a1ea73ecdf71e1438c1e56b9c69c17de91fde3e8c"
+    },
+    "ST": {
+      "size": 37206600,
+      "sha256": "8b0808b0b9f98a874505a8625f3d2cdd59acc84dad5465310a163f69d931e8dc"
+    },
+    "K2R": {
+      "size": 20566845,
+      "sha256": "9a266a61641f4ee92835a0c7a6ea2ab66dde59018fdaef5e4e7a17b5b509c89d"
+    },
+    "R2W": {
+      "size": 235966,
+      "sha256": "e201adc0478cba5700f80b7b3dd9c73592e6afd5742d59f049c25a8601e352f8"
+    }
+  }
+}
