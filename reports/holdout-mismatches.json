@@ -1,0 +1,12 @@
+{
+  "cases": 10,
+  "differences": [],
+  "fixture": "fixtures/holdout.expected.json",
+  "max_tok2vec_absolute_error": 2.86102294921875e-6,
+  "model": "en_core_web_md 3.8.0",
+  "tokens": 105,
+  "versions": {
+    "spacy": "3.8.14",
+    "thinc": "8.3.13"
+  }
+}

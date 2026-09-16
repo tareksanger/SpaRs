@@ -1,0 +1,29 @@
+name: native-fidelity
+on: [push, pull_request]
+jobs:
+  reference-and-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv --python 3.12.5 .venv
+      - run: uv pip sync --python .venv/bin/python tools/reference-requirements.lock
+      - run: .venv/bin/python tools/acquire.py
+      - run: .venv/bin/python tools/export.py
+      - run: cargo fmt --check
+      - run: cargo fmt --manifest-path consumer/Cargo.toml --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: Execute every model-dependent test (missing assets fail)
+        run: cargo test --release -- --include-ignored
+      - run: cargo build --release --manifest-path consumer/Cargo.toml
+      - name: Native consumer without interpreters on PATH
+        run: env -i PATH=/nonexistent consumer/target/release/native-consumer-check "$PWD/assets/en_core_web_md-3.8.0"
+      - run: cargo package --allow-dirty --offline
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fidelity-reports
+          path: reports/

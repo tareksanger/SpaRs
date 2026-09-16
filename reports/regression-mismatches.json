@@ -1,0 +1,12 @@
+{
+  "cases": 9,
+  "differences": [],
+  "fixture": "fixtures/regression.expected.json",
+  "max_tok2vec_absolute_error": 3.2782554626464844e-6,
+  "model": "en_core_web_md 3.8.0",
+  "tokens": 720,
+  "versions": {
+    "spacy": "3.8.14",
+    "thinc": "8.3.13"
+  }
+}
