@@ -43,6 +43,7 @@ input]; pad is [1, feature, output, piece]. Unnormalized tagger scores are used.
 Unsupported versions, components, feature types or operators fail explicitly.
 Changing this representation or numerical semantics requires a new format version
 and fresh compatibility evidence. Model acquisition is never performed by loading
-or processing. The manifest uses ordinary JSON; `model-v1.schema.json` specifies its structural
-contract; `src/validation.rs` and
-`src/neural.rs::validate` are the executable structural and tensor schema.
+or processing. The manifest uses ordinary JSON; [model-v1.schema.json](model-v1.schema.json)
+specifies its structural contract. The loader enforces structural and tensor
+constraints in [validation.rs](../src/validation.rs) and the `validate` function
+in [neural.rs](../src/neural.rs).

@@ -4,7 +4,6 @@ Experimental, standalone Rust NLP library using **official spaCy pretrained
 weights**, with native Rust tokenization and inference. No Python, Node, WASM,
 subprocess, network client, or build-time model download exists in the runtime.
 The project is named **SpaRs**, with Cargo package and Rust import name `spars`.
-Nothing has been published.
 
 The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 /
 Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks,
@@ -17,8 +16,7 @@ of the entire spaCy library**. See [compatibility](docs/COMPATIBILITY.md),
 
 ## Use from Rust
 
-While unpublished, use a path dependency (or a Git dependency after you publish
-the repository yourself):
+Use a local checkout as a Cargo path dependency:
 
 ```toml
 [dependencies]
@@ -80,6 +78,14 @@ published by these commands.
 
 ## Reproduce verification
 
+After acquiring and exporting the model, fetch the Rust dependencies before
+running verification commands that use Cargo offline mode:
+
+```sh
+cargo fetch --locked
+cargo fetch --locked --manifest-path consumer/Cargo.toml
+```
+
 Frozen fixtures are checked in. Do not regenerate expected outputs during fixes.
 To audit their provenance, generators under `tools/` run the pinned official
 reference. `fixtures/README.md` identifies the development, holdout and regression
@@ -96,7 +102,8 @@ cargo package --allow-dirty --offline
 ```
 
 For all gates plus a byte-identical re-export check, run
-`.venv/bin/python tools/verify.py`. Remote CI is configured but has not yet run.
+`.venv/bin/python tools/verify.py`. The [CI workflow](.github/workflows/ci.yml)
+runs the model-dependent tests using the official exported assets.
 
 Model-dependent tests are explicitly marked ignored for ordinary dependency
 builds. **The acceptance command and CI use `--include-ignored`** and fail on
@@ -106,7 +113,8 @@ missing assets/fixtures. `cargo test` alone is not a parity run. Reports under
 PATH; it does not call Python, Node or any service.
 
 Optional secondary WASM reference (never used by runtime/export): download the
-provided HTML to `reference/wasm-demo.html`, then run:
+[reference HTML](https://raw.githubusercontent.com/maymay-wa/spacy-wasm/refs/heads/main/spacy-rt-demo.html)
+to `reference/wasm-demo.html`, then run:
 
 ```sh
 .venv/bin/python tools/wasm_reference.py

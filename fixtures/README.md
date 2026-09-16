@@ -2,7 +2,7 @@
 
 Inputs were authored for this project; MIT licensed with the project. Outputs are
 computed by official spaCy 3.8.14, Thinc 8.3.13, en_core_web_md 3.8.0. Model resource
-licenses apply to copied lexical/vector data; see ../licenses/.
+licenses apply to copied lexical/vector data; see [licenses](../licenses/).
 
 - development.json: 25 inputs used during implementation; development.expected.json
   records offsets, lexical feature IDs, shared tok2vec, all final annotations and
@@ -25,8 +25,11 @@ licenses apply to copied lexical/vector data; see ../licenses/.
 - vectors.expected.json: 8 exact static rows/availability checks and 6 similarity
   pairs, including empty and missing-vector identity behavior.
 
-Generators: tools/fixtures.py SPLIT, tools/stages.py,
-tools/tokenizer_fixtures.py, tools/lexical_fixtures.py, tools/regex_fixtures.py.
+Generators (run from the repository root): `tools/fixtures.py SPLIT`,
+[tools/stages.py](../tools/stages.py),
+[tools/tokenizer_fixtures.py](../tools/tokenizer_fixtures.py),
+[tools/lexical_fixtures.py](../tools/lexical_fixtures.py), and
+[tools/regex_fixtures.py](../tools/regex_fixtures.py).
 Expected fixtures are not generated in normal CI; model export is. The generators
 exist to reproduce the reference, not to redefine expected results during fixes.
-Numerical tolerance justification is in ../docs/VALIDATION.md.
+Numerical tolerance justification is in the [fidelity contract](../docs/VALIDATION.md).

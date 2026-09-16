@@ -1,12 +1,11 @@
-# Native spaCy port progress
+# SpaRs implementation status
 
-## Handoff — 2026-09-16
+## English inference — verified 2026-09-16
 
-The first native English inference implementation and its declared local
-acceptance suite are complete. This does **not** complete the broader spaCy port.
-Project name: SpaRs; Cargo package/import: `spars`. Local atomic commits
-organize the implementation; no remote repository, release or registry package
-is published.
+SpaRs (`spars`) implements native Rust inference for `en_core_web_md` 3.8.0.
+The declared English acceptance suite passes; broader spaCy functionality remains
+under development. The [compatibility inventory](COMPATIBILITY.md) records the
+supported scope and missing capabilities.
 
 ### Verified current behavior
 
@@ -43,42 +42,48 @@ is published.
 - Local environment: macOS 27 arm64, rustc 1.98.0. This is validation metadata,
   not a benchmark. No throughput or memory-performance claims are made.
 
-### Mismatches investigated
+### Compatibility details
 
-1. BASE_NORMS missing from the initial exporter caused currency/dash annotation
-   differences. Exported the official table with correct model override order.
-2. Rust Unicode classification/lowercase version differences and regex search vs
-   Python match semantics caused lexical differences. Exported pinned Unicode
-   property/lowercase tables and anchored email matching; all cases now pass.
+1. The exporter includes the official BASE_NORMS table and preserves model override
+   order, which affects currency and dash normalization.
+2. Pinned Unicode property/lowercase tables preserve Python lexical behavior
+   independently of Rust's Unicode version. Anchored email matching preserves
+   Python match semantics rather than regex search semantics.
 3. Python regex shorthand classes are explicitly translated to pinned Unicode
    ranges rather than relying on a different regex engine's character classes.
-4. Secondary WASM hash matches supplied `8a60c2df...70c7`. Its output differs from
+4. The secondary WASM reference HTML has SHA-256
+   `8a60c2df6e88676970143455b72641c07d3a7e30b106517c3d4df178d8fa70c7`.
+   Its output differs from
    official spaCy on a pseudo-projective dependency in development case 23, with
    an associated noun-chunk difference. Native output matches official Python.
-   See reports/wasm-mismatches.json; no WASM model or executable is shipped.
+   See [the WASM mismatch report](../reports/wasm-mismatches.json); no WASM model
+   or executable is shipped.
 
-### Prerequisite issues and limits
+### Source provenance and limits
 
-- GitHub's v3.8.14 source archive returned 404 and PyPI supplied no sdist for that
-  release. Resolved by reading official wheel-shipped source, verifying it against
-  wheel RECORD, and recording exact source hashes in reference/source-lock.json.
-- Initial reference import failed with typer 0.27.2 missing click. Resolved with
-  pinned typer 0.16.0 and click 8.1.8; dependency validation passes.
-- The earlier provisional package name was checked before this rename. That
-  check does not establish availability of `spars`; registry availability must
-  be checked before publishing. The selected project name is SpaRs.
-- GitHub Actions workflow is defined to export assets and actually execute every
-  model test, but **remote CI has not run** because no remote was published.
+- Source acquisition for spaCy 3.8.14 uses official wheel-shipped source verified
+  against wheel RECORD: the GitHub source archive returned 404 and PyPI supplied
+  no sdist at acquisition. Exact source hashes are recorded in
+  [the source lock](../reference/source-lock.json).
+- The reference environment pins typer 0.16.0 and click 8.1.8; dependency
+  validation passes. The full dependency lock is
+  [tools/reference-requirements.lock](../tools/reference-requirements.lock).
+- [CI](../.github/workflows/ci.yml) exports official assets and executes the
+  model-dependent acceptance tests.
 - Scalar f32 baseline; sequential batching. Finite suites do not prove all-input
   parity. No linguistic-accuracy benchmark was conducted.
 
-### Resume / next task
+### Verification and next capabilities
 
-Read README.md, docs/COMPATIBILITY.md and reports/verification.json. Run:
+Run the acceptance suite from the repository root after following the
+[setup instructions](../README.md):
 
-```
+```sh
 .venv/bin/python tools/verify.py
 ```
+
+[Validation documentation](VALIDATION.md) describes the suite and tolerances;
+[the verification report](../reports/verification.json) records command results.
 
 Next broader-library implementation task: general token Matcher/PhraseMatcher
 with immutable document views, official-rule fixtures and explicit quantifier /
@@ -87,13 +92,3 @@ additional pipelines/languages and training, each with independent acceptance
 suites. Preserve existing inputs and expected outputs when fixing failures.
 New cases belong in new regression fixtures; the used holdout is now a regression
 gate and cannot serve as a fresh future holdout.
-
-## 2026-09-16 naming and commit organization
-
-Renamed the project to SpaRs and the Cargo package/import to `spars`. The on-disk
-checkout remains SpaCyRust so the active workspace path stays valid. Initial
-commits separate reference/export resources, native runtime, and release validation.
-
-Rename verification: all acceptance gates pass with `spars`, including the
-standalone consumer, 13 tests + 2 doc tests, package verification and byte-identical
-model re-export. Initial reference commit: aeef66e; native runtime: b4b8407.

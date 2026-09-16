@@ -1,11 +1,11 @@
 # Fidelity contract
 
-Primary oracle: official installed spaCy 3.8.14, Thinc 8.3.13, English medium
+Primary reference: official spaCy 3.8.14, Thinc 8.3.13, English medium
 model 3.8.0 on CPU. Python 3.12.5. The disabled senter is not part of this pipeline.
 
 Discrete annotations, feature IDs, token offsets, transition choices and span
-boundaries must agree exactly for every case. Inputs in fixtures/development.json
-were authored for this implementation and influence fixes. fixtures/holdout.json
+boundaries must agree exactly for every case. Inputs in [development.json](../fixtures/development.json)
+were authored for this implementation and influence fixes. [holdout.json](../fixtures/holdout.json)
 was frozen before the first comparison and is not used to select rules or weights.
 New failures go into a separate regression corpus; expected outputs are never
 edited to accommodate Rust output.

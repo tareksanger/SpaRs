@@ -39,5 +39,6 @@ languages, matching, mutable docs, serialization and training remain substantial
 work and must receive their own acceptance suites.
 
 Declared English suite: 44 documents / 1,035 tokens; exact discrete outputs.
-All local release gates pass; remote CI is configured but has not run. See
-PROGRESS.md and ../reports/verification.json for exact commands and boundaries.
+The recorded acceptance run passes all verification gates. See
+[implementation status](PROGRESS.md) and the
+[verification report](../reports/verification.json) for commands and boundaries.

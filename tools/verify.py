@@ -21,6 +21,6 @@ with tempfile.TemporaryDirectory(prefix='native-spacy-export-') as tmp:
             assert digest(p)==digest(Path(tmp)/p.name),f'non-reproducible export: {p.name}'
             digests[p.name]=digest(p)
 manifest=json.loads(Path('assets/en_core_web_md-3.8.0/manifest.json').read_text())
-report={'platform':platform.platform(),'machine':platform.machine(),'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),'python':platform.python_version(),'reference_versions':manifest['versions'],'model':manifest['model']+' '+manifest['model_version'],'commands':results,'reexport_sha256':digests,'fixture_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path('fixtures').glob('*.json'))},'note':'Validation environment, not a performance benchmark. CI workflow defined; remote CI has not been run.'}
+report={'platform':platform.platform(),'machine':platform.machine(),'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),'python':platform.python_version(),'reference_versions':manifest['versions'],'model':manifest['model']+' '+manifest['model_version'],'commands':results,'reexport_sha256':digests,'fixture_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path('fixtures').glob('*.json'))},'note':'Local validation environment, not a performance benchmark.'}
 Path('reports/verification.json').write_text(json.dumps(report,indent=2))
 print('PASS byte-identical official re-export')

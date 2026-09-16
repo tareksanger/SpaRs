@@ -8,7 +8,7 @@ source distributed in their official Python wheels. Copyright notices and full
 MIT texts are retained in licenses/spacy-MIT.txt and licenses/thinc-MIT.txt.
 reference/source-lock.json records source hashes verified against wheel RECORD.
 Source repositories: https://github.com/explosion/spaCy and
-https://github.com/explosion/thinc. No original source was recovered from WASM.
+https://github.com/explosion/thinc.
 
 Relevant translations: tokenizer.pyx; strings.pyx; lang/lex_attrs.py;
 lang/en/lex_attrs.py and lemmatizer.py and syntax_iterators.py;
