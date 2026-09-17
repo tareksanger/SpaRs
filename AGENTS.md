@@ -21,6 +21,14 @@ Write repository documentation for users and contributors who have not read any 
 - Use repository-relative links and portable commands. Do not assume readers know a URL, path, or artifact mentioned in a conversation.
 - When changing behavior, reconcile the README, compatibility inventory, model format, and validation documentation where relevant. Do not rewrite license notices or remove provenance to simplify prose.
 
+## Quality reviews
+
+Follow `docs/QUALITY.md` for every behavior change. Add a failing reference or invariant test before the fix, run focused checks and the full acceptance suite, and add an executed developer example. Keep fixture inputs and expected outputs frozen; review checksum changes explicitly.
+
+Delegate independent review of substantial behavior changes to the project agents `reference_review`, `test_review`, and `docs_review`, using `.codex/agents/*.toml`. Give each reviewer the changed files and a bounded question. Reviewers report findings; the main agent owns edits and test execution. If custom roles are unavailable, pass the matching instructions to a standard subagent. Wait for findings and resolve concrete issues before claiming verification. Documentation-only changes need the documentation review, not three redundant reviews.
+
+Write plain English and explain necessary technical terms. Guide examples must run from their Markdown source during `tools/check_docs.py`; compiling without running does not count as a tested example.
+
 ## Implementation and verification
 
 Keep changes small and focused. Prefer pure computation, immutable loaded models, and per-call state. Preserve exact text, whitespace, and distinct byte offsets, code-point offsets, and token indices. Unsupported configurations and unavailable annotations must remain explicit rather than being omitted or fabricated.

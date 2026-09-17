@@ -2,7 +2,7 @@
 
 Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. No Python, Node, WASM, subprocess, network client, or build-time model download exists in the runtime. The project is named **SpaRs**, with Cargo package and Rust import name `spars`.
 
-The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and static vectors. Local validation passes on 44 full-pipeline documents / 1,035 tokens, 4,057 tokenizer cases and 634 transition steps; all discrete outputs agree with the official reference. This is a bounded English inference milestone, **not a port of the entire spaCy library**. See [compatibility](docs/COMPATIBILITY.md), [progress](docs/PROGRESS.md), and [validation](docs/VALIDATION.md).
+The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and static vectors. Local validation passes on 190 full-pipeline documents / 7,031 tokens, 4,057 tokenizer cases and 634 transition steps; all discrete outputs agree with the official reference. This is a bounded English inference milestone, **not a port of the entire spaCy library**. Start with the [developer guide](docs/DEVELOPMENT.md) for tested examples and the [quality process](docs/QUALITY.md) for contribution checks. See [compatibility](docs/COMPATIBILITY.md), [progress](docs/PROGRESS.md), and [validation](docs/VALIDATION.md).
 
 ## Use from Rust
 
@@ -13,19 +13,28 @@ Use a local checkout as a Cargo path dependency:
 spars = { path = "/path/to/SpaRs" }
 ```
 
-```rust,no_run
+```rust
 use spars::{Model, TokenIndex};
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
-let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
-let doc = nlp.process("Alice works at Microsoft in New York.")?;
-for (i, token) in doc.tokens().iter().enumerate() {
-    println!("{} {:?} {:?}", doc.token_text(TokenIndex(i))?, token.lemma, token.dep);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+    let doc = nlp.process("Alice works at Microsoft in New York.")?;
+    for (i, token) in doc.tokens().iter().enumerate() {
+        println!(
+            "{} {:?} {:?}",
+            doc.token_text(TokenIndex(i))?,
+            token.lemma,
+            token.dep
+        );
+    }
+    for entity in doc.entities().unwrap() {
+        println!(
+            "{}: {}",
+            entity.label,
+            doc.span(entity.start, entity.end)?.text()
+        );
+    }
+    Ok(())
 }
-for entity in doc.entities().unwrap() {
-    println!("{}: {}", entity.label, doc.span(entity.start, entity.end)?.text());
-}
-# Ok(())
-# }
 ```
 
 `Model` is immutable, reusable, `Send + Sync`; each call owns its processing state. `pipe` streams documents sequentially with independent per-document computation. `process_until(text, Stage::Tagger)` runs an ordered prefix; missing annotations remain `None`. The API does not silently skip unsupported components.
@@ -76,6 +85,6 @@ Model-dependent tests are explicitly marked ignored for ordinary dependency buil
 
 ## Limits
 
-Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Scalar numerical kernels prioritize fidelity. No performance or accuracy claims are made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
+Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Scalar numerical kernels prioritize fidelity. See [performance](docs/PERFORMANCE.md) for measured loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
 
 MIT project license; translated upstream code and model resources retain their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `licenses/`.

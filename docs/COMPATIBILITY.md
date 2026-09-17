@@ -35,4 +35,4 @@ Implemented means native code exists; only the evidence column establishes its v
 
 Completing one pipeline is not completing spaCy. Additional architectures, languages, matching, mutable docs, serialization and training remain substantial work and must receive their own acceptance suites.
 
-Declared English suite: 44 documents / 1,035 tokens; exact discrete outputs. The recorded acceptance run passes all verification gates. See [implementation status](PROGRESS.md) and the [verification report](../reports/verification.json) for commands and boundaries.
+Declared English suite: 190 documents / 7,031 tokens; exact discrete outputs. The recorded acceptance run passes all verification gates. See [implementation status](PROGRESS.md) and the [verification report](../reports/verification-expanded.json) for commands and boundaries.

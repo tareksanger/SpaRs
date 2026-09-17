@@ -2,7 +2,12 @@ name: native-fidelity
 on: [push, pull_request]
 jobs:
   reference-and-rust:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -13,17 +18,14 @@ jobs:
       - run: uv pip sync --python .venv/bin/python tools/reference-requirements.lock
       - run: .venv/bin/python tools/acquire.py
       - run: .venv/bin/python tools/export.py
-      - run: cargo fmt --check
-      - run: cargo fmt --manifest-path consumer/Cargo.toml --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - name: Execute every model-dependent test (missing assets fail)
-        run: cargo test --release -- --include-ignored
-      - run: cargo build --release --manifest-path consumer/Cargo.toml
-      - name: Native consumer without interpreters on PATH
-        run: env -i PATH=/nonexistent consumer/target/release/native-consumer-check "$PWD/assets/en_core_web_md-3.8.0"
-      - run: cargo package --allow-dirty --offline
+      - run: cargo fetch --locked
+      - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
+      - name: Run the same acceptance checks as local development
+        run: .venv/bin/python tools/verify.py --report reports/verification-ci.json
+      - name: Record performance separately from fidelity
+        run: .venv/bin/python tools/benchmark.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: fidelity-reports
+          name: fidelity-reports-${{ matrix.os }}
           path: reports/
