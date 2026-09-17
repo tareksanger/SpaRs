@@ -1,0 +1,496 @@
+{
+  "version": 1,
+  "provenance": "Original project-authored synthetic inputs, MIT license. Frozen before the first native comparison. Domain coverage is illustrative, not a sampled real-world distribution.",
+  "cases": [
+    {
+      "id": "news-01",
+      "category": "news",
+      "text": "The council approved the bridge after residents asked for a safer crossing."
+    },
+    {
+      "id": "news-02",
+      "category": "news",
+      "text": "A reporter who arrived before dawn found the station closed."
+    },
+    {
+      "id": "news-03",
+      "category": "news",
+      "text": "Officials said the storm had damaged three schools, but nobody was injured."
+    },
+    {
+      "id": "news-04",
+      "category": "news",
+      "text": "The mayor denied that the committee had rejected the proposal."
+    },
+    {
+      "id": "news-05",
+      "category": "news",
+      "text": "By Friday, engineers expect both lanes to reopen."
+    },
+    {
+      "id": "news-06",
+      "category": "news",
+      "text": "The company, founded in Bristol in 1982, will move its headquarters to Leeds."
+    },
+    {
+      "id": "news-07",
+      "category": "news",
+      "text": "Neither the minister nor her advisers would discuss the leaked report."
+    },
+    {
+      "id": "news-08",
+      "category": "news",
+      "text": "Several witnesses described a blue van leaving the square."
+    },
+    {
+      "id": "science-01",
+      "category": "science",
+      "text": "The samples were heated to 37°C and then cooled for twenty minutes."
+    },
+    {
+      "id": "science-02",
+      "category": "science",
+      "text": "Although the signal was weak, the detector recorded a consistent peak."
+    },
+    {
+      "id": "science-03",
+      "category": "science",
+      "text": "Researchers compared mice that received the treatment with mice that did not."
+    },
+    {
+      "id": "science-04",
+      "category": "science",
+      "text": "An increase in pressure does not necessarily imply an increase in temperature."
+    },
+    {
+      "id": "science-05",
+      "category": "science",
+      "text": "The protein binds to DNA only when calcium is present."
+    },
+    {
+      "id": "science-06",
+      "category": "science",
+      "text": "At pH 7.4, the solution remained clear; at pH 4.0, it turned cloudy."
+    },
+    {
+      "id": "science-07",
+      "category": "science",
+      "text": "Figure 2 shows the difference between predicted and observed values."
+    },
+    {
+      "id": "science-08",
+      "category": "science",
+      "text": "We cannot rule out the possibility that contamination affected the result."
+    },
+    {
+      "id": "commerce-01",
+      "category": "commerce",
+      "text": "Please refund order #AB-2048; the parcel arrived without its charger."
+    },
+    {
+      "id": "commerce-02",
+      "category": "commerce",
+      "text": "Our invoice lists £1,250.00, including VAT, payable by 30 September."
+    },
+    {
+      "id": "commerce-03",
+      "category": "commerce",
+      "text": "If you renew before Tuesday, the annual fee will remain unchanged."
+    },
+    {
+      "id": "commerce-04",
+      "category": "commerce",
+      "text": "The supplier has shipped neither the replacement screen nor the cable."
+    },
+    {
+      "id": "commerce-05",
+      "category": "commerce",
+      "text": "Two of the five boxes were empty when the warehouse received them."
+    },
+    {
+      "id": "commerce-06",
+      "category": "commerce",
+      "text": "Acme Ltd. bought a 12.5% stake in Northstar Holdings for $4 million."
+    },
+    {
+      "id": "commerce-07",
+      "category": "commerce",
+      "text": "The warranty covers parts but excludes accidental damage."
+    },
+    {
+      "id": "commerce-08",
+      "category": "commerce",
+      "text": "Sales rose in Canada while falling in the United States."
+    },
+    {
+      "id": "conversation-01",
+      "category": "conversation",
+      "text": "I would've called you, but my phone wouldn't charge."
+    },
+    {
+      "id": "conversation-02",
+      "category": "conversation",
+      "text": "You're telling me she hasn't even opened it yet?"
+    },
+    {
+      "id": "conversation-03",
+      "category": "conversation",
+      "text": "Well... I thought we'd already agreed on that!"
+    },
+    {
+      "id": "conversation-04",
+      "category": "conversation",
+      "text": "No, thanks. I've got enough, honestly."
+    },
+    {
+      "id": "conversation-05",
+      "category": "conversation",
+      "text": "Who's going to tell them that we're not coming?"
+    },
+    {
+      "id": "conversation-06",
+      "category": "conversation",
+      "text": "He said, \"I'll be there,\" and then he wasn't."
+    },
+    {
+      "id": "conversation-07",
+      "category": "conversation",
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "id": "conversation-08",
+      "category": "conversation",
+      "text": "Let's grab lunch after you've finished, shall we?"
+    },
+    {
+      "id": "instructions-01",
+      "category": "instructions",
+      "text": "Turn the handle clockwise until the indicator stops flashing."
+    },
+    {
+      "id": "instructions-02",
+      "category": "instructions",
+      "text": "Do not disconnect the cable while the update is running."
+    },
+    {
+      "id": "instructions-03",
+      "category": "instructions",
+      "text": "Before opening the lid, check that the motor has stopped."
+    },
+    {
+      "id": "instructions-04",
+      "category": "instructions",
+      "text": "Select Settings > Privacy, then clear the saved permissions."
+    },
+    {
+      "id": "instructions-05",
+      "category": "instructions",
+      "text": "Mix the flour and salt; add water a little at a time."
+    },
+    {
+      "id": "instructions-06",
+      "category": "instructions",
+      "text": "For each row, enter a name, an address, and a contact number."
+    },
+    {
+      "id": "instructions-07",
+      "category": "instructions",
+      "text": "Leave the field blank if the date is unknown."
+    },
+    {
+      "id": "instructions-08",
+      "category": "instructions",
+      "text": "Restart the service only after all pending requests have completed."
+    },
+    {
+      "id": "narrative-01",
+      "category": "narrative",
+      "text": "Under the old oak stood a woman whose face he almost recognized."
+    },
+    {
+      "id": "narrative-02",
+      "category": "narrative",
+      "text": "The letter that Nora had hidden beneath the floorboards was gone."
+    },
+    {
+      "id": "narrative-03",
+      "category": "narrative",
+      "text": "Only when the lights went out did he notice the open window."
+    },
+    {
+      "id": "narrative-04",
+      "category": "narrative",
+      "text": "She handed the child a coat, which he promptly dropped into the mud."
+    },
+    {
+      "id": "narrative-05",
+      "category": "narrative",
+      "text": "There was nothing in the room except a chair and a broken clock."
+    },
+    {
+      "id": "narrative-06",
+      "category": "narrative",
+      "text": "Had they left earlier, they might have reached the village before dark."
+    },
+    {
+      "id": "narrative-07",
+      "category": "narrative",
+      "text": "What frightened him most was how quietly the door had opened."
+    },
+    {
+      "id": "narrative-08",
+      "category": "narrative",
+      "text": "The dog followed the boy who followed the woman into the garden."
+    },
+    {
+      "id": "questions-01",
+      "category": "questions",
+      "text": "Which book did you say the librarian thought I should read?"
+    },
+    {
+      "id": "questions-02",
+      "category": "questions",
+      "text": "Who does Anna believe sent the package?"
+    },
+    {
+      "id": "questions-03",
+      "category": "questions",
+      "text": "How many people who applied last year have applied again?"
+    },
+    {
+      "id": "questions-04",
+      "category": "questions",
+      "text": "Is the painting above the fireplace the one your aunt restored?"
+    },
+    {
+      "id": "questions-05",
+      "category": "questions",
+      "text": "Why would anyone buy a ticket for a train that has already left?"
+    },
+    {
+      "id": "questions-06",
+      "category": "questions",
+      "text": "To whom should the completed form be sent?"
+    },
+    {
+      "id": "questions-07",
+      "category": "questions",
+      "text": "What, if anything, has changed since the last meeting?"
+    },
+    {
+      "id": "questions-08",
+      "category": "questions",
+      "text": "Didn't the manager ask whether we could finish by noon?"
+    },
+    {
+      "id": "coordination-01",
+      "category": "coordination",
+      "text": "Alice and Ben washed and dried the dishes."
+    },
+    {
+      "id": "coordination-02",
+      "category": "coordination",
+      "text": "The teacher praised the students and thanked their parents."
+    },
+    {
+      "id": "coordination-03",
+      "category": "coordination",
+      "text": "Some guests wanted tea, others coffee, and one asked for water."
+    },
+    {
+      "id": "coordination-04",
+      "category": "coordination",
+      "text": "The report was detailed but neither clear nor convincing."
+    },
+    {
+      "id": "coordination-05",
+      "category": "coordination",
+      "text": "She bought apples, pears, and peaches, all of which were ripe."
+    },
+    {
+      "id": "coordination-06",
+      "category": "coordination",
+      "text": "Not only the owner but also the tenants signed the agreement."
+    },
+    {
+      "id": "coordination-07",
+      "category": "coordination",
+      "text": "The red and white flags hung above the east and west entrances."
+    },
+    {
+      "id": "coordination-08",
+      "category": "coordination",
+      "text": "He promised to call, to write, and, if possible, to visit."
+    },
+    {
+      "id": "negation-01",
+      "category": "negation",
+      "text": "It is not true that nobody saw the error."
+    },
+    {
+      "id": "negation-02",
+      "category": "negation",
+      "text": "I don't think she ever said he was guilty."
+    },
+    {
+      "id": "negation-03",
+      "category": "negation",
+      "text": "Unless the evidence changes, the decision will not be reversed."
+    },
+    {
+      "id": "negation-04",
+      "category": "negation",
+      "text": "The files cannot be deleted without the owner's permission."
+    },
+    {
+      "id": "negation-05",
+      "category": "negation",
+      "text": "Few people believed that the plan would succeed."
+    },
+    {
+      "id": "negation-06",
+      "category": "negation",
+      "text": "He rarely leaves before everyone else has gone home."
+    },
+    {
+      "id": "negation-07",
+      "category": "negation",
+      "text": "There is no reason to assume that every missing value is zero."
+    },
+    {
+      "id": "negation-08",
+      "category": "negation",
+      "text": "Neither claim has been independently verified."
+    },
+    {
+      "id": "web-01",
+      "category": "web",
+      "text": "Read https://example.org/docs?q=rust&lang=en#intro before proceeding."
+    },
+    {
+      "id": "web-02",
+      "category": "web",
+      "text": "Send the log to first.last+debug@example.co.uk, not support@example.org."
+    },
+    {
+      "id": "web-03",
+      "category": "web",
+      "text": "Version 2.0.1 fixes issue #42 in src/main.rs."
+    },
+    {
+      "id": "web-04",
+      "category": "web",
+      "text": "The server returned HTTP 503 at 09:41:22 UTC."
+    },
+    {
+      "id": "web-05",
+      "category": "web",
+      "text": "@alex: this is awesome 😂 #RustLang"
+    },
+    {
+      "id": "web-06",
+      "category": "web",
+      "text": "Use `cargo test` after editing the config.toml file."
+    },
+    {
+      "id": "web-07",
+      "category": "web",
+      "text": "The path /var/tmp/report.json contains 3,072 bytes."
+    },
+    {
+      "id": "web-08",
+      "category": "web",
+      "text": "Our website (https://example.com/a/b) is available again!"
+    },
+    {
+      "id": "unicode-01",
+      "category": "unicode",
+      "text": "Zoë met José at the café near Zürich."
+    },
+    {
+      "id": "unicode-02",
+      "category": "unicode",
+      "text": "The sign read “Welcome”—in English, العربية, and 日本語."
+    },
+    {
+      "id": "unicode-03",
+      "category": "unicode",
+      "text": "👩🏽‍💻 and 👨‍👩‍👧‍👦 are sequences of several Unicode characters."
+    },
+    {
+      "id": "unicode-04",
+      "category": "unicode",
+      "text": "Café and Café look similar but use different code points."
+    },
+    {
+      "id": "unicode-05",
+      "category": "unicode",
+      "text": "The measurements were ½ inch, ¾ inch, and 2½ inches."
+    },
+    {
+      "id": "unicode-06",
+      "category": "unicode",
+      "text": "İstanbul, IĞDIR, and Σίσυφος test case conversion."
+    },
+    {
+      "id": "unicode-07",
+      "category": "unicode",
+      "text": "A nonbreaking space differs from a thin space."
+    },
+    {
+      "id": "unicode-08",
+      "category": "unicode",
+      "text": "Emoji 😀, flags 🇨🇦, and symbols ©™ occur in the same sentence."
+    },
+    {
+      "id": "layout-01",
+      "category": "layout",
+      "text": ""
+    },
+    {
+      "id": "layout-02",
+      "category": "layout",
+      "text": " "
+    },
+    {
+      "id": "layout-03",
+      "category": "layout",
+      "text": "\t\n\r\n"
+    },
+    {
+      "id": "layout-04",
+      "category": "layout",
+      "text": "  Leading and trailing spaces.  "
+    },
+    {
+      "id": "layout-05",
+      "category": "layout",
+      "text": "First line.\n\nSecond paragraph.\n"
+    },
+    {
+      "id": "layout-06",
+      "category": "layout",
+      "text": "Name\tValue\r\nalpha\t1\r\nbeta\t2"
+    },
+    {
+      "id": "layout-07",
+      "category": "layout",
+      "text": "A\u0000B \u001c C ​D."
+    },
+    {
+      "id": "layout-08",
+      "category": "layout",
+      "text": "one   two\tthree\nfour\r\nfive"
+    },
+    {
+      "id": "long-64",
+      "category": "long",
+      "text": "The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. "
+    },
+    {
+      "id": "long-256",
+      "category": "long",
+      "text": "The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. The scientist who reviewed the results asked whether the experiment could be repeated. "
+    }
+  ]
+}

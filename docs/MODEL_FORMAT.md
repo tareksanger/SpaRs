@@ -1,12 +1,14 @@
 # Native model format v1
 
+The manifest is a JSON file that describes the model. Tensors are numbered arrays containing its learned weights. This format lets a Rust application load the exported model without Python.
+
 A model directory contains `manifest.json`, `weights.safetensors`, model LICENSE, LICENSES_SOURCES, upstream source/license notices and source-lock.json. All numeric parameters and static vectors are F32, row-major, in SafeTensors. The manifest's SHA256 authenticates the weights against that manifest (it is not a digital signature for an untrusted manifest). Acquisition separately pins the official wheel SHA256.
 
 Required top-level fields:
 
 - format_version=1; model=en_core_web_md; model_version=3.8.0; versions with spaCy 3.8.14 and Thinc 8.3.13; official source URL, wheel digest, metadata/license, original config text and ordered pipeline.
 - tensors: map of tensor keys to {shape: positive dimension array, dtype: F32}. SafeTensors validates offsets/lengths; the loader checks actual shapes, dtypes, finite values and operation-specific cross-dimension constraints.
-- tokenizer: prefix/suffix/infix/url/token_match; rules map source strings to ordered ORTH/NORM entries. python_patterns retain original Python regexes. regex_dialect identifies explicit Python-Unicode shorthand translation.
+- tokenizer: prefix/suffix/infix/url/token_match; rules map source strings to ordered ORTH/NORM entries. python_patterns retain original Python regexes. faster_heuristics is true for the supported model; older v1 exports without this field use true. Other values are unsupported. The second exception pass matches token sequences produced without special-case rules. regex_dialect identifies explicit Python-Unicode shorthand translation.
 - lexical: pinned Unicode version, sorted inclusive property ranges, lowercase mapping, stop words, number words, punctuation sets, TLDs, email regex.
 - symbols: reserved spaCy IDs. norms: hashed lexical keys to string replacements, with model lookups overriding BASE_NORMS. IDs use JSON integer values or decimal string map keys; they must not be rounded through JavaScript Number.
 - tok2vec: width, ordered attrs, hash table references and seeds, static projection, mix maxout/normalization parameters, windows, encoder layers and padding count.

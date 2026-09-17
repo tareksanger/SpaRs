@@ -1,0 +1,67 @@
+{
+  "cases": 98,
+  "category_counts": {
+    "commerce": {
+      "passed": 8,
+      "total": 8
+    },
+    "conversation": {
+      "passed": 8,
+      "total": 8
+    },
+    "coordination": {
+      "passed": 8,
+      "total": 8
+    },
+    "instructions": {
+      "passed": 8,
+      "total": 8
+    },
+    "layout": {
+      "passed": 8,
+      "total": 8
+    },
+    "long": {
+      "passed": 2,
+      "total": 2
+    },
+    "narrative": {
+      "passed": 8,
+      "total": 8
+    },
+    "negation": {
+      "passed": 8,
+      "total": 8
+    },
+    "news": {
+      "passed": 8,
+      "total": 8
+    },
+    "questions": {
+      "passed": 8,
+      "total": 8
+    },
+    "science": {
+      "passed": 8,
+      "total": 8
+    },
+    "unicode": {
+      "passed": 8,
+      "total": 8
+    },
+    "web": {
+      "passed": 8,
+      "total": 8
+    }
+  },
+  "command": "cargo test --release --test evaluation -- --include-ignored",
+  "differences": [],
+  "input_sha256": "18dc7638b786f7b770bc0e13104d9349d0b1d7ff9e78d48a9a234cb5a178c1fa",
+  "max_vector_absolute_error": 0.0,
+  "model": "en_core_web_md 3.8.0",
+  "tokens": 5570,
+  "versions": {
+    "spacy": "3.8.14",
+    "thinc": "8.3.13"
+  }
+}

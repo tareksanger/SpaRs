@@ -81,7 +81,7 @@ def export(out):
         'wheel_sha256':digest('assets/en_core_web_md-3.8.0-py3-none-any.whl'),
         'weights_sha256':digest(out/'weights.safetensors'),
         'tensors':{k:{'shape':list(v.shape),'dtype':'F32'} for k,v in tensors.items()},
-        'tokenizer':{**native_patterns,'python_patterns':original_patterns,'regex_dialect':'fancy-regex-explicit-python-unicode-v1','rules':rules},
+        'tokenizer':{'faster_heuristics':tokenizer.faster_heuristics,**native_patterns,'python_patterns':original_patterns,'regex_dialect':'fancy-regex-explicit-python-unicode-v1','rules':rules},
         'norms':{**{str(hash_string(k)):v for k,v in BASE_NORMS.items()}, **{str(k):v for k,v in nlp.vocab.lookups.get_table('lexeme_norm').items()}},
         'lexical':lexical_data,'symbols':IDS,'tok2vec':shared,'tagger':tag,**transitions,
         'attribute_rules':nlp.get_pipe('attribute_ruler').patterns,'lemmas':lemmas,

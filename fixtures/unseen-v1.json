@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "provenance": "Original project-authored synthetic inputs, MIT. Frozen after the tokenizer correction, before any native comparison. Used once for a post-fix unseen-input check; future use is regression testing.",
+  "cases": [
+    {
+      "id": "unseen-01",
+      "category": "unseen",
+      "text": "The orchestra rehearsed in a hall whose roof had recently been repaired."
+    },
+    {
+      "id": "unseen-02",
+      "category": "unseen",
+      "text": "A volunteer asked where the missing bicycles had been stored."
+    },
+    {
+      "id": "unseen-03",
+      "category": "unseen",
+      "text": "Despite the delay, every passenger reached the island before sunset."
+    },
+    {
+      "id": "unseen-04",
+      "category": "unseen",
+      "text": "Would the recipe still work if we replaced butter with olive oil?"
+    },
+    {
+      "id": "unseen-05",
+      "category": "unseen",
+      "text": "The astronomer identified two faint objects beyond the bright star."
+    },
+    {
+      "id": "unseen-06",
+      "category": "unseen",
+      "text": "Someone left a note saying that the parcel belonged to the upstairs tenant."
+    },
+    {
+      "id": "unseen-07",
+      "category": "unseen",
+      "text": "The youngest player scored twice, although her team eventually lost."
+    },
+    {
+      "id": "unseen-08",
+      "category": "unseen",
+      "text": "Please check the serial number before returning the device."
+    },
+    {
+      "id": "unseen-09",
+      "category": "unseen",
+      "text": "After searching the attic, we found neither the map nor the photograph."
+    },
+    {
+      "id": "unseen-10",
+      "category": "unseen",
+      "text": "The judge asked whether the witness remembered signing the statement."
+    },
+    {
+      "id": "unseen-11",
+      "category": "unseen",
+      "text": "I wish I'd known how much time the repairs would take."
+    },
+    {
+      "id": "unseen-12",
+      "category": "unseen",
+      "text": "Whoever finishes first should leave the key beneath the flowerpot."
+    },
+    {
+      "id": "unseen-13",
+      "category": "unseen",
+      "text": "The train from Glasgow, which was due at six, arrived at seven."
+    },
+    {
+      "id": "unseen-14",
+      "category": "unseen",
+      "text": "They offered to paint the walls but refused to replace the broken tiles."
+    },
+    {
+      "id": "unseen-15",
+      "category": "unseen",
+      "text": "It wasn't until December that the last application was processed."
+    },
+    {
+      "id": "unseen-16",
+      "category": "unseen",
+      "text": "The café's owner recommended a pastry filled with almonds and honey."
+    },
+    {
+      "id": "unseen-17",
+      "category": "unseen",
+      "text": "Can you explain why this row is empty while that one contains two values?"
+    },
+    {
+      "id": "unseen-18",
+      "category": "unseen",
+      "text": "One child wore a purple scarf; another carried a yellow umbrella."
+    },
+    {
+      "id": "unseen-19",
+      "category": "unseen",
+      "text": "The archive contains letters, postcards, and several unsigned sketches."
+    },
+    {
+      "id": "unseen-20",
+      "category": "unseen",
+      "text": "We watched the birds fly over the lake and disappear behind the trees."
+    },
+    {
+      "id": "unseen-21",
+      "category": "unseen",
+      "text": "At 8:15 a.m., the technician recorded a reading of 0.003 volts."
+    },
+    {
+      "id": "unseen-22",
+      "category": "unseen",
+      "text": "The message said “See you soon!” and ended with a smiling face 🙂."
+    },
+    {
+      "id": "unseen-23",
+      "category": "unseen",
+      "text": "The programmer emailed a patch to maintainer@example.net on Thursday."
+    },
+    {
+      "id": "unseen-24",
+      "category": "unseen",
+      "text": "A new footpath connects the school to the library across the river."
+    }
+  ]
+}

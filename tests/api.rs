@@ -66,6 +66,7 @@ fn malformed_models_are_errors() {
     std::fs::hard_link(root.join("weights.safetensors"), &weights).unwrap();
     let cases = [
         ("/format_version", serde_json::json!(99)),
+        ("/tokenizer/faster_heuristics", serde_json::json!(false)),
         ("/versions/spacy", serde_json::json!("0")),
         ("/pipeline", serde_json::json!(["transformer"])),
         ("/weights_sha256", serde_json::json!("bad")),

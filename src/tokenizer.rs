@@ -8,7 +8,7 @@ pub(crate) struct Tokenizer {
     infix: Regex,
     url: Regex,
     rules: HashMap<String, Vec<Value>>,
-    max_exception_bytes: usize,
+    matcher_patterns: HashMap<String, Vec<Vec<String>>>,
 }
 impl Tokenizer {
     pub(crate) fn url_match(&self, s: &str) -> Result<bool> {
@@ -23,34 +23,91 @@ impl Tokenizer {
                 crate::Error::Model(format!("missing tokenizer {k}"))
             })?)?)
         };
-        Ok(Self {
-            prefix: re("prefix")?,
-            suffix: re("suffix")?,
-            infix: re("infix")?,
+        if v.get("faster_heuristics").is_some_and(|flag| flag != true) {
+            return Err(crate::Error::Unsupported(
+                "tokenizer faster_heuristics must be true".into(),
+            ));
+        }
+        let prefix = re("prefix")?;
+        let suffix = re("suffix")?;
+        let infix = re("infix")?;
+        let rules: HashMap<String, Vec<Value>> = serde_json::from_value(v["rules"].clone())?;
+        let mut tokenizer = Self {
+            prefix,
+            suffix,
+            infix,
+            matcher_patterns: HashMap::new(),
             url: re("url")?,
-            rules: serde_json::from_value(v["rules"].clone())?,
-            max_exception_bytes: v["rules"]
-                .as_object()
-                .unwrap()
-                .keys()
-                .map(String::len)
-                .max()
-                .unwrap_or(0),
-        })
+            rules,
+        };
+        // spaCy builds phrase patterns with exception handling disabled.
+        // Matching the same text with different token boundaries is insufficient.
+        for word in tokenizer.rules.keys() {
+            let prefix_length = tokenizer
+                .prefix
+                .find(word)?
+                .map_or(0, |m| m.end() - m.start());
+            let suffix_length = tokenizer
+                .suffix
+                .find(word)?
+                .map_or(0, |m| m.end() - m.start());
+            if word.contains(' ')
+                || prefix_length > 0
+                || suffix_length > 0
+                || tokenizer.infix.is_match(word)?
+            {
+                let pattern: Vec<String> = tokenizer
+                    .split_whitespace(word, false)?
+                    .iter()
+                    .map(|(a, b, _)| word[*a..*b].to_owned())
+                    .collect();
+                if let Some(first) = pattern.first() {
+                    tokenizer
+                        .matcher_patterns
+                        .entry(first.clone())
+                        .or_default()
+                        .push(pattern);
+                }
+            }
+        }
+        Ok(tokenizer)
+    }
+    fn split_whitespace(
+        &self,
+        text: &str,
+        with_special_cases: bool,
+    ) -> Result<Vec<(usize, usize, Option<String>)>> {
+        let mut raw = vec![];
+        let mut start = 0;
+        let mut in_ws = text.chars().next().is_some_and(is_space);
+        for (i, c) in text.char_indices() {
+            if is_space(c) != in_ws {
+                if start < i {
+                    self.split(&text[start..i], start, &mut raw, with_special_cases)?;
+                }
+                start = if c == ' ' { i + 1 } else { i };
+                in_ws = !in_ws;
+            }
+        }
+        if start < text.len() {
+            self.split(&text[start..], start, &mut raw, with_special_cases)?;
+        }
+        Ok(raw)
     }
     fn split(
         &self,
         s: &str,
         offset: usize,
         out: &mut Vec<(usize, usize, Option<String>)>,
+        with_special_cases: bool,
     ) -> Result<()> {
         let mut start = 0;
         let mut end = s.len();
         let mut suffixes = vec![];
-        while start < end && !self.rules.contains_key(&s[start..end]) {
+        while start < end && !(with_special_cases && self.rules.contains_key(&s[start..end])) {
             let text = &s[start..end];
             let p = self.prefix.find(text)?.map_or(0, |m| m.end() - m.start());
-            if p > 0 && self.rules.contains_key(&text[p..]) {
+            if p > 0 && with_special_cases && self.rules.contains_key(&text[p..]) {
                 out.push((offset + start, offset + start + p, None));
                 start += p;
                 break;
@@ -59,7 +116,7 @@ impl Tokenizer {
                 .suffix
                 .find(&text[p..])?
                 .map_or(0, |m| m.end() - m.start());
-            if z > 0 && self.rules.contains_key(&text[..text.len() - z]) {
+            if z > 0 && with_special_cases && self.rules.contains_key(&text[..text.len() - z]) {
                 suffixes.push((offset + end - z, offset + end, None));
                 end -= z;
                 break;
@@ -78,7 +135,7 @@ impl Tokenizer {
         }
         if start < end {
             let text = &s[start..end];
-            if let Some(rule) = self.rules.get(text) {
+            if let Some(rule) = self.rules.get(text).filter(|_| with_special_cases) {
                 let mut at = offset + start;
                 for t in rule {
                     let len = t["ORTH"].as_str().unwrap().len();
@@ -116,30 +173,25 @@ pub(crate) fn is_space(c: char) -> bool {
 }
 impl Model {
     pub fn tokenize(&self, text: &str) -> Result<Doc> {
-        let mut raw = vec![];
-        let mut start = 0;
-        let mut in_ws = text.chars().next().is_some_and(is_space);
-        for (i, c) in text.char_indices() {
-            if is_space(c) != in_ws {
-                if start < i {
-                    self.tokenizer.split(&text[start..i], start, &mut raw)?
-                }
-                start = if c == ' ' { i + 1 } else { i };
-                in_ws = !in_ws
-            }
-        }
-        if start < text.len() {
-            self.tokenizer.split(&text[start..], start, &mut raw)?
-        }
-        // Apply multi-token exceptions after affix/infix segmentation, longest first.
+        let raw = self.tokenizer.split_whitespace(text, true)?;
         let mut matches = vec![];
-        for (i, (a, _, _)) in raw.iter().enumerate() {
-            for (j, (_, b, _)) in raw.iter().enumerate().skip(i) {
-                if *b - *a > self.tokenizer.max_exception_bytes {
-                    break;
-                }
-                if let Some(rule) = self.tokenizer.rules.get(&text[*a..*b]) {
-                    matches.push((j + 1 - i, i, j + 1, rule));
+        for (i, (a, b, _)) in raw.iter().enumerate() {
+            if let Some(patterns) = self.tokenizer.matcher_patterns.get(&text[*a..*b]) {
+                for pattern in patterns {
+                    let j = i + pattern.len();
+                    if j <= raw.len()
+                        && raw[i..j]
+                            .iter()
+                            .zip(pattern)
+                            .all(|((a, b, _), word)| &text[*a..*b] == word)
+                    {
+                        matches.push((
+                            pattern.len(),
+                            i,
+                            j,
+                            self.tokenizer.rules.get(&text[*a..raw[j - 1].1]),
+                        ));
+                    }
                 }
             }
         }
@@ -147,10 +199,13 @@ impl Model {
         let mut used = vec![false; raw.len()];
         let mut selected = HashMap::new();
         for (_, i, j, r) in matches {
-            if !used[i..j].iter().any(|x| *x) {
-                used[i..j].fill(true);
-                selected.insert(i, (j, r));
+            if !used[i] && !used[j - 1] {
+                if let Some(rule) = r {
+                    selected.insert(i, (j, rule));
+                }
             }
+            // Upstream also reserves tokens from rejected overlapping matches.
+            used[i..j].fill(true);
         }
         let mut replaced = vec![];
         let mut i = 0;

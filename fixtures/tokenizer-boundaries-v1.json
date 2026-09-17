@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "provenance": "Original project-authored regression inputs, MIT license. Contraction and infix cases were informed by a tokenizer mismatch found during evaluation-v1 review; these are development regressions, not an untouched holdout. Frozen before checking the token-sequence correction.",
+  "cases": [
+    {
+      "id": "boundary-01",
+      "category": "tokenizer-boundaries",
+      "text": "He's-word"
+    },
+    {
+      "id": "boundary-02",
+      "category": "tokenizer-boundaries",
+      "text": "word-He's"
+    },
+    {
+      "id": "boundary-03",
+      "category": "tokenizer-boundaries",
+      "text": "He’s-word"
+    },
+    {
+      "id": "boundary-04",
+      "category": "tokenizer-boundaries",
+      "text": "word-He’s"
+    },
+    {
+      "id": "boundary-05",
+      "category": "tokenizer-boundaries",
+      "text": "How's/word"
+    },
+    {
+      "id": "boundary-06",
+      "category": "tokenizer-boundaries",
+      "text": "word/How's"
+    },
+    {
+      "id": "boundary-07",
+      "category": "tokenizer-boundaries",
+      "text": "How’s/word"
+    },
+    {
+      "id": "boundary-08",
+      "category": "tokenizer-boundaries",
+      "text": "word/How’s"
+    },
+    {
+      "id": "boundary-09",
+      "category": "tokenizer-boundaries",
+      "text": "He's—word"
+    },
+    {
+      "id": "boundary-10",
+      "category": "tokenizer-boundaries",
+      "text": "word—He's"
+    },
+    {
+      "id": "boundary-11",
+      "category": "tokenizer-boundaries",
+      "text": "He’s—word"
+    },
+    {
+      "id": "boundary-12",
+      "category": "tokenizer-boundaries",
+      "text": "word—He’s"
+    },
+    {
+      "id": "boundary-13",
+      "category": "tokenizer-boundaries",
+      "text": "can't-word"
+    },
+    {
+      "id": "boundary-14",
+      "category": "tokenizer-boundaries",
+      "text": "word-can't"
+    },
+    {
+      "id": "boundary-15",
+      "category": "tokenizer-boundaries",
+      "text": "can’t/word"
+    },
+    {
+      "id": "boundary-16",
+      "category": "tokenizer-boundaries",
+      "text": "word/can’t"
+    },
+    {
+      "id": "boundary-17",
+      "category": "tokenizer-boundaries",
+      "text": "(He's-word)"
+    },
+    {
+      "id": "boundary-18",
+      "category": "tokenizer-boundaries",
+      "text": "(How’s/word)"
+    },
+    {
+      "id": "boundary-19",
+      "category": "tokenizer-boundaries",
+      "text": "He's ready, and she’s waiting."
+    },
+    {
+      "id": "boundary-20",
+      "category": "tokenizer-boundaries",
+      "text": "I can't go; we won’t leave."
+    },
+    {
+      "id": "boundary-21",
+      "category": "tokenizer-boundaries",
+      "text": "He said: \"He's ready.\""
+    },
+    {
+      "id": "boundary-22",
+      "category": "tokenizer-boundaries",
+      "text": "We met at 3 p.m. in the U.K."
+    },
+    {
+      "id": "boundary-23",
+      "category": "tokenizer-boundaries",
+      "text": "He's-word\tword-He’s\nHow's/word"
+    },
+    {
+      "id": "boundary-24",
+      "category": "tokenizer-boundaries",
+      "text": "word-He's-word/How’s"
+    }
+  ]
+}

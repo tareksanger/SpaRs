@@ -1,0 +1,2895 @@
+{
+  "cases": 98,
+  "category_counts": {
+    "commerce": {
+      "passed": 8,
+      "total": 8
+    },
+    "conversation": {
+      "passed": 7,
+      "total": 8
+    },
+    "coordination": {
+      "passed": 8,
+      "total": 8
+    },
+    "instructions": {
+      "passed": 8,
+      "total": 8
+    },
+    "layout": {
+      "passed": 8,
+      "total": 8
+    },
+    "long": {
+      "passed": 2,
+      "total": 2
+    },
+    "narrative": {
+      "passed": 8,
+      "total": 8
+    },
+    "negation": {
+      "passed": 8,
+      "total": 8
+    },
+    "news": {
+      "passed": 8,
+      "total": 8
+    },
+    "questions": {
+      "passed": 8,
+      "total": 8
+    },
+    "science": {
+      "passed": 8,
+      "total": 8
+    },
+    "unicode": {
+      "passed": 8,
+      "total": 8
+    },
+    "web": {
+      "passed": 8,
+      "total": 8
+    }
+  },
+  "command": "cargo test --release --test evaluation -- --include-ignored",
+  "differences": [
+    {
+      "actual": [
+        {
+          "dep": "intj",
+          "end": 4,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 0,
+          "lemma": "wait",
+          "morphology": "VerbForm=Inf",
+          "norm": "wait",
+          "pos": "VERB",
+          "sentence_start": true,
+          "start": 0,
+          "tag": "VB",
+          "whitespace": false
+        },
+        {
+          "dep": "punct",
+          "end": 7,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 4,
+          "lemma": "—",
+          "morphology": "",
+          "norm": "-",
+          "pos": "PUNCT",
+          "sentence_start": false,
+          "start": 4,
+          "tag": ":",
+          "whitespace": false
+        },
+        {
+          "dep": "aux",
+          "end": 10,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 5,
+          "lemma": "do",
+          "morphology": "Tense=Past|VerbForm=Fin",
+          "norm": "do",
+          "pos": "AUX",
+          "sentence_start": false,
+          "start": 7,
+          "tag": "VBD",
+          "whitespace": false
+        },
+        {
+          "dep": "neg",
+          "end": 13,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 8,
+          "lemma": "not",
+          "morphology": "Polarity=Neg",
+          "norm": "not",
+          "pos": "PART",
+          "sentence_start": false,
+          "start": 10,
+          "tag": "RB",
+          "whitespace": true
+        },
+        {
+          "dep": "nsubj",
+          "end": 17,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 12,
+          "lemma": "you",
+          "morphology": "Case=Nom|Person=2|PronType=Prs",
+          "norm": "you",
+          "pos": "PRON",
+          "sentence_start": false,
+          "start": 14,
+          "tag": "PRP",
+          "whitespace": true
+        },
+        {
+          "dep": "ROOT",
+          "end": 21,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 16,
+          "lemma": "say",
+          "morphology": "VerbForm=Inf",
+          "norm": "say",
+          "pos": "VERB",
+          "sentence_start": false,
+          "start": 18,
+          "tag": "VB",
+          "whitespace": true
+        },
+        {
+          "dep": "poss",
+          "end": 26,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 7,
+          "idx": 20,
+          "lemma": "your",
+          "morphology": "Person=2|Poss=Yes|PronType=Prs",
+          "norm": "your",
+          "pos": "PRON",
+          "sentence_start": false,
+          "start": 22,
+          "tag": "PRP$",
+          "whitespace": true
+        },
+        {
+          "dep": "nsubj",
+          "end": 33,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 8,
+          "idx": 25,
+          "lemma": "sister",
+          "morphology": "Number=Sing",
+          "norm": "sister",
+          "pos": "NOUN",
+          "sentence_start": false,
+          "start": 27,
+          "tag": "NN",
+          "whitespace": true
+        },
+        {
+          "dep": "ccomp",
+          "end": 39,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 32,
+          "lemma": "live",
+          "morphology": "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin",
+          "norm": "lives",
+          "pos": "VERB",
+          "sentence_start": false,
+          "start": 34,
+          "tag": "VBZ",
+          "whitespace": true
+        },
+        {
+          "dep": "amod",
+          "end": 44,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 10,
+          "idx": 38,
+          "lemma": "next",
+          "morphology": "Degree=Pos",
+          "norm": "next",
+          "pos": "ADJ",
+          "sentence_start": false,
+          "start": 40,
+          "tag": "JJ",
+          "whitespace": true
+        },
+        {
+          "dep": "npadvmod",
+          "end": 49,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 8,
+          "idx": 43,
+          "lemma": "door",
+          "morphology": "Number=Sing",
+          "norm": "door",
+          "pos": "NOUN",
+          "sentence_start": false,
+          "start": 45,
+          "tag": "NN",
+          "whitespace": false
+        },
+        {
+          "dep": "punct",
+          "end": 50,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 5,
+          "idx": 47,
+          "lemma": "?",
+          "morphology": "PunctType=Peri",
+          "norm": "?",
+          "pos": "PUNCT",
+          "sentence_start": false,
+          "start": 49,
+          "tag": ".",
+          "whitespace": false
+        }
+      ],
+      "expected": [
+        {
+          "dep": "advcl",
+          "end": 4,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 0,
+          "lemma": "wait",
+          "morphology": "VerbForm=Inf",
+          "norm": "wait",
+          "pos": "VERB",
+          "sentence_start": true,
+          "start": 0,
+          "tag": "VB",
+          "whitespace": false
+        },
+        {
+          "dep": "punct",
+          "end": 7,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 4,
+          "lemma": "—",
+          "morphology": "",
+          "norm": "-",
+          "pos": "PUNCT",
+          "sentence_start": false,
+          "start": 4,
+          "tag": ":",
+          "whitespace": false
+        },
+        {
+          "dep": "aux",
+          "end": 13,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 5,
+          "lemma": "didn't",
+          "morphology": "Tense=Pres|VerbForm=Fin",
+          "norm": "didn't",
+          "pos": "AUX",
+          "sentence_start": false,
+          "start": 7,
+          "tag": "VBP",
+          "whitespace": true
+        },
+        {
+          "dep": "nsubj",
+          "end": 17,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 12,
+          "lemma": "you",
+          "morphology": "Case=Nom|Person=2|PronType=Prs",
+          "norm": "you",
+          "pos": "PRON",
+          "sentence_start": false,
+          "start": 14,
+          "tag": "PRP",
+          "whitespace": true
+        },
+        {
+          "dep": "ROOT",
+          "end": 21,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 16,
+          "lemma": "say",
+          "morphology": "Tense=Pres|VerbForm=Fin",
+          "norm": "say",
+          "pos": "VERB",
+          "sentence_start": false,
+          "start": 18,
+          "tag": "VBP",
+          "whitespace": true
+        },
+        {
+          "dep": "poss",
+          "end": 26,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 6,
+          "idx": 20,
+          "lemma": "your",
+          "morphology": "Person=2|Poss=Yes|PronType=Prs",
+          "norm": "your",
+          "pos": "PRON",
+          "sentence_start": false,
+          "start": 22,
+          "tag": "PRP$",
+          "whitespace": true
+        },
+        {
+          "dep": "nsubj",
+          "end": 33,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 7,
+          "idx": 25,
+          "lemma": "sister",
+          "morphology": "Number=Sing",
+          "norm": "sister",
+          "pos": "NOUN",
+          "sentence_start": false,
+          "start": 27,
+          "tag": "NN",
+          "whitespace": true
+        },
+        {
+          "dep": "ccomp",
+          "end": 39,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 32,
+          "lemma": "live",
+          "morphology": "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin",
+          "norm": "lives",
+          "pos": "VERB",
+          "sentence_start": false,
+          "start": 34,
+          "tag": "VBZ",
+          "whitespace": true
+        },
+        {
+          "dep": "amod",
+          "end": 44,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 9,
+          "idx": 38,
+          "lemma": "next",
+          "morphology": "Degree=Pos",
+          "norm": "next",
+          "pos": "ADJ",
+          "sentence_start": false,
+          "start": 40,
+          "tag": "JJ",
+          "whitespace": true
+        },
+        {
+          "dep": "npadvmod",
+          "end": 49,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 7,
+          "idx": 43,
+          "lemma": "door",
+          "morphology": "Number=Sing",
+          "norm": "door",
+          "pos": "NOUN",
+          "sentence_start": false,
+          "start": 45,
+          "tag": "NN",
+          "whitespace": false
+        },
+        {
+          "dep": "punct",
+          "end": 50,
+          "entity_iob": "O",
+          "entity_type": "",
+          "head": 4,
+          "idx": 47,
+          "lemma": "?",
+          "morphology": "PunctType=Peri",
+          "norm": "?",
+          "pos": "PUNCT",
+          "sentence_start": false,
+          "start": 49,
+          "tag": ".",
+          "whitespace": false
+        }
+      ],
+      "field": "tokens",
+      "id": "conversation-07",
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": [
+        {
+          "end": 12,
+          "label": "",
+          "start": 0
+        }
+      ],
+      "expected": [
+        {
+          "end": 11,
+          "label": "",
+          "start": 0
+        }
+      ],
+      "field": "sentences",
+      "id": "conversation-07",
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": [
+        {
+          "end": 5,
+          "label": "NP",
+          "start": 4
+        },
+        {
+          "end": 8,
+          "label": "NP",
+          "start": 6
+        }
+      ],
+      "expected": [
+        {
+          "end": 4,
+          "label": "NP",
+          "start": 3
+        },
+        {
+          "end": 7,
+          "label": "NP",
+          "start": 5
+        }
+      ],
+      "field": "noun_chunks",
+      "id": "conversation-07",
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.6899592280387878,
+      "expected": -0.6876809597015381,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 0,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.10451638698577881,
+      "expected": 0.025813328102231026,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 1,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.22645898163318634,
+      "expected": -0.15484619140625,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 2,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12573657929897308,
+      "expected": -0.12462625652551651,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 3,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.19287623465061188,
+      "expected": -0.19674406945705414,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 4,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.09111851453781128,
+      "expected": 0.11847436428070068,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 5,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.006767751183360815,
+      "expected": 0.00025063075008802116,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 6,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.16561225056648254,
+      "expected": -0.09032872319221497,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 7,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.15655456483364105,
+      "expected": 0.14301344752311707,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 8,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 2.387350082397461,
+      "expected": 2.0580544471740723,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 9,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0686115026473999,
+      "expected": -0.006713459268212318,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 10,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05546083673834801,
+      "expected": -0.034418728202581406,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 11,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05362125113606453,
+      "expected": -0.0881977304816246,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 12,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.06158067658543587,
+      "expected": 0.07764618843793869,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 13,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.35279062390327454,
+      "expected": -0.3418515622615814,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 14,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05454975739121437,
+      "expected": -0.03252556547522545,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 15,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.14680498838424683,
+      "expected": -0.1410706490278244,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 16,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.23320455849170685,
+      "expected": -0.007640453986823559,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 17,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0673149973154068,
+      "expected": -0.04852999746799469,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 18,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.14959965646266937,
+      "expected": 0.17426162958145142,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 19,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09867950528860092,
+      "expected": -0.09242872893810272,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 20,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.034067753702402115,
+      "expected": -0.005209367256611586,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 21,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.15192283689975739,
+      "expected": 0.17595508694648743,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 22,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.17685566842556,
+      "expected": -0.15093399584293365,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 23,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08610158413648605,
+      "expected": 0.07028372585773468,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 24,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.037820663303136826,
+      "expected": -0.05351799726486206,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 25,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08817584067583084,
+      "expected": -0.04065053164958954,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 26,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.18367433547973633,
+      "expected": -0.22708474099636078,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 27,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.028290435671806335,
+      "expected": 0.059882305562496185,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 28,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.20493417978286743,
+      "expected": -0.140123650431633,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 29,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.176583930850029,
+      "expected": -0.16765855252742767,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 30,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.09402024745941162,
+      "expected": 0.06546827405691147,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 31,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.18242935836315155,
+      "expected": -0.1610296368598938,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 32,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.05982724949717522,
+      "expected": 0.152123361825943,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 33,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.14482158422470093,
+      "expected": 0.08872081339359283,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 34,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.13571332395076752,
+      "expected": 0.03771818056702614,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 35,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.022778166458010674,
+      "expected": 0.00849772896617651,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 36,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.02984078787267208,
+      "expected": 0.046367768198251724,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 37,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06447073072195053,
+      "expected": -0.053489793092012405,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 38,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08230958133935928,
+      "expected": 0.09678036719560623,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 39,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04218833148479462,
+      "expected": 0.07767309248447418,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 40,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10109889507293701,
+      "expected": -0.053683336824178696,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 41,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.015727413818240166,
+      "expected": 0.037046268582344055,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 42,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04549507424235344,
+      "expected": 0.0008573593222536147,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 43,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.026698170229792595,
+      "expected": -0.0021565454080700874,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 44,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.021565666422247887,
+      "expected": -0.08329036831855774,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 45,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08551866561174393,
+      "expected": -0.09032128006219864,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 46,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07151259481906891,
+      "expected": 0.040987275540828705,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 47,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.16257424652576447,
+      "expected": -0.16729283332824707,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 48,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.02537637948989868,
+      "expected": 0.021754860877990723,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 49,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10923832654953003,
+      "expected": -0.1400091052055359,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 50,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.22121216356754303,
+      "expected": 0.16212235391139984,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 51,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.051950644701719284,
+      "expected": -0.06696433573961258,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 52,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.007637000177055597,
+      "expected": -0.04335672780871391,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 53,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0030490874778479338,
+      "expected": 0.032625362277030945,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 54,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0006845860625617206,
+      "expected": -0.00016791102825663984,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 55,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06051091477274895,
+      "expected": -0.029061902314424515,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 56,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.11251557618379593,
+      "expected": -0.08048791438341141,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 57,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.009293586015701294,
+      "expected": -0.07815755158662796,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 58,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12452853471040726,
+      "expected": -0.07631821185350418,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 59,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.07565108686685562,
+      "expected": -0.058302637189626694,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 60,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10744774341583252,
+      "expected": -0.04690845310688019,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 61,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05645724758505821,
+      "expected": -0.08955717831850052,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 62,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.11176449805498123,
+      "expected": -0.23042036592960358,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 63,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.23425382375717163,
+      "expected": 0.15746119618415833,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 64,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12758265435695648,
+      "expected": -0.049164727330207825,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 65,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.017124831676483154,
+      "expected": 0.015737999230623245,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 66,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.015579788945615292,
+      "expected": 0.026975803077220917,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 67,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.165786013007164,
+      "expected": 0.20938926935195923,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 68,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.018561046570539474,
+      "expected": -0.03794576972723007,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 69,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.12717008590698242,
+      "expected": 0.06690463423728943,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 70,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.060189250856637955,
+      "expected": 0.07105281949043274,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 71,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.20833174884319305,
+      "expected": 0.15223462879657745,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 72,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03181116655468941,
+      "expected": -0.043390996754169464,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 73,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.2163494974374771,
+      "expected": -0.28746727108955383,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 74,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.20386157929897308,
+      "expected": 0.16762171685695648,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 75,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.21440108120441437,
+      "expected": 0.29274556040763855,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 76,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1876576542854309,
+      "expected": -0.17585109174251556,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 77,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05355367064476013,
+      "expected": -0.01750127784907818,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 78,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.38696643710136414,
+      "expected": 0.3540170192718506,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 79,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12461582571268082,
+      "expected": -0.059555456042289734,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 80,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.06882025301456451,
+      "expected": 0.11251936107873917,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 81,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.019392823800444603,
+      "expected": -0.016205094754695892,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 82,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.14385001361370087,
+      "expected": -0.13632000982761383,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 83,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.0019263314316049218,
+      "expected": 0.00164326885715127,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 84,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.13195334374904633,
+      "expected": -0.124594546854496,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 85,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.3823246657848358,
+      "expected": 0.38082873821258545,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 86,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.4588848054409027,
+      "expected": -0.42647072672843933,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 87,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08608198910951614,
+      "expected": 0.08925707638263702,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 88,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08859017491340637,
+      "expected": -0.07927746325731277,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 89,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12479463964700699,
+      "expected": -0.10571780800819397,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 90,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.039551831781864166,
+      "expected": -0.06626547127962112,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 91,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.19114108383655548,
+      "expected": -0.18085117638111115,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 92,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07757259160280228,
+      "expected": 0.1295575499534607,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 93,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.053637485951185226,
+      "expected": 0.028739094734191895,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 94,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.14464633166790009,
+      "expected": -0.06232236698269844,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 95,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.004074337426573038,
+      "expected": -0.08714383095502853,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 96,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.055784836411476135,
+      "expected": -0.07388708740472794,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 97,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.027728334069252014,
+      "expected": -0.038637276738882065,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 98,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.019412336871027946,
+      "expected": 0.03594926372170448,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 99,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05621175095438957,
+      "expected": 0.007342636585235596,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 100,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.04033450409770012,
+      "expected": -0.072791188955307,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 101,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1516564041376114,
+      "expected": -0.08018245548009872,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 102,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.04510049894452095,
+      "expected": -0.07831554859876633,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 103,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.25580915808677673,
+      "expected": 0.1986681967973709,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 104,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.9685699343681335,
+      "expected": -0.9899672865867615,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 105,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.07120358198881149,
+      "expected": -0.08416790515184402,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 106,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.006369166076183319,
+      "expected": -0.05785708501935005,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 107,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.21565304696559906,
+      "expected": -0.25861042737960815,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 108,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.013547413982450962,
+      "expected": 0.0574682243168354,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 109,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.005855504423379898,
+      "expected": 0.01627872698009014,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 110,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.17591740190982819,
+      "expected": -0.06831354647874832,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 111,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09228504449129105,
+      "expected": -0.08108095824718475,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 112,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.3019833564758301,
+      "expected": -0.2226727157831192,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 113,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12052375078201294,
+      "expected": -0.06169181689620018,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 114,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.0682622492313385,
+      "expected": 0.02576063945889473,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 115,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03674120828509331,
+      "expected": 0.02963585965335369,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 116,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.3169125020503998,
+      "expected": -0.298585444688797,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 117,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06938730180263519,
+      "expected": -0.09614252299070358,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 118,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12567554414272308,
+      "expected": -0.0985269546508789,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 119,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08713991194963455,
+      "expected": 0.08435872197151184,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 120,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06731367111206055,
+      "expected": -0.08905382454395294,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 121,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.041619330644607544,
+      "expected": -0.01542000100016594,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 122,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0674859955906868,
+      "expected": 0.013967091217637062,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 123,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.02156716026365757,
+      "expected": 0.05725235864520073,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 124,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.024466171860694885,
+      "expected": 0.014984911307692528,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 125,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06559791415929794,
+      "expected": -0.14195281267166138,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 126,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08906158059835434,
+      "expected": -0.1275782585144043,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 127,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03994692489504814,
+      "expected": -0.041753727942705154,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 128,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.20119242370128632,
+      "expected": -0.17782536149024963,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 129,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1466914415359497,
+      "expected": -0.16818413138389587,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 130,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08449799567461014,
+      "expected": 0.11162872612476349,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 131,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.007014416623860598,
+      "expected": -0.04805246368050575,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 132,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.021716080605983734,
+      "expected": -0.06071499362587929,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 133,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06599730998277664,
+      "expected": -0.08472707122564316,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 134,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06039850041270256,
+      "expected": -0.01287873089313507,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 135,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.19078785181045532,
+      "expected": -0.1601976454257965,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 136,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.06836124509572983,
+      "expected": 0.05866936594247818,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 137,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.015929700806736946,
+      "expected": -0.05425458773970604,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 138,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12788774073123932,
+      "expected": -0.11179854720830917,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 139,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -1.8936800956726074,
+      "expected": -1.6147547960281372,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 140,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.19982649385929108,
+      "expected": 0.20971252024173737,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 141,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.22680146992206573,
+      "expected": 0.11381161212921143,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 142,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.057804498821496964,
+      "expected": 0.0764940083026886,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 143,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1341821700334549,
+      "expected": -0.032671451568603516,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 144,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.023426920175552368,
+      "expected": -0.07037392258644104,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 145,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.17109008133411407,
+      "expected": -0.15555192530155182,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 146,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.12844334542751312,
+      "expected": 0.15862363576889038,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 147,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12165955454111099,
+      "expected": -0.1292627900838852,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 148,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.026813330128788948,
+      "expected": -0.008254725486040115,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 149,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07042674720287323,
+      "expected": 0.05370154604315758,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 150,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.05245941877365112,
+      "expected": 0.04032459482550621,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 151,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.008027167059481144,
+      "expected": 0.07696601003408432,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 152,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.007328913081437349,
+      "expected": -0.010159357450902462,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 153,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.17682307958602905,
+      "expected": 0.15536335110664368,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 154,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.044419001787900925,
+      "expected": 0.01595836691558361,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 155,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.02359607070684433,
+      "expected": 0.13482753932476044,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 156,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1089242473244667,
+      "expected": -0.18394699692726135,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 157,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.005040912423282862,
+      "expected": -0.01765553466975689,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 158,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03815050050616264,
+      "expected": 0.009553727693855762,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 159,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.058264121413230896,
+      "expected": 0.16502083837985992,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 160,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.021454906091094017,
+      "expected": 0.06446555256843567,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 161,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07786509394645691,
+      "expected": -0.010103542357683182,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 162,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.13107259571552277,
+      "expected": 0.17814244329929352,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 163,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.031057758256793022,
+      "expected": 0.04474354162812233,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 164,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.030538415536284447,
+      "expected": -0.013842815533280373,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 165,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07039757817983627,
+      "expected": 0.030883723869919777,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 166,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.09443315863609314,
+      "expected": 0.018835268914699554,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 167,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1334017515182495,
+      "expected": -0.16602879762649536,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 168,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09167415648698807,
+      "expected": -0.055107999593019485,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 169,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1610134094953537,
+      "expected": -0.12934735417366028,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 170,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.21670560538768768,
+      "expected": -0.22494608163833618,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 171,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.11460263282060623,
+      "expected": 0.18497632443904877,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 172,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.19806963205337524,
+      "expected": -0.2402968853712082,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 173,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.23362581431865692,
+      "expected": 0.30104997754096985,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 174,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07475599646568298,
+      "expected": 0.07065927237272263,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 175,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08424883335828781,
+      "expected": -0.0619523786008358,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 176,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08139483630657196,
+      "expected": 0.09491345286369324,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 177,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.0524691641330719,
+      "expected": -0.01970636658370495,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 178,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.11270225793123245,
+      "expected": -0.10469409823417664,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 179,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.057056862860918045,
+      "expected": 0.11754384636878967,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 180,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.178419828414917,
+      "expected": -0.08521072566509247,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 181,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.2578049898147583,
+      "expected": -0.1797218918800354,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 182,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.1742631047964096,
+      "expected": 0.15251728892326355,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 183,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0948113426566124,
+      "expected": -0.05545689910650253,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 184,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.1188696026802063,
+      "expected": 0.08246263861656189,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 185,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1291245073080063,
+      "expected": 0.0018441731808707118,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 186,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09336775541305542,
+      "expected": -0.1451602578163147,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 187,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.19967041909694672,
+      "expected": 0.18549436330795288,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 188,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.18930482864379883,
+      "expected": 0.2223089188337326,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 189,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.20333415269851685,
+      "expected": 0.23892726004123688,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 190,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09936168789863586,
+      "expected": -0.12436528503894806,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 191,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03871266916394234,
+      "expected": -0.0792812630534172,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 192,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.068254254758358,
+      "expected": 0.06806737184524536,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 193,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.030011996626853943,
+      "expected": 0.06905782967805862,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 194,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0932106077671051,
+      "expected": -0.08323357254266739,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 195,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03585163131356239,
+      "expected": -0.058000776916742325,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 196,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1332554966211319,
+      "expected": -0.10885782539844513,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 197,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04319709539413452,
+      "expected": 0.16347864270210266,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 198,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.2517003118991852,
+      "expected": 0.17466853559017181,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 199,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.02135608345270157,
+      "expected": 0.025147490203380585,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 200,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10118567198514938,
+      "expected": -0.1287229061126709,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 201,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12575532495975494,
+      "expected": -0.11792068183422089,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 202,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.006613582372665405,
+      "expected": -0.020937364548444748,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 203,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.17123466730117798,
+      "expected": -0.15773773193359375,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 204,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.04938984289765358,
+      "expected": -0.0849980041384697,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 205,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.12600259482860565,
+      "expected": 0.14386172592639923,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 206,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.05372432991862297,
+      "expected": 0.013694086112082005,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 207,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.20520059764385223,
+      "expected": 0.21275153756141663,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 208,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.13396356999874115,
+      "expected": 0.08517119288444519,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 209,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06815341860055923,
+      "expected": -0.07815827429294586,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 210,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.13475006818771362,
+      "expected": 0.15758918225765228,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 211,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.020723996683955193,
+      "expected": -0.06627127528190613,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 212,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0426504947245121,
+      "expected": 0.005917641334235668,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 213,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.18664492666721344,
+      "expected": 0.17932993173599243,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 214,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.07768891006708145,
+      "expected": -0.07255863398313522,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 215,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04616500064730644,
+      "expected": 0.05935272201895714,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 216,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04342835023999214,
+      "expected": -0.059798166155815125,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 217,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.33118709921836853,
+      "expected": -0.16763319075107574,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 218,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08563924580812454,
+      "expected": -0.05200827121734619,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 219,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12996061146259308,
+      "expected": -0.09514794498682022,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 220,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.043978501111269,
+      "expected": 0.017853502184152603,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 221,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1309167444705963,
+      "expected": -0.09415126591920853,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 222,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.17110292613506317,
+      "expected": -0.19688445329666138,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 223,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.03437458351254463,
+      "expected": -0.005220452323555946,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 224,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.21791265904903412,
+      "expected": -0.2069692760705948,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 225,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0621892549097538,
+      "expected": -0.08810464292764664,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 226,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.10174659639596939,
+      "expected": 0.05991928279399872,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 227,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.007470859680324793,
+      "expected": -0.02722886949777603,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 228,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12691648304462433,
+      "expected": -0.11151190102100372,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 229,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.008978000842034817,
+      "expected": -0.03759036958217621,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 230,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.008056164719164371,
+      "expected": -0.0015300411032512784,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 231,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.09738891571760178,
+      "expected": 0.058936990797519684,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 232,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04411625862121582,
+      "expected": 0.06724682450294495,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 233,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.049107592552900314,
+      "expected": -0.04819972813129425,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 234,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08644817024469376,
+      "expected": 0.06256526708602905,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 235,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.18138156831264496,
+      "expected": 0.18406443297863007,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 236,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03036024607717991,
+      "expected": -0.01054100040346384,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 237,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.07440783828496933,
+      "expected": -0.07274290919303894,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 238,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.03690608963370323,
+      "expected": 0.03196299076080322,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 239,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.1146169975399971,
+      "expected": 0.08964590728282928,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 240,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.03772425279021263,
+      "expected": 0.06807318329811096,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 241,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.010163232684135437,
+      "expected": -0.0510004423558712,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 242,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.14175178110599518,
+      "expected": 0.09991741180419922,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 243,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.0722096636891365,
+      "expected": 0.12390273064374924,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 244,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.19265341758728027,
+      "expected": -0.20705284178256989,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 245,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.02219427563250065,
+      "expected": -0.03205902874469757,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 246,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.25873878598213196,
+      "expected": -0.18382830917835236,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 247,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.03172257915139198,
+      "expected": -0.05937745422124863,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 248,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.37926414608955383,
+      "expected": 0.40071362257003784,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 249,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.10689565539360046,
+      "expected": 0.1651192456483841,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 250,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0861758291721344,
+      "expected": -0.07780454307794571,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 251,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.09221524745225906,
+      "expected": 0.038998451083898544,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 252,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09921475499868393,
+      "expected": -0.07314515858888626,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 253,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.05618899688124657,
+      "expected": -0.13153216242790222,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 254,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.08530199527740479,
+      "expected": 0.07963328808546066,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 255,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.15353427827358246,
+      "expected": -0.08457375317811966,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 256,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1431359201669693,
+      "expected": -0.12364964187145233,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 257,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.07953891903162003,
+      "expected": 0.05346245691180229,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 258,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.13638684153556824,
+      "expected": 0.10912200808525085,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 259,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.25321248173713684,
+      "expected": -0.21440090239048004,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 260,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.17117083072662354,
+      "expected": 0.14366018772125244,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 261,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.030802838504314423,
+      "expected": -0.04754218831658363,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 262,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.12584733963012695,
+      "expected": 0.10657255351543427,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 263,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.19249916076660156,
+      "expected": 0.1265459954738617,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 264,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.042201172560453415,
+      "expected": 0.06553873419761658,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 265,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10925158113241196,
+      "expected": -0.110738106071949,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 266,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.03308374807238579,
+      "expected": 0.008571364916861057,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 267,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.4646366536617279,
+      "expected": 0.37630927562713623,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 268,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.18948149681091309,
+      "expected": 0.2666771113872528,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 269,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.011323165148496628,
+      "expected": -0.016440551728010178,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 270,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1394999921321869,
+      "expected": -0.19593669474124908,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 271,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.10127633064985275,
+      "expected": -0.07603291422128677,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 272,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.25756433606147766,
+      "expected": -0.17447471618652344,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 273,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1093125119805336,
+      "expected": -0.10310392081737518,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 274,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04304249957203865,
+      "expected": 0.04016454145312309,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 275,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.04611891880631447,
+      "expected": 0.07919808477163315,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 276,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08445632457733154,
+      "expected": -0.02370145171880722,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 277,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.005134671926498413,
+      "expected": -0.014085092581808567,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 278,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.20753125846385956,
+      "expected": 0.16357773542404175,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 279,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.08260595053434372,
+      "expected": -0.0583174005150795,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 280,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.136244997382164,
+      "expected": -0.1361827254295349,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 281,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.007056667003780603,
+      "expected": -0.059757087379693985,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 282,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.045555416494607925,
+      "expected": 0.009164446964859962,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 283,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.06531039625406265,
+      "expected": -0.12115588039159775,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 284,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.21248149871826172,
+      "expected": 0.1665228009223938,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 285,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.14290384948253632,
+      "expected": 0.13384714722633362,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 286,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.11359848827123642,
+      "expected": -0.056609272956848145,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 287,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.12296741455793381,
+      "expected": -0.21719537675380707,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 288,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.019520005211234093,
+      "expected": 0.024716364219784737,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 289,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.18943367898464203,
+      "expected": -0.10032401233911514,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 290,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.024516833946108818,
+      "expected": -0.037458911538124084,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 291,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.1315036565065384,
+      "expected": -0.1278376430273056,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 292,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.050292667001485825,
+      "expected": -0.11176018416881561,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 293,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.11703508347272873,
+      "expected": 0.15158918499946594,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 294,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.22037144005298615,
+      "expected": 0.17469581961631775,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 295,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.0593448244035244,
+      "expected": -0.0774872675538063,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 296,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": -0.09742183238267899,
+      "expected": -0.10136926919221878,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 297,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.005118085537105799,
+      "expected": 0.036206457763910294,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 298,
+      "text": "Wait—didn't you say your sister lives next door?"
+    },
+    {
+      "actual": 0.15527601540088654,
+      "expected": 0.1956832855939865,
+      "field": "vector",
+      "id": "conversation-07",
+      "index": 299,
+      "text": "Wait—didn't you say your sister lives next door?"
+    }
+  ],
+  "input_sha256": "18dc7638b786f7b770bc0e13104d9349d0b1d7ff9e78d48a9a234cb5a178c1fa",
+  "max_vector_absolute_error": 0.32929563522338867,
+  "model": "en_core_web_md 3.8.0",
+  "tokens": 5570,
+  "versions": {
+    "spacy": "3.8.14",
+    "thinc": "8.3.13"
+  },
+  "native_runtime_revision": "246b34d9d5d2227e7f3184886f068bf5b4620bde",
+  "reproduction": "Use the native runtime from this revision with tests/evaluation.rs and fixtures/evaluation-v1* from the expanded evaluation, then run cargo test --release --test evaluation expanded_official_parity -- --include-ignored. The tokenizer-boundary fix is absent from this runtime revision."
+}
