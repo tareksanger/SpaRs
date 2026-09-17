@@ -138,7 +138,7 @@ class FixtureReport:
 
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
-    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json']
+    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json']
     reports: list[FixtureReport] = []
     failure: ReferenceMismatch | None = None
     with tempfile.TemporaryDirectory(prefix='spars-reference-check-') as temporary:
@@ -147,6 +147,9 @@ def main() -> None:
         shutil.copyfile(root / 'fixtures/development.json', work / 'fixtures/development.json')
         for script, arguments in [('fixtures.py', ['development']), ('stages.py', [])]:
             subprocess.run([sys.executable, str(root / 'tools' / script), *arguments], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/traversal_reference.py'),
+                        str(root / 'fixtures/evaluation-v1.expected.json'),
+                        str(work / 'fixtures/traversal-v1.expected.json')], cwd=work, check=True)
         for name in expected:
             original = root / 'fixtures' / name
             generated = work / 'fixtures' / name
