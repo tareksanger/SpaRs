@@ -50,9 +50,9 @@ fn check(split: &str) {
             }
         }
     }
-    std::fs::create_dir_all("reports").unwrap();
-    std::fs::write(format!("reports/{split}-mismatches.json"),serde_json::to_string_pretty(&serde_json::json!({"versions":fixture["versions"],"model":"en_core_web_md 3.8.0","fixture":format!("fixtures/{split}.expected.json"),"tokens":fixture["cases"].as_array().unwrap().iter().map(|c|c["tokens"].as_array().unwrap().len()).sum::<usize>(),"cases":fixture["cases"].as_array().unwrap().len(),"max_tok2vec_absolute_error":max_error,"differences":differences})).unwrap()).unwrap();
-    assert!(differences.is_empty(),"{} field mismatches; tok2vec max abs error {max_error}; see reports/development-mismatches.json",differences.len());
+    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::write(format!("target/reports/{split}-mismatches.json"),serde_json::to_string_pretty(&serde_json::json!({"versions":fixture["versions"],"model":"en_core_web_md 3.8.0","fixture":format!("fixtures/{split}.expected.json"),"tokens":fixture["cases"].as_array().unwrap().iter().map(|c|c["tokens"].as_array().unwrap().len()).sum::<usize>(),"cases":fixture["cases"].as_array().unwrap().len(),"max_tok2vec_absolute_error":max_error,"differences":differences})).unwrap()).unwrap();
+    assert!(differences.is_empty(),"{} field mismatches; tok2vec max abs error {max_error}; see target/reports/{split}-mismatches.json",differences.len());
 }
 #[test]
 #[ignore = "requires official export; mandatory CI"]

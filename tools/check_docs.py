@@ -68,10 +68,10 @@ def main() -> None:
                         'passed':ok,'stdout':portable_text(result.stdout, root),'stderr':portable_text(result.stderr, root)})
     if not results:
         raise RuntimeError('No runnable Rust examples found.')
-    (root/'reports').mkdir(exist_ok=True)
-    (root/'reports/documentation.json').write_text(json.dumps(results,indent=2)+'\n')
+    (root/'target/reports').mkdir(parents=True, exist_ok=True)
+    (root/'target/reports/documentation.json').write_text(json.dumps(results,indent=2)+'\n')
     if not all(r['passed'] for r in results):
-        raise SystemExit('Documentation examples failed; see reports/documentation.json')
+        raise SystemExit('Documentation examples failed; see target/reports/documentation.json')
 
 
 if __name__ == '__main__':

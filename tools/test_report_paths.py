@@ -12,9 +12,9 @@ class ReportPathTests(unittest.TestCase):
     def test_artifact_guard_rejects_host_paths(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root/'reports').mkdir()
-            (root/'reports/nested').mkdir()
-            report = root/'reports/nested/result.json'
+            (root/'target/reports').mkdir(parents=True)
+            (root/'target/reports/nested').mkdir(parents=True)
+            report = root/'target/reports/nested/result.json'
             report.write_text(json.dumps({'output': '/home/example/project/file'}))
             with self.assertRaisesRegex(ValueError, 'absolute filesystem paths'):
                 check_portable_artifacts(root)

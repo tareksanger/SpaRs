@@ -23,7 +23,7 @@ class Options(argparse.Namespace):
     profile: str = 'short'
     rounds: int = 3
     warmup: int = 1
-    output: Path = Path('reports/python-comparison.json')
+    output: Path = Path('target/reports/python-comparison.json')
 
 
 @dataclass(frozen=True)
@@ -156,7 +156,7 @@ def main() -> None:
     parser.add_argument('--profile', choices=('short', 'long'), default='short')
     parser.add_argument('--rounds', type=int, default=3)
     parser.add_argument('--warmup', type=int, default=1)
-    parser.add_argument('--output', type=Path, default=Path('reports/python-comparison.json'))
+    parser.add_argument('--output', type=Path, default=Path('target/reports/python-comparison.json'))
     options = Options()
     parser.parse_args(namespace=options)
     if options.rounds < 1 or options.warmup < 0:
@@ -191,6 +191,7 @@ def main() -> None:
         command=reproduction_command(options),
         limits='One sequential native then Python run per profile; no batching or parallelism. Warm caches; OS caches not cleared. Inference excludes model load, imports, corpus reading, document destruction, and JSON output. Python materializes sentences, noun chunks and entities to match native work. Peak RSS includes interpreter and model loading. Load excludes Python import time. Synthetic corpus and single run do not establish general speed. Values below 1 mean Rust is slower.',
     )
+    options.output.parent.mkdir(parents=True, exist_ok=True)
     options.output.write_text(json.dumps(portable_json(validate_json(asdict(report)), Path.cwd()), indent=2) + '\n')
 
 

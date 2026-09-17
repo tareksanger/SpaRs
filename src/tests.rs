@@ -85,7 +85,8 @@ fn official_stage_parity() {
             }
         }
     }
-    std::fs::write("reports/stages.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"actions":actions,"max_activation_absolute_error":max_activation,"max_score_absolute_error":max_score})).unwrap()).unwrap();
+    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::write("target/reports/stages.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"actions":actions,"max_activation_absolute_error":max_activation,"max_score_absolute_error":max_score})).unwrap()).unwrap();
 }
 #[test]
 #[ignore = "requires official export; mandatory CI stage"]
@@ -108,7 +109,8 @@ fn tokenizer_and_features() {
             failures.push(serde_json::json!({"text":c["text"],"actual":actual,"expected":c["tokens"],"features":features,"expected_features":c["features"]}));
         }
     }
-    std::fs::write("reports/tokenizer-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"tokens":count,"differences":failures})).unwrap()).unwrap();
+    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::write("target/reports/tokenizer-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"tokens":count,"differences":failures})).unwrap()).unwrap();
     assert!(
         failures.is_empty(),
         "{} tokenizer/feature mismatches",
@@ -131,8 +133,9 @@ fn lexical_and_vectors() {
             );
         }
     }
+    std::fs::create_dir_all("target/reports").unwrap();
     std::fs::write(
-        "reports/lexical-mismatches.json",
+        "target/reports/lexical-mismatches.json",
         serde_json::to_string_pretty(
             &serde_json::json!({"cases":cases.as_array().unwrap().len(),"differences":failures}),
         )
@@ -187,7 +190,8 @@ fn regex_span_semantics() {
             }
         }
     }
-    std::fs::write("reports/regex-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"comparisons":cases.as_array().unwrap().len()*4,"differences":failures})).unwrap()).unwrap();
+    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::write("target/reports/regex-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"comparisons":cases.as_array().unwrap().len()*4,"differences":failures})).unwrap()).unwrap();
     assert!(
         failures.is_empty(),
         "{} regex span mismatches",

@@ -83,20 +83,20 @@ fn check(split: &str) {
             count.1 += 1;
         }
     }
-    std::fs::create_dir_all("reports").unwrap();
+    std::fs::create_dir_all("target/reports").unwrap();
     let report = json!({"model":fixture["model"], "versions":fixture["versions"],
         "input_sha256":fixture["input_sha256"], "cases":cases.len(), "tokens":tokens,
         "category_counts":categories.iter().map(|(name,(total,passed))| (name,json!({"total":total,"passed":passed}))).collect::<BTreeMap<_,_>>(),
         "max_vector_absolute_error":max_vector_error, "differences":differences,
         "command":"cargo test --release --test evaluation -- --include-ignored"});
     std::fs::write(
-        format!("reports/{split}.json"),
+        format!("target/reports/{split}.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
     )
     .unwrap();
     assert!(
         differences.is_empty(),
-        "{} differences: see reports/{split}.json",
+        "{} differences: see target/reports/{split}.json",
         differences.len()
     );
 }

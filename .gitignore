@@ -5,3 +5,4 @@
 __pycache__/
 /consumer/target/
 /tools/node_modules/
+/reports/

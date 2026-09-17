@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Acquire and export explicitly
 
-Requirements: Rust 1.85+ (tested toolchain recorded in reports), Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. Python and Node.js are only development tools; neither is needed by Rust consumers.
+Requirements: Rust 1.85+ (each verification run records the tested toolchain), Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. Python and Node.js are only development tools; neither is needed by Rust consumers.
 
 ```sh
 uv venv --python 3.12.5 .venv
@@ -82,10 +82,10 @@ cargo package --allow-dirty --offline
 
 For all gates plus a byte-identical re-export check, run `.venv/bin/python tools/verify.py`. The [CI workflow](.github/workflows/ci.yml) runs the model-dependent tests using the official exported assets.
 
-Model-dependent tests are explicitly marked ignored for ordinary dependency builds. **The acceptance command and CI use `--include-ignored`** and fail on missing assets/fixtures. `cargo test` alone is not a parity run. Reports under `reports/` contain denominators and expected/actual mismatches. The separate `consumer` Cargo application verifies all pipeline outputs with an empty runtime PATH; it does not call Python, Node or any service.
+Model-dependent tests are explicitly marked ignored for ordinary dependency builds. **The acceptance command and CI use `--include-ignored`** and fail on missing assets/fixtures. `cargo test` alone is not a parity run. Generated reports under ignored `target/reports/` contain denominators and expected/actual mismatches. In GitHub Actions, open a workflow run and download its `fidelity-reports` artifact for the relevant operating system. Reports are generated for each run and are not stored in Git. The separate `consumer` Cargo application verifies all pipeline outputs with an empty runtime PATH; it does not call Python, Node or any service.
 
 ## Limits
 
-Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Scalar numerical kernels prioritize fidelity. See [performance](docs/PERFORMANCE.md) for measured loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
+Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Native CPU matrix kernels preserve the declared fidelity limits. See [performance](docs/PERFORMANCE.md) for commands to measure loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
 
 MIT project license; translated upstream code and model resources retain their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `licenses/`.

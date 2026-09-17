@@ -23,8 +23,8 @@ class ComparisonTests(unittest.TestCase):
         options = Options()
         options.rounds = 7
         options.warmup = 2
-        options.output = Path('reports/custom.json')
-        self.assertEqual(reproduction_command(options), ['.venv/bin/python', 'tools/compare_python.py', '--rounds', '7', '--warmup', '2', '--output', 'reports/custom.json'])
+        options.output = Path('target/reports/custom.json')
+        self.assertEqual(reproduction_command(options), ['.venv/bin/python', 'tools/compare_python.py', '--rounds', '7', '--warmup', '2', '--output', 'target/reports/custom.json'])
 
     def test_mismatched_workload(self) -> None:
         native = Measurements(.1, 1., 3, 10, .5, 1., 100.)

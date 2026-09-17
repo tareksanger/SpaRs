@@ -29,10 +29,10 @@ Implemented means native code exists; only the evidence column establishes its v
 | Transformers, character CNN, LSTM | Unimplemented | Explicitly outside supported model config |
 | Other languages / multilingual resources | Unimplemented | English only |
 | Training / optimizers / backprop / pretraining | Unimplemented | Official pretrained inference only |
-| GPU, beam search, multiprocessing | Unimplemented | Scalar CPU greedy inference |
+| GPU, beam search, multiprocessing | Unimplemented | Native CPU greedy inference |
 | Scorer / training Examples / alignment | Unimplemented | Development parity harness only |
 | displaCy / projects / CLI ecosystem | Unimplemented | Standalone export and example tools only |
 
 Completing one pipeline is not completing spaCy. Additional architectures, languages, matching, mutable docs, serialization and training remain substantial work and must receive their own acceptance suites.
 
-Declared English suite: 190 documents / 7,029 tokens; exact discrete outputs. The recorded acceptance run passes all verification gates. See [implementation status](PROGRESS.md) and the [verification report](../reports/verification-portable.json) for commands and boundaries.
+Declared English suite: 190 documents / 7,029 tokens; exact discrete outputs. See [implementation status](PROGRESS.md) for the declared scope and the [quality process](QUALITY.md) to reproduce verification and locate run artifacts.

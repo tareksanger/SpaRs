@@ -10,7 +10,7 @@ Production tokenization and inference must run natively in Rust. Python belongs 
 
 Keep each prose paragraph on one source line; do not hard-wrap Markdown to a fixed column width. Keep structural line breaks for headings, list items, tables, and code blocks.
 
-Commit documentation for lasting supported behavior, repeatable workflows, settled design decisions, and enduring limitations. Keep active-task notes, exploratory profiling, interim benchmark runs, and temporary findings in ignored `target/` files or temporary storage. Update public guides after the result is verified; do not commit a new document or report for each work step. Keep reusable diagnostic tools separate from their temporary output.
+Commit documentation for lasting supported behavior, repeatable workflows, settled design decisions, and enduring limitations. Keep active-task notes, exploratory profiling, interim benchmark runs, and temporary findings in ignored `target/` files or temporary storage. Update public guides after the result is verified; do not commit a new document or report for each work step. Keep reusable diagnostic tools separate from their temporary output. Write generated test, verification, and benchmark reports under ignored `target/reports/`; CI retains them as artifacts. Keep tests, fixtures, expected results, checksums, and source/model provenance in Git.
 
 Write repository documentation for users and contributors who have not read any development conversation. Describe the software, supported behavior, limitations, design rationale, setup, verification, and contribution requirements.
 

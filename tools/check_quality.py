@@ -86,7 +86,7 @@ def check_agents(root: Path) -> None:
 def check_portable_artifacts(root: Path) -> None:
     from report_paths import portable_json
 
-    paths = [*sorted((root/'fixtures').rglob('*.json')), *sorted((root/'reports').rglob('*.json'))]
+    paths = [*sorted((root/'fixtures').rglob('*.json')), *sorted((root/'target/reports').rglob('*.json'))]
     for path in paths:
         value = read_json(path)
         if portable_json(value, root) != value:

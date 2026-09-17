@@ -14,7 +14,7 @@ from json_types import ModelMetadata, parse_json, json_object, json_float, json_
 class Options(argparse.Namespace):
     rounds: int = 3
     warmup: int = 1
-    output: Path = Path("reports/benchmark.json")
+    output: Path = Path("target/reports/benchmark.json")
 
 
 class LoadMeasurements(TypedDict):
@@ -82,7 +82,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--rounds', type=int, default=3)
     parser.add_argument('--warmup', type=int, default=1)
-    parser.add_argument('--output', type=Path, default=Path('reports/benchmark.json'))
+    parser.add_argument('--output', type=Path, default=Path('target/reports/benchmark.json'))
     args = Options()
     parser.parse_args(namespace=args)
     if args.rounds < 1 or args.warmup < 0:

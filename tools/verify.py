@@ -12,7 +12,7 @@ from report_paths import portable_text
 
 
 class Options(argparse.Namespace):
-    report: Path = Path("reports/verification.json")
+    report: Path = Path("target/reports/verification.json")
 
 
 class CommandResult(TypedDict):
@@ -41,7 +41,7 @@ def digest(path: Path) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--report', type=Path, default=Path('reports/verification.json'))
+    parser.add_argument('--report', type=Path, default=Path('target/reports/verification.json'))
     options = Options()
     parser.parse_args(namespace=options)
     report_path = options.report

@@ -79,6 +79,8 @@ cargo test --release --offline --test robustness -- --include-ignored
 
 Ordinary `cargo test` skips model-dependent tests. Acceptance and CI include them explicitly. CI uses the same verification script as local development, saves reports even on failure, and runs on Linux and macOS. Repository administrators should make both `native-fidelity` jobs required before merging; the workflow alone does not configure branch protection.
 
+Generated reports belong in ignored `target/reports/`, not Git. Keep test code, frozen fixtures, expected outputs, checksums, and source/model provenance in Git. To inspect CI evidence, open the workflow run in GitHub Actions and download the `fidelity-reports` artifact for its operating system. Artifacts describe that run and may expire under the repository retention policy; rerun verification when fresh evidence is needed.
+
 The verification report records commands, outputs, versions, and fixture hashes. Individual comparison reports show denominators and mismatches. Benchmark results live separately because machine speed should not determine whether the annotations are correct.
 
 ## Use reviewers with clear jobs

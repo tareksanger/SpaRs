@@ -1,4 +1,9 @@
 """Check that the quality tools reject errors rather than merely running."""
+from contextlib import redirect_stdout
+from io import StringIO
+import subprocess
+from unittest.mock import patch
+import verify
 import hashlib
 import json
 import tempfile
@@ -69,6 +74,22 @@ class QualityChecks(unittest.TestCase):
             performance.write_text(content.replace("read-only", "workspace-write"))
             with self.assertRaisesRegex(ValueError, "read-only"):
                 check_agents(root)
+
+    def test_verification_failure_creates_report_and_still_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)/"target/reports/verification.json"
+            failure = output.with_name("verification-failure.json")
+            command = ["tools/node_modules/.bin/pyright", "--project", "pyrightconfig.json"]
+            result = subprocess.CompletedProcess(command, 1, "deliberate failure", "diagnostic")
+            with patch("sys.argv", ["verify.py", "--report", str(output)]), \
+                    patch("verify.subprocess.run", return_value=result), redirect_stdout(StringIO()):
+                with self.assertRaisesRegex(SystemExit, "Failed"):
+                    verify.main()
+            self.assertFalse(output.exists())
+            self.assertEqual(parse_json(failure.read_text()), [{
+                "command": command, "exit_code": 1,
+                "stdout": "deliberate failure", "stderr": "diagnostic",
+            }])
 
     def test_modified_fixture_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

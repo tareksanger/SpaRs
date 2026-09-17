@@ -158,8 +158,8 @@ def main() -> None:
             except ReferenceMismatch as error:
                 report.mismatch = error.mismatch
                 failure = failure or error
-    output = root / 'reports/reference-regeneration.json'
-    output.parent.mkdir(exist_ok=True)
+    output = root / 'target/reports/reference-regeneration.json'
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({
         'passed': failure is None,
         'versions': {name: importlib.metadata.version(name) for name in ('spacy', 'thinc', 'numpy')},

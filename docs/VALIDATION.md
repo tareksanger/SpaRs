@@ -31,4 +31,4 @@ The complete pipeline accepts empty text. Calling Thinc's raw embedding model wi
 
 Comparison reports retain case IDs or indices, input text, versions, expected and actual results, and counts. The expanded tests also check that the source input matches its saved checksum. Existing expected outputs stay fixed during repairs.
 
-Run `.venv/bin/python tools/verify.py` after setup. The [quality process](QUALITY.md) explains the full checks, and [performance](PERFORMANCE.md) explains the separate speed and memory measurements.
+Run `.venv/bin/python tools/verify.py` after setup. Generated reports go to ignored `target/reports/`; they are not committed. CI uploads the reports produced by each run as downloadable artifacts, including available failure diagnostics. The [quality process](QUALITY.md) explains the full checks, and [performance](PERFORMANCE.md) explains the separate speed and memory measurements.

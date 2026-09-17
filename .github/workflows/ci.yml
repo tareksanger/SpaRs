@@ -25,11 +25,12 @@ jobs:
       - run: cargo fetch --locked
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
       - name: Run the same acceptance checks as local development
-        run: .venv/bin/python tools/verify.py --report reports/verification-ci.json
+        run: .venv/bin/python tools/verify.py --report target/reports/verification-ci.json
       - name: Record performance separately from fidelity
         run: .venv/bin/python tools/benchmark.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: fidelity-reports-${{ matrix.os }}
-          path: reports/
+          path: target/reports/
+          retention-days: 14
