@@ -41,7 +41,7 @@ tools/node_modules/.bin/pyright --project pyrightconfig.json
 .venv/bin/python tools/check_typing_policy.py
 ```
 
-Pyright runs in strict mode over all Python tools. The policy check requires function annotations and rejects `Any`, unchecked casts, and ignored type errors. Resolve the underlying type mismatch instead of weakening these checks. Narrow local stubs describe the spaCy and Thinc interfaces used by the exporter; a byte-identical export and reference fixture comparisons test those declarations against the real libraries. Stubs must describe actual behavior, not merely satisfy the checker.
+Pyright runs in strict mode over all Python tools. The policy check requires function annotations and rejects `Any`, unchecked casts, and ignored type errors. Resolve the underlying type mismatch instead of weakening these checks. Narrow local stubs describe the spaCy and Thinc interfaces used by the exporter; a byte-identical export and regenerated reference fixture comparisons test those declarations against the real libraries. Regenerated annotations and hashes must match exactly; neural values use the existing floating-point limits in [validation](VALIDATION.md). Stubs must describe actual behavior, not merely satisfy the checker.
 
 ## Keep evaluation data stable
 

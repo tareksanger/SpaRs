@@ -28,7 +28,7 @@
         "tools/check_typing_policy.py"
       ],
       "exit_code": 0,
-      "stdout": "PASS explicit typing policy for 34 Python and stub files\n",
+      "stdout": "PASS explicit typing policy for 35 Python and stub files\n",
       "stderr": ""
     },
     {
@@ -46,7 +46,7 @@
         "tools/check_reference.py"
       ],
       "exit_code": 0,
-      "stdout": "PASS 3 regenerated reference fixtures are byte-identical\n",
+      "stdout": "PASS 3 regenerated reference fixtures: exact discrete outputs and declared float tolerances\n",
       "stderr": ""
     },
     {
@@ -62,7 +62,7 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": ".....................\n----------------------------------------------------------------------\nRan 21 tests in 0.007s\n\nOK\n"
+      "stderr": "...........................\n----------------------------------------------------------------------\nRan 27 tests in 0.007s\n\nOK\n"
     },
     {
       "command": [
@@ -110,8 +110,8 @@
         "--include-ignored"
       ],
       "exit_code": 0,
-      "stdout": "\nrunning 11 tests\ntest config::tests::action_deserialization_preserves_label_and_kind ... ok\ntest config::tests::feature_and_tensor_types_reject_unknown_or_mistyped_fields ... ok\ntest tests::document_snapshots_validate_offsets ... ok\ntest config::tests::tokenizer_optional_boolean_rejects_null_but_nullable_resources_remain_valid ... ok\ntest config::tests::attribute_patterns_preserve_attribute_value_types ... ok\ntest config::tests::optional_attributes_allow_absence_but_reject_null ... ok\ntest tests::hash_keys_match_thinc ... ok\ntest tests::lexical_and_vectors ... ok\ntest tests::tokenizer_and_features ... ok\ntest tests::regex_span_semantics ... ok\ntest tests::official_stage_parity ... ok\n\ntest result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s\n\n\nrunning 4 tests\ntest missing_model_is_an_error ... ok\ntest checked_views_and_similarity ... ok\ntest public_api_and_batch_isolation ... ok\ntest malformed_models_are_errors ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s\n\n\nrunning 1 test\ntest reported_median_handles_even_odd_and_empty_samples ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest tokenizer_boundary_regressions ... ok\ntest unseen_postfix_comparison ... ok\ntest expanded_official_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s\n\n\nrunning 3 tests\ntest official_holdout_parity ... ok\ntest official_development_parity ... ok\ntest official_regression_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s\n\n\nrunning 4 tests\ntest malformed_snapshots_reject_unicode_offsets_indices_and_spans ... ok\ntest malformed_resource_types_and_missing_configuration_are_rejected ... ok\ntest damaged_tensor_files_reach_validation_after_checksum_is_updated ... ok\ntest long_unicode_and_alternating_calls_preserve_results ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.75s\n\n\nrunning 2 tests\ntest src/lib.rs - (line 6) - compile ... ok\ntest src/lib.rs - (line 18) ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
-      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Finished `release` profile [optimized + debuginfo] target(s) in 3.79s\n     Running unittests src/lib.rs (target/release/deps/spars-cb476587bde9d3f3)\n     Running tests/api.rs (target/release/deps/api-802f15882d052041)\n     Running tests/benchmark_math.rs (target/release/deps/benchmark_math-5051b4f62faf4431)\n     Running tests/evaluation.rs (target/release/deps/evaluation-12d23c274f3e95e7)\n     Running tests/parity.rs (target/release/deps/parity-4a449cea51097986)\n     Running tests/robustness.rs (target/release/deps/robustness-624358538e878345)\n   Doc-tests spars\n"
+      "stdout": "\nrunning 11 tests\ntest config::tests::action_deserialization_preserves_label_and_kind ... ok\ntest config::tests::feature_and_tensor_types_reject_unknown_or_mistyped_fields ... ok\ntest tests::document_snapshots_validate_offsets ... ok\ntest config::tests::attribute_patterns_preserve_attribute_value_types ... ok\ntest config::tests::tokenizer_optional_boolean_rejects_null_but_nullable_resources_remain_valid ... ok\ntest config::tests::optional_attributes_allow_absence_but_reject_null ... ok\ntest tests::hash_keys_match_thinc ... ok\ntest tests::lexical_and_vectors ... ok\ntest tests::tokenizer_and_features ... ok\ntest tests::regex_span_semantics ... ok\ntest tests::official_stage_parity ... ok\n\ntest result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s\n\n\nrunning 4 tests\ntest missing_model_is_an_error ... ok\ntest checked_views_and_similarity ... ok\ntest public_api_and_batch_isolation ... ok\ntest malformed_models_are_errors ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s\n\n\nrunning 1 test\ntest reported_median_handles_even_odd_and_empty_samples ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest tokenizer_boundary_regressions ... ok\ntest unseen_postfix_comparison ... ok\ntest expanded_official_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.24s\n\n\nrunning 3 tests\ntest official_holdout_parity ... ok\ntest official_development_parity ... ok\ntest official_regression_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s\n\n\nrunning 4 tests\ntest malformed_snapshots_reject_unicode_offsets_indices_and_spans ... ok\ntest malformed_resource_types_and_missing_configuration_are_rejected ... ok\ntest damaged_tensor_files_reach_validation_after_checksum_is_updated ... ok\ntest long_unicode_and_alternating_calls_preserve_results ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.85s\n\n\nrunning 2 tests\ntest src/lib.rs - (line 6) - compile ... ok\ntest src/lib.rs - (line 18) ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s\n\n",
+      "stderr": "    Finished `release` profile [optimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/release/deps/spars-cb476587bde9d3f3)\n     Running tests/api.rs (target/release/deps/api-802f15882d052041)\n     Running tests/benchmark_math.rs (target/release/deps/benchmark_math-5051b4f62faf4431)\n     Running tests/evaluation.rs (target/release/deps/evaluation-12d23c274f3e95e7)\n     Running tests/parity.rs (target/release/deps/parity-4a449cea51097986)\n     Running tests/robustness.rs (target/release/deps/robustness-624358538e878345)\n   Doc-tests spars\n"
     },
     {
       "command": [
@@ -119,7 +119,7 @@
         "tools/check_docs.py"
       ],
       "exit_code": 0,
-      "stdout": "\nrunning 1 test\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/README.md - SpaRs::Use_from_Rust (line 16) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s\n\n\nrunning 4 tests\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Work_with_Unicode_offsets (line 48) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Read_tokens_and_named_entities (line 24) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Run_part_of_the_pipeline_and_save_a_document (line 66) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Process_several_documents (line 86) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\n\n",
+      "stdout": "\nrunning 1 test\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/README.md - SpaRs::Use_from_Rust (line 16) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s\n\n\nrunning 4 tests\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Work_with_Unicode_offsets (line 48) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Run_part_of_the_pipeline_and_save_a_document (line 66) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Read_tokens_and_named_entities (line 24) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Process_several_documents (line 86) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\n\n",
       "stderr": "    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s\n"
     },
     {
@@ -133,7 +133,7 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling native-consumer-check v0.0.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/consumer)\n    Finished `release` profile [optimized] target(s) in 4.31s\n"
+      "stderr": "    Finished `release` profile [optimized] target(s) in 0.02s\n"
     },
     {
       "command": [
@@ -156,17 +156,17 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": "warning: manifest has no documentation, homepage or repository\n  |\n  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info\n   Packaging spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Packaged 109 files, 480.3KiB (142.9KiB compressed)\n   Verifying spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/target/package/spars-0.1.0)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.68s\n"
+      "stderr": "warning: manifest has no documentation, homepage or repository\n  |\n  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info\n   Packaging spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Packaged 109 files, 480.4KiB (142.9KiB compressed)\n   Verifying spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/target/package/spars-0.1.0)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s\n"
     },
     {
       "command": [
         ".venv/bin/python",
         "tools/export.py",
         "--out",
-        "/var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-clz03_eg"
+        "/var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-1s2p92br"
       ],
       "exit_code": 0,
-      "stdout": "exported 69 tensors to /var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-clz03_eg\n",
+      "stdout": "exported 69 tensors to /var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-1s2p92br\n",
       "stderr": ""
     }
   ],

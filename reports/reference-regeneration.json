@@ -1,0 +1,118 @@
+{
+  "passed": true,
+  "versions": {
+    "spacy": "3.8.14",
+    "thinc": "8.3.13",
+    "numpy": "2.5.3"
+  },
+  "tolerances": {
+    "exact": {
+      "absolute": 0.0,
+      "relative": 0.0
+    },
+    "activation": {
+      "absolute": 2e-05,
+      "relative": 2e-05
+    },
+    "score": {
+      "absolute": 0.0002,
+      "relative": 2e-05
+    },
+    "vector": {
+      "absolute": 2e-06,
+      "relative": 2e-06
+    }
+  },
+  "fixtures": [
+    {
+      "file": "development.expected.json",
+      "expected_sha256": "c386cf3c705fe1939f5047c19229ead2a18ce978bb3a31e22ac60ab453d23c19",
+      "actual_sha256": "c386cf3c705fe1939f5047c19229ead2a18ce978bb3a31e22ac60ab453d23c19",
+      "counts": {
+        "objects": 340,
+        "arrays": 596,
+        "discrete_values": 4536,
+        "numbers": {
+          "exact": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "activation": {
+            "compared": 20160,
+            "maximum_absolute_difference": 0.0
+          },
+          "score": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "vector": {
+            "compared": 7500,
+            "maximum_absolute_difference": 0.0
+          }
+        }
+      },
+      "mismatch": null,
+      "passed": true
+    },
+    {
+      "file": "stages.expected.json",
+      "expected_sha256": "e41348f913e957b45e5b91460164a33155433950d41378feaf19cdf4102ed5f1",
+      "actual_sha256": "e41348f913e957b45e5b91460164a33155433950d41378feaf19cdf4102ed5f1",
+      "counts": {
+        "objects": 659,
+        "arrays": 4343,
+        "discrete_values": 65165,
+        "numbers": {
+          "exact": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "activation": {
+            "compared": 201600,
+            "maximum_absolute_difference": 0.0
+          },
+          "score": {
+            "compared": 60484,
+            "maximum_absolute_difference": 0.0
+          },
+          "vector": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          }
+        }
+      },
+      "mismatch": null,
+      "passed": true
+    },
+    {
+      "file": "hash.expected.json",
+      "expected_sha256": "170feb704b078574b876a0979ebf89410730f4003eb956f7bb0b5dd9ca11a166",
+      "actual_sha256": "170feb704b078574b876a0979ebf89410730f4003eb956f7bb0b5dd9ca11a166",
+      "counts": {
+        "objects": 30,
+        "arrays": 31,
+        "discrete_values": 180,
+        "numbers": {
+          "exact": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "activation": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "score": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          },
+          "vector": {
+            "compared": 0,
+            "maximum_absolute_difference": 0.0
+          }
+        }
+      },
+      "mismatch": null,
+      "passed": true
+    }
+  ]
+}
