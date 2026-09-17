@@ -55,15 +55,6 @@ pub(crate) fn resources(c: &Manifest) -> Result<()> {
             if pat.is_empty() || r.index >= pat.len() as i64 || r.index < -(pat.len() as i64) {
                 return Err(bad("attribute index out of range"));
             }
-            for t in pat {
-                for constraint in [&t.lower, &t.tag, &t.dep].into_iter().flatten() {
-                    if let Constraint::Operators(ops) = constraint {
-                        if let Some(re) = &ops.regex {
-                            fancy_regex::Regex::new(re)?;
-                        }
-                    }
-                }
-            }
         }
     }
     for pos in ["noun", "verb", "adj", "adv", "punct"] {

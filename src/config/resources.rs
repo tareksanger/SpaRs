@@ -88,11 +88,38 @@ pub(crate) struct TokenPattern {
     #[serde(default, deserialize_with = "present")]
     pub is_space: Option<bool>,
 }
-#[derive(Deserialize)]
-#[serde(untagged)]
 pub(crate) enum Constraint {
     Exact(String),
     Operators(Operators),
+}
+impl<'de> Deserialize<'de> for Constraint {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct ConstraintVisitor;
+        impl<'de> serde::de::Visitor<'de> for ConstraintVisitor {
+            type Value = Constraint;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("an exact string or attribute operator map")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Constraint, E> {
+                Ok(Constraint::Exact(value.to_owned()))
+            }
+
+            fn visit_string<E: serde::de::Error>(self, value: String) -> Result<Constraint, E> {
+                Ok(Constraint::Exact(value))
+            }
+
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                map: M,
+            ) -> Result<Constraint, M::Error> {
+                Operators::deserialize(serde::de::value::MapAccessDeserializer::new(map))
+                    .map(Constraint::Operators)
+            }
+        }
+        d.deserialize_any(ConstraintVisitor)
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "SCREAMING_SNAKE_CASE")]
@@ -102,8 +129,8 @@ pub(crate) struct Operators {
     pub included: Option<Vec<String>>,
     #[serde(default, deserialize_with = "present")]
     pub not_in: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "present")]
-    pub regex: Option<String>,
+    #[serde(default, deserialize_with = "compiled_regex")]
+    pub regex: Option<fancy_regex::Regex>,
 }
 #[derive(Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -157,4 +184,14 @@ where
     T: Deserialize<'de>,
 {
     T::deserialize(d).map(Some)
+}
+
+fn compiled_regex<'de, D>(d: D) -> Result<Option<fancy_regex::Regex>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let pattern = String::deserialize(d)?;
+    fancy_regex::Regex::new(&pattern)
+        .map(Some)
+        .map_err(serde::de::Error::custom)
 }
