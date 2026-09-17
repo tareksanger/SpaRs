@@ -2,7 +2,7 @@ use crate::{Doc, Error, Result, TokenView};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-/// Token annotations supported by dependency patterns.
+/// Token annotations shared by token and dependency patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenAttribute {

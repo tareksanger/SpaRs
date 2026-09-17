@@ -19,7 +19,8 @@ Implemented means native code exists; only the evidence column establishes its v
 | English noun chunks | Implemented | Upstream dependency/POS rules |
 | Static vectors | Partial | Token/span/doc vectors and similarities verified; no floret or vector mutation |
 | DependencyMatcher | Partial | All 20 relationships; seven token attributes and five predicates; ordered official reference comparisons; no callbacks, regex, fuzzy matching, or span input |
-| Matcher / PhraseMatcher | Unimplemented | Planned after DependencyMatcher; text/lemma/POS/morphology conditions, repetition, overlaps, and result order need reference suites; tokenizer exception matching is internal only |
+| Token Matcher | Partial | Typed shared conditions, repetition, overlapping spans and default discovery order; no greedy selection, alignments, callbacks, regex, fuzzy matching or span input |
+| PhraseMatcher | Unimplemented | Next matcher priority; attribute selection, overlaps and result ordering need reference suites |
 | EntityRuler/SpanRuler | Unimplemented | No public rule-based span annotation API |
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |

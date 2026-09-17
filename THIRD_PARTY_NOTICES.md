@@ -4,7 +4,7 @@ This is an independent, experimental port, not an Explosion product. spaCy and T
 
 Native algorithms are translated from official spaCy 3.8.14 and Thinc 8.3.13 source distributed in their official Python wheels. Copyright notices and full MIT texts are retained in licenses/spacy-MIT.txt and licenses/thinc-MIT.txt. reference/source-lock.json records source hashes verified against wheel RECORD. Source repositories: https://github.com/explosion/spaCy and https://github.com/explosion/thinc.
 
-Relevant translations: tokenizer.pyx; strings.pyx; lang/lex_attrs.py; lang/en/lex_attrs.py and lemmatizer.py and syntax_iterators.py; ml/models/tok2vec.py and parser.py; ml/_precomputable_affine.py and parser_model.pyx; pipeline/_parser_internals/{_state.pxd,arc_eager.pyx,ner.pyx,nonproj.pyx}; pipeline/{attributeruler.py,lemmatizer.py}; Thinc layers/{hashembed,maxout, layernorm,expand_window,with_array,residual}.py and backends/numpy_ops.pyx.
+Relevant translations: matcher/{matcher.pyx,dependencymatcher.pyx}; morphology.pyx; tokenizer.pyx; strings.pyx; lang/lex_attrs.py; lang/en/lex_attrs.py and lemmatizer.py and syntax_iterators.py; ml/models/tok2vec.py and parser.py; ml/_precomputable_affine.py and parser_model.pyx; pipeline/_parser_internals/{_state.pxd,arc_eager.pyx,ner.pyx,nonproj.pyx}; pipeline/{attributeruler.py,lemmatizer.py}; Thinc layers/{hashembed,maxout, layernorm,expand_window,with_array,residual}.py and backends/numpy_ops.pyx.
 
 MurmurHash was written by Austin Appleby and placed in the public domain. The Thinc uint64 specialization is translated from its MIT source; despite its x86_128 function name, the actual operations mix two 64-bit words.
 

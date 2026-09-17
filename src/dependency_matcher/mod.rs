@@ -1,5 +1,5 @@
 //! Reusable patterns over dependency relationships, evaluated without model access.
-mod predicates;
+pub(crate) mod predicates;
 mod relations;
 use crate::{Doc, Error, Result, TokenIndex};
 use predicates::CompiledConstraint;

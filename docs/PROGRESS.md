@@ -19,11 +19,12 @@ SpaRs implements native Rust inference for `en_core_web_md` 3.8.0, using spaCy 3
 | Parser and entity action traces | 634 action choices, context IDs, and valid-action masks |
 | New robustness checks | 9 malformed configurations, 4 damaged tensors, 27 malformed snapshots, 3 invalid UTF-8 offsets, and 28 processing results across repeated, batched, and concurrent calls |
 | Dependency traversal | 98 documents / 5,568 tokens compared with official children, ancestors, subtree order, and sentence spans |
-| Executed Markdown examples | 1 README example and 6 guide examples |
+| Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
+| Executed Markdown examples | 1 README example and 7 guide examples |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python type checking, the typing policy, formatting, Clippy, Rust and Python tests, 2 source doc tests, the 7 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the seven executed Markdown examples. The consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python type checking, the typing policy, formatting, Clippy, Rust and Python tests, 2 source doc tests, the 8 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the eight executed Markdown examples. The consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
@@ -49,10 +50,9 @@ The current lexical generator produces 5,367 cases and its regex generator produ
 
 See [performance measurements](PERFORMANCE.md) for commands to measure loading time, throughput, and peak process memory. The implementation uses native CPU matrix kernels and processes documents sequentially. Each measurement applies to its recorded machine, source version, and corpus; it does not promise a particular speed for other workloads.
 
-Dependency traversal, sentence access, and the [typed DependencyMatcher](DEPENDENCY_MATCHER.md) are implemented. Matcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
+Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Token Matcher: text, lemma, POS, morphology, and repetition patterns. Verify how repetition operators select tokens and how overlapping matches are ordered; preserve the same token-condition semantics across matcher families where spaCy shares them.
-2. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering.
-3. Model installation without Python or a project-hosted deployment: investigate native download and conversion of the pinned official model package into the validated native format. Pin source versions and checksums, preserve resource licenses, and keep acquisition separate from offline loading and processing. This path is not implemented; the current setup still requires the Python exporter. Reading the official package alone is not enough: installation also needs the linguistic resources currently produced by the exporter.
+1. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering.
+2. Model installation without Python or a project-hosted deployment: investigate native download and conversion of the pinned official model package into the validated native format. Pin source versions and checksums, preserve resource licenses, and keep acquisition separate from offline loading and processing. This path is not implemented; the current setup still requires the Python exporter. Reading the official package alone is not enough: installation also needs the linguistic resources currently produced by the exporter.
 
 Document editing, broader serialization, additional pipelines and languages, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.

@@ -129,3 +129,5 @@ Children follow token order. Ancestors start with the parent and end at the root
 The first dependency query validates all heads in the document and builds a shared index in linear time and memory. An incomplete or cyclic dependency graph anywhere in the document rejects dependency queries. Later child queries visit only the immediate children, ancestor queries follow only the parent chain, and subtree queries visit only that subtree without recursion. Sentence lookup uses the stored sentence spans independently of dependency annotations. Token relationship and sentence queries return errors for missing annotations; `sentence_views()` returns `None` when sentence boundaries are unavailable. A computed empty result is an empty iterator. The cache does not change document equality or saved JSON.
 
 For reusable patterns over these relationships, see [dependency matching](DEPENDENCY_MATCHER.md).
+
+For contiguous sequences and repetition, see [Token Matcher](TOKEN_MATCHER.md).
