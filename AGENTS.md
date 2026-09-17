@@ -4,7 +4,7 @@
 
 SpaRs (`spars`) is a standalone native Rust NLP library. The current supported model is the official `en_core_web_md` 3.8.0 export, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. Keep broader compatibility status in `docs/COMPATIBILITY.md`; one English pipeline does not establish full spaCy parity.
 
-Production tokenization and inference must run natively in Rust. Python belongs only in development, export, and reference tooling; the optional WASM harness is a secondary reference. Keep acquisition explicit and processing offline.
+Production tokenization and inference must run natively in Rust. Python belongs only in development, export, and reference tooling. Keep acquisition explicit and processing offline.
 
 ## Documentation
 

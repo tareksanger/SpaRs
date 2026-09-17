@@ -74,16 +74,6 @@ For all gates plus a byte-identical re-export check, run `.venv/bin/python tools
 
 Model-dependent tests are explicitly marked ignored for ordinary dependency builds. **The acceptance command and CI use `--include-ignored`** and fail on missing assets/fixtures. `cargo test` alone is not a parity run. Reports under `reports/` contain denominators and expected/actual mismatches. The separate `consumer` Cargo application verifies all pipeline outputs with an empty runtime PATH; it does not call Python, Node or any service.
 
-Optional secondary WASM reference (never used by runtime/export): download the [reference HTML](https://raw.githubusercontent.com/maymay-wa/spacy-wasm/refs/heads/main/spacy-rt-demo.html) to `reference/wasm-demo.html`, then run:
-
-```sh
-.venv/bin/python tools/wasm_reference.py
-node tools/wasm_reference.cjs > reports/wasm-development.json
-.venv/bin/python tools/compare_wasm.py
-```
-
-Extraction rejects a changed HTML checksum. Its annotations are diagnostic only; official Python remains authoritative. No secondary model assets are shipped.
-
 ## Limits
 
 Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Scalar numerical kernels prioritize fidelity. No performance or accuracy claims are made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.

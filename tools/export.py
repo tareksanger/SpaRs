@@ -1,4 +1,4 @@
-"""Export only official installed model resources; never consumes the WASM bundle."""
+"""Export official installed model resources."""
 import hashlib
 import importlib.metadata as md
 import json

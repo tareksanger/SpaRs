@@ -16,6 +16,6 @@ Required top-level fields:
 - lemmas: lemma_index, lemma_exc, lemma_rules per POS.
 - vector_keys: lexical hash to row; vectors tensor provides row width/count.
 
-Dimensions and label counts are loaded, never inferred from filenames or the WASM bundle. The pinned architecture semantics define concatenation, zero padding, learned parser padding, residual order, layer normalization epsilon 1e-8, and first-index tie breaking. Lower transition weights are [feature, output, piece, input]; pad is [1, feature, output, piece]. Unnormalized tagger scores are used.
+Dimensions and label counts are loaded, from the validated official model configuration. The pinned architecture semantics define concatenation, zero padding, learned parser padding, residual order, layer normalization epsilon 1e-8, and first-index tie breaking. Lower transition weights are [feature, output, piece, input]; pad is [1, feature, output, piece]. Unnormalized tagger scores are used.
 
 Unsupported versions, components, feature types or operators fail explicitly. Changing this representation or numerical semantics requires a new format version and fresh compatibility evidence. Model acquisition is never performed by loading or processing. The manifest uses ordinary JSON; [model-v1.schema.json](model-v1.schema.json) specifies its structural contract. The loader enforces structural and tensor constraints in [validation.rs](../src/validation.rs) and the `validate` function in [neural.rs](../src/neural.rs).

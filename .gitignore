@@ -2,7 +2,5 @@
 /.venv/
 /assets/
 /reference/upstream/
-/reference/wasm-demo.html
-/reference/wasm/
 __pycache__/
 /consumer/target/

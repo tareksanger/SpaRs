@@ -26,7 +26,6 @@ SpaRs (`spars`) implements native Rust inference for `en_core_web_md` 3.8.0. The
 1. The exporter includes the official BASE_NORMS table and preserves model override order, which affects currency and dash normalization.
 2. Pinned Unicode property/lowercase tables preserve Python lexical behavior independently of Rust's Unicode version. Anchored email matching preserves Python match semantics rather than regex search semantics.
 3. Python regex shorthand classes are explicitly translated to pinned Unicode ranges rather than relying on a different regex engine's character classes.
-4. The secondary WASM reference HTML has SHA-256 `8a60c2df6e88676970143455b72641c07d3a7e30b106517c3d4df178d8fa70c7`. Its output differs from official spaCy on a pseudo-projective dependency in development case 23, with an associated noun-chunk difference. Native output matches official Python. See [the WASM mismatch report](../reports/wasm-mismatches.json); no WASM model or executable is shipped.
 
 ### Source provenance and limits
 

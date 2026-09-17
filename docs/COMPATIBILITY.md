@@ -19,7 +19,7 @@ Implemented means native code exists; only the evidence column establishes its v
 | English noun chunks | Implemented | Upstream dependency/POS rules |
 | Static vectors | Partial | Token/span/doc vectors and similarities verified; no floret or vector mutation |
 | Matcher/PhraseMatcher/DependencyMatcher | Unimplemented | Tokenizer's exception matcher is internal only |
-| EntityRuler/SpanRuler | Unimplemented | Not implied by secondary WASM exports |
+| EntityRuler/SpanRuler | Unimplemented | No public rule-based span annotation API |
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
 | Model serialization | Partial | Versioned native official-export format; not spaCy binary-compatible |
