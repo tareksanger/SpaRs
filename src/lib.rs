@@ -27,7 +27,9 @@
 //! Training, additional architectures/languages and the wider spaCy API remain
 //! unimplemented. See the repository compatibility matrix and parity reports.
 mod config;
+mod dependency_matcher;
 mod document;
+pub use dependency_matcher::*;
 mod hash;
 mod lexical;
 pub use lexical::Lexeme;
@@ -55,6 +57,8 @@ pub enum Error {
     Model(String),
     #[error("unsupported configuration: {0}")]
     Unsupported(String),
+    #[error("invalid dependency pattern: {0}")]
+    Pattern(String),
     #[error("invalid span or offset")]
     Bounds,
     #[error("annotation unavailable: {0}")]

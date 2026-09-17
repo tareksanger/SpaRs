@@ -18,13 +18,13 @@ Implemented means native code exists; only the evidence column establishes its v
 | Sentence boundaries | Implemented | Parser roots/subtrees; independent senter/sentencizer not exposed |
 | English noun chunks | Implemented | Upstream dependency/POS rules |
 | Static vectors | Partial | Token/span/doc vectors and similarities verified; no floret or vector mutation |
-| DependencyMatcher | Unimplemented | Next matcher priority; reusable dependency patterns |
-| Matcher / PhraseMatcher | Unimplemented | Planned after DependencyMatcher; tokenizer exception matching is internal only |
+| DependencyMatcher | Partial | All 20 relationships; seven token attributes and five predicates; ordered official reference comparisons; no callbacks, regex, fuzzy matching, or span input |
+| Matcher / PhraseMatcher | Unimplemented | Planned after DependencyMatcher; text/lemma/POS/morphology conditions, repetition, overlaps, and result order need reference suites; tokenizer exception matching is internal only |
 | EntityRuler/SpanRuler | Unimplemented | No public rule-based span annotation API |
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
 | Model serialization | Partial | Versioned native official-export format; not spaCy binary-compatible |
-| Downloadable native model exports | Unimplemented | Planned versioned downloads with checksums; currently consumers run the Python exporter |
+| Model installation without Python | Unimplemented | Native acquisition/conversion from versioned official packages with checksums is planned for investigation; no project-hosted deployment required; current installation uses the Python exporter |
 | Custom components / registry | Unimplemented | Only fixed ordered pipeline accepted |
 | Morphologizer / trainable senter | Unimplemented | Export excludes disabled senter |
 | Textcat, span categorizer/finder, entity linker, edit-tree lemmatizer | Unimplemented | No supported architectures |
