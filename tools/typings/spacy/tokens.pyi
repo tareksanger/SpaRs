@@ -1,0 +1,3 @@
+from reference_types import Doc as ReferenceDoc, Vocab
+
+def Doc(vocab: Vocab, *, words: list[str], spaces: list[bool], heads: list[int], deps: list[str], pos: list[str], tags: list[str], lemmas: list[str], morphs: list[str]) -> ReferenceDoc: ...
