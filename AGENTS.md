@@ -40,6 +40,8 @@ Run strict Pyright and `tools/check_typing_policy.py` through the acceptance scr
 
 ## Performance changes
 
+Speed is a required design constraint for every runtime change. Delegate an independent review to `performance_review` for changes to runtime algorithms, model loading, data structures, batching, or runtime dependencies, including new features. Give it the affected paths and available before/after measurements. If the custom role is unavailable, use a standard subagent with its instructions. Resolve measured regressions before completion; report missing measurements as unverified performance.
+
 Profile the actual workload before choosing an optimization. Measure the final implementation against the same baseline, model, corpus, build mode, thread limits, and warmup procedure. Keep loading, inference, and process memory separate. Run measurements without competing test or benchmark processes.
 
 Optimize measured hot paths with reusable buffers, precompiled immutable resources, cached per-call features, and matrix operations across token rows where appropriate. Preserve model reuse and call isolation. Keep numerical tolerances and discrete-output expectations unchanged; an optimization that fails parity is unfinished.

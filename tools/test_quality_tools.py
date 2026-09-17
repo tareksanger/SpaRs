@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from check_docs import rust_examples, rustdoc_passed
-from check_quality import check_fixtures, check_markdown, ReviewerConfig
+from check_quality import check_fixtures, check_markdown, check_agents, ReviewerConfig
 from benchmark import parse_measurements
 from json_types import ModelMetadata, json_int, parse_json, validate_json
 
@@ -42,6 +42,33 @@ class QualityChecks(unittest.TestCase):
             path.write_text('name = 1')
             with self.assertRaisesRegex(ValueError, "missing name"):
                 ReviewerConfig.load(path)
+
+    def test_reviewer_inventory_requires_each_documented_role(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root/".codex/agents"
+            folder.mkdir(parents=True)
+            for name in ("reference_review", "test_review", "docs_review", "performance_review"):
+                (folder/f"{name}.toml").write_text(
+                    f'name = "{name}"\ndescription = "Review"\n'
+                    'developer_instructions = "Inspect evidence"\nsandbox_mode = "read-only"\n')
+            check_agents(root)
+            performance = folder/"performance_review.toml"
+            content = performance.read_text()
+            performance.unlink()
+            with self.assertRaisesRegex(ValueError, "inventory"):
+                check_agents(root)
+            replacement = folder/"other_review.toml"
+            replacement.write_text(content.replace("performance_review", "other_review"))
+            with self.assertRaisesRegex(ValueError, "inventory"):
+                check_agents(root)
+            replacement.unlink()
+            performance.write_text(content.replace('name = "performance_review"', 'name = "test_review"'))
+            with self.assertRaisesRegex(ValueError, "match filenames"):
+                check_agents(root)
+            performance.write_text(content.replace("read-only", "workspace-write"))
+            with self.assertRaisesRegex(ValueError, "read-only"):
+                check_agents(root)
 
     def test_modified_fixture_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from json_types import read_json, string_map, validate_json, json_object
 
 
+REVIEWER_NAMES: frozenset[str] = frozenset({
+    "reference_review", "test_review", "docs_review", "performance_review",
+})
+
+
 @dataclass(frozen=True)
 class ReviewerConfig:
     name: str
@@ -66,8 +71,8 @@ def check_markdown(path: Path, root: Path) -> None:
 
 def check_agents(root: Path) -> None:
     paths = sorted((root/'.codex/agents').glob('*.toml'))
-    if len(paths) != 3:
-        raise ValueError('Expected the three documented reviewer configurations.')
+    if frozenset(path.stem for path in paths) != REVIEWER_NAMES:
+        raise ValueError('Reviewer inventory must match the documented roles: ' + ', '.join(sorted(REVIEWER_NAMES)))
     names: set[str] = set()
     for path in paths:
         data = ReviewerConfig.load(path)
@@ -96,7 +101,7 @@ def main() -> None:
     for path in paths:
         check_markdown(path, root)
     check_agents(root)
-    print(f'PASS frozen fixture checksums, {len(paths)} Markdown files, and 3 reviewer configurations')
+    print(f'PASS frozen fixture checksums, {len(paths)} Markdown files, and {len(REVIEWER_NAMES)} reviewer configurations')
 
 
 if __name__ == '__main__':

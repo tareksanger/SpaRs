@@ -83,13 +83,14 @@ The verification report records commands, outputs, versions, and fixture hashes.
 
 ## Use reviewers with clear jobs
 
-The project defines three optional Codex reviewers in [`.codex/agents`](../.codex/agents):
+The project defines four Codex reviewers in [`.codex/agents`](../.codex/agents):
 
 - `reference_review` checks behavior against official source and reference results.
 - `test_review` checks whether tests catch mistakes and actually execute in CI.
 - `docs_review` checks plain English, examples, and supported-feature claims.
+- `performance_review` checks processing time, loading time, memory use, repeated work, and how cost grows with input size. Runtime changes require this review, including new features and dependency changes.
 
-Ask Codex: “Review this change with reference_review, test_review, and docs_review. Give each reviewer its matching scope, wait for their findings, and resolve concrete issues before marking it verified.” The main agent makes changes and runs tests; the reviewers inspect files and report findings. Their reports supplement the automated checks.
+Ask Codex: “Review this change with reference_review, test_review, and docs_review. Give each reviewer its matching scope, wait for their findings, and resolve concrete issues before marking it verified.” Include `performance_review` whenever runtime performance can change. Supply the changed files and comparable before/after results; missing measurements mean performance is unverified. Resolve measured regressions before completion. The main agent makes changes and runs tests; the reviewers inspect files and report findings. Their reports supplement the automated checks.
 
 The files follow the [official custom-agent format](https://learn.chatgpt.com/docs/agent-configuration/subagents). They inherit the selected model and use read-only review instructions. Configuration syntax is checked in CI; loading the files still depends on the Codex client. These agents are not a background service and do not run inside GitHub Actions.
 
