@@ -43,6 +43,10 @@ tools/node_modules/.bin/pyright --project pyrightconfig.json
 
 Pyright runs in strict mode over all Python tools. The policy check requires function annotations and rejects `Any`, unchecked casts, and ignored type errors. Resolve the underlying type mismatch instead of weakening these checks. Narrow local stubs describe the spaCy and Thinc interfaces used by the exporter; a byte-identical export and regenerated reference fixture comparisons test those declarations against the real libraries. Regenerated annotations and hashes must match exactly; neural values use the existing floating-point limits in [validation](VALIDATION.md). Stubs must describe actual behavior, not merely satisfy the checker.
 
+## Keep saved data portable
+
+Fixtures and reports must not contain personal directories or absolute filesystem paths. Use project-relative paths when a path is needed. Report generators remove external host paths from captured output, and the quality check rejects absolute paths in saved JSON artifacts. Source URLs remain intact for attribution.
+
 ## Keep evaluation data stable
 
 A fixture is a saved input and its expected output. Official spaCy produces the expected outputs; SpaRs reads them in tests. `fixtures/checksums.json` records the file hashes so accidental edits fail verification. A hash detects changes; reviewing a changed checksum still requires a person or reviewer to check the reason.

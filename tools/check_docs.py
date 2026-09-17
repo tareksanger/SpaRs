@@ -4,6 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 from typing import TypedDict
+from report_paths import portable_text
 
 
 class DocumentationResult(TypedDict):
@@ -55,16 +56,16 @@ def main() -> None:
         count = rust_examples(path.read_text())
         if not count:
             continue
-        cmd = ['rustdoc', '--test', str(path), '--edition', '2021',
-               '--extern', f'spars={root}/target/release/libspars.rlib',
-               '-L', f'dependency={root}/target/release/deps',
-               '--test-run-directory', str(root)]
+        cmd = ['rustdoc', '--test', str(path.relative_to(root)), '--edition', '2021',
+               '--extern', 'spars=target/release/libspars.rlib',
+               '-L', 'dependency=target/release/deps',
+               '--test-run-directory', '.']
         result = subprocess.run(cmd, cwd=root, text=True, capture_output=True)
         print(result.stdout, end='')
         print(result.stderr, end='')
         ok = rustdoc_passed(result.returncode, result.stdout, count)
         results.append({'document':str(path.relative_to(root)), 'examples':count,
-                        'passed':ok,'stdout':result.stdout,'stderr':result.stderr})
+                        'passed':ok,'stdout':portable_text(result.stdout, root),'stderr':portable_text(result.stderr, root)})
     if not results:
         raise RuntimeError('No runnable Rust examples found.')
     (root/'reports').mkdir(exist_ok=True)

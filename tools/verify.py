@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 from json_types import ModelMetadata
+from report_paths import portable_text
 
 
 class Options(argparse.Namespace):
@@ -49,14 +50,14 @@ def main() -> None:
 
     def run(cmd: list[str]) -> None:
         result = subprocess.run(cmd, text=True, capture_output=True)
-        results.append({'command':cmd, 'exit_code':result.returncode,
-                        'stdout':result.stdout, 'stderr':result.stderr})
+        results.append({'command':[portable_text(part, Path.cwd()) for part in cmd], 'exit_code':result.returncode,
+                        'stdout':portable_text(result.stdout, Path.cwd()), 'stderr':portable_text(result.stderr, Path.cwd())})
         if result.returncode:
             failure = report_path.with_name(report_path.stem+'-failure.json')
             failure.write_text(json.dumps(results, indent=2)+'\n')
             print(result.stdout, result.stderr)
             raise SystemExit(f'Failed: {cmd}. See {failure}')
-        print('PASS', ' '.join(cmd), flush=True)
+        print('PASS', ' '.join(results[-1]['command']), flush=True)
 
     commands = [
         ["tools/node_modules/.bin/pyright", "--project", "pyrightconfig.json"],
@@ -70,13 +71,14 @@ def main() -> None:
         ['cargo', 'test', '--release', '--offline', '--', '--include-ignored'],
         ['.venv/bin/python', 'tools/check_docs.py'],
         ['cargo', 'build', '--release', '--offline', '--manifest-path', 'consumer/Cargo.toml'],
-        ['env', '-i', 'PATH=/nonexistent', 'consumer/target/release/native-consumer-check',
-         str(Path('assets/en_core_web_md-3.8.0').resolve())],
+        ['env', '-i', 'PATH=', 'consumer/target/release/native-consumer-check',
+         'assets/en_core_web_md-3.8.0'],
         ['cargo', 'package', '--allow-dirty', '--offline'],
     ]
     for cmd in commands:
         run(cmd)
-    with tempfile.TemporaryDirectory(prefix='spars-export-') as tmp:
+    Path('target').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='reference-export-', dir='target') as tmp:
         run(['.venv/bin/python', 'tools/export.py', '--out', tmp])
         root = Path('assets/en_core_web_md-3.8.0')
         digests = {p.name:digest(p) for p in sorted(root.iterdir()) if p.is_file()}

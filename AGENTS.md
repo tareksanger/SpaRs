@@ -18,6 +18,7 @@ Write repository documentation for users and contributors who have not read any 
 - Preserve technically relevant history: source provenance, fixture influence, resolved compatibility differences, and reasons for implementation constraints.
 - Scope claims to their evidence. Distinguish implemented, verified, partial, and unsupported behavior. Link validation claims to reports and reproducible commands; do not infer linguistic accuracy from reference agreement.
 - Avoid transient publication or CI-status claims in prose. Document how to install, verify, or locate CI results instead. Generated report metadata must describe only what that generator actually checks.
+- Save only project-relative filesystem paths in fixtures, reports, and documentation. Remove external host paths from captured diagnostics before saving them. Never record personal home directories or temporary-directory locations. Keep upstream source URLs intact.
 - Use repository-relative links and portable commands. Do not assume readers know a URL, path, or artifact mentioned in a conversation.
 - When changing behavior, reconcile the README, compatibility inventory, model format, and validation documentation where relevant. Do not rewrite license notices or remove provenance to simplify prose.
 

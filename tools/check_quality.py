@@ -78,9 +78,20 @@ def check_agents(root: Path) -> None:
         names.add(data.name)
 
 
+def check_portable_artifacts(root: Path) -> None:
+    from report_paths import portable_json
+
+    paths = [*sorted((root/'fixtures').rglob('*.json')), *sorted((root/'reports').rglob('*.json'))]
+    for path in paths:
+        value = read_json(path)
+        if portable_json(value, root) != value:
+            raise ValueError(f'{path.relative_to(root)}: remove absolute filesystem paths from saved data')
+
+
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
     check_fixtures(root)
+    check_portable_artifacts(root)
     paths = [*root.glob('*.md'), *sorted((root/'docs').glob('*.md')), root/'fixtures/README.md', *sorted((root/'.github').glob('*.md'))]
     for path in paths:
         check_markdown(path, root)
