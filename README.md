@@ -45,11 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Acquire and export explicitly
 
-Requirements: Rust 1.85+ (tested toolchain recorded in reports), Python 3.12.5, `uv`, and `curl`. Python is only for this development/export workflow.
+Requirements: Rust 1.85+ (tested toolchain recorded in reports), Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. Python and Node.js are only development tools; neither is needed by Rust consumers.
 
 ```sh
 uv venv --python 3.12.5 .venv
 uv pip sync --python .venv/bin/python tools/reference-requirements.lock
+npm --prefix tools ci --ignore-scripts --no-audit --no-fund
 .venv/bin/python tools/acquire.py
 .venv/bin/python tools/export.py
 .venv/bin/python tools/provenance.py

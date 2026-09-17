@@ -4,7 +4,7 @@ SpaRs turns text into tokens (words and punctuation), identifies names and place
 
 ## Set up the project
 
-Install Rust, `uv`, and `curl`, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. Fetch both sets of Rust dependencies before running the offline checks:
+Install Rust, `uv`, `curl`, and Node.js 24 with npm, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. Fetch both sets of Rust dependencies before running the offline checks:
 
 ```sh
 cargo fetch --locked

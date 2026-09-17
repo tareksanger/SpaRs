@@ -3,14 +3,14 @@
     "document": "README.md",
     "examples": 1,
     "passed": true,
-    "stdout": "\nrunning 1 test\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/README.md - SpaRs::Use_from_Rust (line 16) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s\n\n",
+    "stdout": "\nrunning 1 test\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/README.md - SpaRs::Use_from_Rust (line 16) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s\n\n",
     "stderr": ""
   },
   {
     "document": "docs/DEVELOPMENT.md",
     "examples": 4,
     "passed": true,
-    "stdout": "\nrunning 4 tests\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Work_with_Unicode_offsets (line 48) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Run_part_of_the_pipeline_and_save_a_document (line 66) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Read_tokens_and_named_entities (line 24) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Process_several_documents (line 86) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s\n\n",
+    "stdout": "\nrunning 4 tests\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Work_with_Unicode_offsets (line 48) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Read_tokens_and_named_entities (line 24) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Run_part_of_the_pipeline_and_save_a_document (line 66) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Process_several_documents (line 86) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\n\n",
     "stderr": ""
   }
 ]

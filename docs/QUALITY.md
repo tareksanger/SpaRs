@@ -28,6 +28,21 @@ For a model or reference-version change, create a new fixture version and docume
 
 “Exact” means every expected discrete value agrees. Matching most tokens does not pass. Numerical tolerances allow small differences in floating-point calculations; they never excuse a different tag, dependency, or entity. See [validation](VALIDATION.md) for the limits and their reasoning.
 
+## Use strong types
+
+Use named records for data with known fields. Rust model configuration uses structs and enums, so an unknown feature or a tensor reference with the wrong type fails when the model loads. Python tools use annotated functions, dataclasses, and TypedDicts (dictionaries whose field names and value types are specified).
+
+External data still needs validation. For example, `json_int(True)` raises `ValueError`, even though Python normally treats booleans as integers. `tools/test_quality_tools.py` tests this boundary and malformed model metadata. Types cannot prove that an array has the right dimensions, so model loading also checks shapes and bounds.
+
+Run the typing checks independently with:
+
+```sh
+tools/node_modules/.bin/pyright --project pyrightconfig.json
+.venv/bin/python tools/check_typing_policy.py
+```
+
+Pyright runs in strict mode over all Python tools. The policy check requires function annotations and rejects `Any`, unchecked casts, and ignored type errors. Resolve the underlying type mismatch instead of weakening these checks. Narrow local stubs describe the spaCy and Thinc interfaces used by the exporter; a byte-identical export and reference fixture comparisons test those declarations against the real libraries. Stubs must describe actual behavior, not merely satisfy the checker.
+
 ## Keep evaluation data stable
 
 A fixture is a saved input and its expected output. Official spaCy produces the expected outputs; SpaRs reads them in tests. `fixtures/checksums.json` records the file hashes so accidental edits fail verification. A hash detects changes; reviewing a changed checksum still requires a person or reviewer to check the reason.
@@ -44,7 +59,7 @@ After the setup in the [developer guide](DEVELOPMENT.md), run:
 .venv/bin/python tools/verify.py
 ```
 
-This checks frozen fixtures, documentation structure, reviewer configuration, quality-tool failure cases, Rust formatting, Clippy (Rust code checks), all Rust tests, executed Markdown examples, the separate native consumer, Cargo packaging, and a second official export. Missing model assets fail the run. Packaging verifies a local archive; it does not publish a release.
+This checks strict Python types, the explicit typing policy, frozen fixtures, documentation structure, reviewer configuration, quality-tool failure cases, regeneration of the development, stage, and hash reference fixtures, Rust formatting, Clippy (Rust code checks), all Rust tests, executed Markdown examples, the separate native consumer, Cargo packaging, and a second official export. Missing model assets fail the run. Packaging verifies a local archive; it does not publish a release.
 
 Use this command for just the expanded reference comparison:
 

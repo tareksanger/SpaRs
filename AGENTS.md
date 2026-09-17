@@ -29,6 +29,12 @@ Delegate independent review of substantial behavior changes to the project agent
 
 Write plain English and explain necessary technical terms. Guide examples must run from their Markdown source during `tools/check_docs.py`; compiling without running does not count as a tested example.
 
+## Strong typing
+
+Use concrete types throughout Rust and Python, including tools and tests. Represent known records with structs, enums, dataclasses, or TypedDicts rather than generic dictionaries. Annotate Python function parameters and return values. Validate external JSON and upstream library values at the boundary, then pass typed records into computation. Generic JSON is appropriate for decoding, serialization, and deliberately malformed test inputs, not as a substitute for model or domain types.
+
+Run strict Pyright and `tools/check_typing_policy.py` through the acceptance script. Fix errors rather than adding `Any`, unchecked casts, ignored diagnostics, or weaker checker settings. Keep local stubs narrow and accurate to the pinned upstream interfaces; exercise those interfaces against the real reference environment. Type annotations do not replace shape, bounds, or semantic validation.
+
 ## Implementation and verification
 
 Keep changes small and focused. Prefer pure computation, immutable loaded models, and per-call state. Preserve exact text, whitespace, and distinct byte offsets, code-point offsets, and token indices. Unsupported configurations and unavailable annotations must remain explicit rather than being omitted or fabricated.

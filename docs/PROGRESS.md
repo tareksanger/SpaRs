@@ -22,7 +22,11 @@ SpaRs implements native Rust inference for `en_core_web_md` 3.8.0, using spaCy 3
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). In the recorded intermediate tests, the maximum activation difference was 4.291534423828125e-6 and the maximum transition-score difference was 1.9073486328125e-5. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [expanded verification report](../reports/verification-expanded.json) records formatting, Clippy, 21 Rust tests, 2 source doc tests, 7 quality-tool tests, the 5 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the five executed Markdown examples. The consumer runs with no interpreters on its PATH.
+The [typed implementation verification report](../reports/verification-typed.json) records strict Python type checking, the typing policy, formatting, Clippy, Rust and Python tests, 2 source doc tests, the 5 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the five executed Markdown examples. The consumer runs with no interpreters on its PATH.
+
+## Strong typing
+
+Runtime model configuration uses typed Rust records and enums instead of generic JSON values. Python tools use strict Pyright checking, named records, and checked conversions at external-data boundaries. Regression tests reject wrong field types, unknown operators, invalid null constraints, booleans used as integers, and typing-policy bypasses. The exported model format and frozen reference expectations remain unchanged.
 
 ## What the expanded evaluation found
 
@@ -35,6 +39,10 @@ These are synthetic, project-authored examples. They broaden coverage but do not
 ## Model provenance
 
 The official model wheel has SHA-256 `5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310`. The exporter copies 69 F32 tensors, configuration, linguistic resources, and license notices. Source hashes verified against the official wheel are recorded in [source-lock.json](../reference/source-lock.json). For spaCy 3.8.14, wheel-shipped source was used because a source archive was unavailable at acquisition.
+
+## Fixture generator limitation
+
+The current lexical generator produces 5,367 cases and its regex generator produces 16,038 texts, while the frozen suites contain 4,374 lexical cases and 13,059 regex texts. This difference predates the typing changes: the previous and typed generators produce byte-identical outputs with the current exported resources. Existing fixture inputs and expectations remain frozen. Reconcile generator input provenance before claiming that every frozen suite can be regenerated from the current scripts.
 
 ## Performance and remaining work
 

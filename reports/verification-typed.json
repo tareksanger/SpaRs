@@ -1,0 +1,206 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "machine": "arm64",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18) (Homebrew)",
+  "python": "3.12.5",
+  "reference_versions": {
+    "murmurhash": "1.0.15",
+    "numpy": "2.5.3",
+    "spacy": "3.8.14",
+    "srsly": "2.5.3",
+    "thinc": "8.3.13"
+  },
+  "model": "en_core_web_md 3.8.0",
+  "commands": [
+    {
+      "command": [
+        "tools/node_modules/.bin/pyright",
+        "--project",
+        "pyrightconfig.json"
+      ],
+      "exit_code": 0,
+      "stdout": "0 errors, 0 warnings, 0 informations\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "tools/check_typing_policy.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS explicit typing policy for 34 Python and stub files\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "tools/check_quality.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS frozen fixture checksums, 13 Markdown files, and 3 reviewer configurations\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "tools/check_reference.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS 3 regenerated reference fixtures are byte-identical\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ".....................\n----------------------------------------------------------------------\nRan 21 tests in 0.007s\n\nOK\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "consumer/Cargo.toml",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--offline",
+        "--",
+        "--include-ignored"
+      ],
+      "exit_code": 0,
+      "stdout": "\nrunning 11 tests\ntest config::tests::action_deserialization_preserves_label_and_kind ... ok\ntest config::tests::feature_and_tensor_types_reject_unknown_or_mistyped_fields ... ok\ntest tests::document_snapshots_validate_offsets ... ok\ntest config::tests::tokenizer_optional_boolean_rejects_null_but_nullable_resources_remain_valid ... ok\ntest config::tests::attribute_patterns_preserve_attribute_value_types ... ok\ntest config::tests::optional_attributes_allow_absence_but_reject_null ... ok\ntest tests::hash_keys_match_thinc ... ok\ntest tests::lexical_and_vectors ... ok\ntest tests::tokenizer_and_features ... ok\ntest tests::regex_span_semantics ... ok\ntest tests::official_stage_parity ... ok\n\ntest result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s\n\n\nrunning 4 tests\ntest missing_model_is_an_error ... ok\ntest checked_views_and_similarity ... ok\ntest public_api_and_batch_isolation ... ok\ntest malformed_models_are_errors ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s\n\n\nrunning 1 test\ntest reported_median_handles_even_odd_and_empty_samples ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest tokenizer_boundary_regressions ... ok\ntest unseen_postfix_comparison ... ok\ntest expanded_official_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s\n\n\nrunning 3 tests\ntest official_holdout_parity ... ok\ntest official_development_parity ... ok\ntest official_regression_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s\n\n\nrunning 4 tests\ntest malformed_snapshots_reject_unicode_offsets_indices_and_spans ... ok\ntest malformed_resource_types_and_missing_configuration_are_rejected ... ok\ntest damaged_tensor_files_reach_validation_after_checksum_is_updated ... ok\ntest long_unicode_and_alternating_calls_preserve_results ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.75s\n\n\nrunning 2 tests\ntest src/lib.rs - (line 6) - compile ... ok\ntest src/lib.rs - (line 18) ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Finished `release` profile [optimized + debuginfo] target(s) in 3.79s\n     Running unittests src/lib.rs (target/release/deps/spars-cb476587bde9d3f3)\n     Running tests/api.rs (target/release/deps/api-802f15882d052041)\n     Running tests/benchmark_math.rs (target/release/deps/benchmark_math-5051b4f62faf4431)\n     Running tests/evaluation.rs (target/release/deps/evaluation-12d23c274f3e95e7)\n     Running tests/parity.rs (target/release/deps/parity-4a449cea51097986)\n     Running tests/robustness.rs (target/release/deps/robustness-624358538e878345)\n   Doc-tests spars\n"
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "tools/check_docs.py"
+      ],
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/README.md - SpaRs::Use_from_Rust (line 16) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s\n\n\nrunning 4 tests\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Work_with_Unicode_offsets (line 48) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Read_tokens_and_named_entities (line 24) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Run_part_of_the_pipeline_and_save_a_document (line 66) ... ok\ntest /Users/tareksanger/Developer/SideHustle/SpaCyRust/docs/DEVELOPMENT.md - Develop_with_SpaRs::Process_several_documents (line 86) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\n\n",
+      "stderr": "    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--manifest-path",
+        "consumer/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling native-consumer-check v0.0.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/consumer)\n    Finished `release` profile [optimized] target(s) in 4.31s\n"
+    },
+    {
+      "command": [
+        "env",
+        "-i",
+        "PATH=/nonexistent",
+        "consumer/target/release/native-consumer-check",
+        "/Users/tareksanger/Developer/SideHustle/SpaCyRust/assets/en_core_web_md-3.8.0"
+      ],
+      "exit_code": 0,
+      "stdout": "Alice\tNNP\tAlice\t1\tnsubj\nworks\tVBZ\twork\t1\tROOT\nat\tIN\tat\t1\tprep\nMicrosoft\tNNP\tMicrosoft\t2\tpobj\nin\tIN\tin\t1\tprep\nNew\tNNP\tNew\t6\tcompound\nYork\tNNP\tYork\t4\tpobj\n.\t.\t.\t1\tpunct\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "package",
+        "--allow-dirty",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "warning: manifest has no documentation, homepage or repository\n  |\n  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info\n   Packaging spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Packaged 109 files, 480.3KiB (142.9KiB compressed)\n   Verifying spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/target/package/spars-0.1.0)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.68s\n"
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "tools/export.py",
+        "--out",
+        "/var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-clz03_eg"
+      ],
+      "exit_code": 0,
+      "stdout": "exported 69 tensors to /var/folders/49/7ql5bz295kl75_lkz4z89gjh0000gn/T/spars-export-clz03_eg\n",
+      "stderr": ""
+    }
+  ],
+  "reexport_sha256": {
+    "LICENSE": "3933c176979b68bc6d0bcc902c7d6c130f1d127f476f17ba5cdba8d99cfd0012",
+    "LICENSES_SOURCES": "ea21333cecd2593c1fea842e9362bedf7b556abfb97cd08ce0650f2228b2eb58",
+    "Python.txt": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+    "Unicode.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "manifest.json": "49c3cff0b964eb97e71b9aa2df5afacf66a766eab77b376346c5771f3b2b5a4a",
+    "source-lock.json": "c9e471790052924cde490c753baa22f9e695d2cfe3a697a3e2945e4f735abd8f",
+    "spacy-MIT.txt": "3f4378e67708fecacd3e27651c8bc0f977cf20789e19da0d81a2840e7cf573a2",
+    "thinc-MIT.txt": "d7192459f33a5d8c66358e2115ccbd3265478750f0b9d15f0c22e68e3ce6cc1e",
+    "weights.safetensors": "f427a440f7322bc7259ef59fed7581534d93ed2307b6ad49bb3ed8191003cc54"
+  },
+  "fixture_sha256": {
+    "fixtures/checksums.json": "9a606c922f68ae4c2c62703bd7a5d94bacfc0cdafd951577becd351b32a30a0d",
+    "fixtures/development.expected.json": "c386cf3c705fe1939f5047c19229ead2a18ce978bb3a31e22ac60ab453d23c19",
+    "fixtures/development.json": "d7127bd012c10e974d3ecf0a2a559f52ed49d365fcf7be87c6f945eeec937149",
+    "fixtures/evaluation-v1.expected.json": "461bf4aeee817c28aee763524e897e4006ebdff7823d51f03c91992d1e32c001",
+    "fixtures/evaluation-v1.json": "18dc7638b786f7b770bc0e13104d9349d0b1d7ff9e78d48a9a234cb5a178c1fa",
+    "fixtures/hash.expected.json": "170feb704b078574b876a0979ebf89410730f4003eb956f7bb0b5dd9ca11a166",
+    "fixtures/holdout.expected.json": "a395dec77756e11dcc224ebe106fc0c3265805305b2b112d868edb4635f2173a",
+    "fixtures/holdout.json": "8eef5cbc75df0f07e44be3d7ab937a3e9565f0348822af3407d54e2475680b95",
+    "fixtures/lexical.expected.json": "e8c40f354a18529b1c998958af0fc1c6c6d96a5b1f1ea2a84d1d57c99fe7786e",
+    "fixtures/regex.expected.json": "4bf254d4b26c649b9c9bc1ab5d2b12dc824d369259c37c16c8f108011f3357b1",
+    "fixtures/regression.expected.json": "cb9904df9417e6f04b547c45878797ec7ce9c012595d1f33a41acf720640c71b",
+    "fixtures/regression.json": "323244262ddf4e1be8931a363e0227bb57f3346ac3632cc52e4d063bb1745e5f",
+    "fixtures/stages.expected.json": "e41348f913e957b45e5b91460164a33155433950d41378feaf19cdf4102ed5f1",
+    "fixtures/tokenizer-boundaries-v1.expected.json": "cacfd815a4f68d0d32d9a5ca73fa5fac0e73128c81f3bceb36bd54d518e83ec7",
+    "fixtures/tokenizer-boundaries-v1.json": "2cf87c8da4fbb9a7dae6ea226e9c17311b06dd02cd501cf5be6884d0a69e273d",
+    "fixtures/tokenizer.expected.json": "782da7ece64d95828787b84b5c4f1dbd2a183adc4afaf5f223f42efdb6e787e7",
+    "fixtures/unseen-v1.expected.json": "88a3acd3753a53a3766171d61beaf9416825ea89096b8013574e80e1925b9a54",
+    "fixtures/unseen-v1.json": "8cf2c8ee5e1c4f917c556496725c9ceb8811f53d70673de0761188cbadf5d8c2",
+    "fixtures/vectors.expected.json": "7c21a627d093969dbcafe564ac787a8b970ac1c933570fda904a9a00e4e896c0"
+  },
+  "note": "Local validation environment, not a performance benchmark."
+}
