@@ -138,7 +138,7 @@ class FixtureReport:
 
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
-    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json']
+    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json']
     reports: list[FixtureReport] = []
     failure: ReferenceMismatch | None = None
     with tempfile.TemporaryDirectory(prefix='spars-reference-check-') as temporary:
@@ -154,6 +154,12 @@ def main() -> None:
                         str(work / 'fixtures/dependency-match-v1.expected.json')], cwd=work, check=True)
         subprocess.run([sys.executable, str(root / 'tools/dependency_match_reference.py'),
                         '--regressions', str(work / 'fixtures/dependency-match-regressions-v1.expected.json')], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
+                        str(work / 'fixtures/token-match-v1.expected.json')], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
+                        '--exhaustive', str(work / 'fixtures/token-match-exhaustive-v1.expected.json')], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
+                        '--branching', str(work / 'fixtures/token-match-branching-v1.expected.json')], cwd=work, check=True)
         for name in expected:
             original = root / 'fixtures' / name
             generated = work / 'fixtures' / name

@@ -19,5 +19,8 @@
   "fixtures/vectors.expected.json": "7c21a627d093969dbcafe564ac787a8b970ac1c933570fda904a9a00e4e896c0",
   "fixtures/traversal-v1.expected.json": "05cc5c5c9a7aa2f97e439d8026ae877d467209a3be97d5dfad1451c98c9a916c",
   "fixtures/dependency-match-v1.expected.json": "8196672c3884269e954ca5f0486481ec559b5ace28d237775e83ff42d356bf3b",
-  "fixtures/dependency-match-regressions-v1.expected.json": "6924e730dc379b80c7e79a1ec184fec388d26b3b6a45531d05c3291b507fa78c"
+  "fixtures/dependency-match-regressions-v1.expected.json": "6924e730dc379b80c7e79a1ec184fec388d26b3b6a45531d05c3291b507fa78c",
+  "fixtures/token-match-v1.expected.json": "dc87882195334a698b4f03166f4c98bab04d9cfda7bddcb9b57e9880b724d3fd",
+  "fixtures/token-match-exhaustive-v1.expected.json": "e85ebb4f58e6b0d9155423648e681a54510c1a469cb9274965e40cd9fc30900f",
+  "fixtures/token-match-branching-v1.expected.json": "d196c64a75d5baa7944abd542492c79a92c9de037fdd1236c11dd569176dfc95"
 }
