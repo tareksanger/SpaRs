@@ -6,7 +6,7 @@ from json_types import JsonValue
 
 # URLs are source provenance, not filesystem paths. Protect them before scanning.
 _URL = re.compile(r'https?://[^\s\"<>]+|</3(?![\w/])')
-_ABSOLUTE = re.compile(r'(?<![\w/])(?:file:///?|[A-Za-z]:[\\/]|\\\\|/)(?=[^\W\d]|[._~]|\d+/)[^\s\"\'<>),;]+')
+_ABSOLUTE = re.compile(r'(?<![\w/])(?:file:///?|[A-Za-z]:[\\/]|\\\\|/)(?=[^\W]|[.~])[^\s\"\'<>),;]+')
 
 
 def portable_text(text: str, root: Path) -> str:

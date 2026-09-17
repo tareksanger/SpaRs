@@ -28,7 +28,7 @@ class ReportPathTests(unittest.TestCase):
 
     def test_external_paths_are_removed(self) -> None:
         for prefix in ('/Users/example', '/home/example', '/private/tmp', '/var/folders/cache',
-                       'C:\\Users\\example', '/Éric/private', 'file:///Users/example',
+                       'C:\\Users\\example', '/Éric/private', '/123', 'file:///Users/example',
                        '\\\\server\\share'):
             with self.subTest(prefix=prefix):
                 self.assertEqual(portable_text(f'error: {prefix}/file.py:2', Path.cwd()),
