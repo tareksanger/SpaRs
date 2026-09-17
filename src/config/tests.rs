@@ -63,3 +63,31 @@ fn tokenizer_optional_boolean_rejects_null_but_nullable_resources_remain_valid()
     assert!(serde_json::from_value::<TokenizerConfig>(json).is_ok());
     assert!(serde_json::from_str::<Exception>(r#"{"ORTH":"x","NORM":null}"#).is_ok());
 }
+
+#[test]
+fn lemma_resources_preserve_membership_and_rule_priority() {
+    let lemmas: Lemmas = serde_json::from_str(
+        r#"{"lemma_index":{"noun":["cat","café","cat"],"verb":{}},
+        "lemma_exc":{"noun":{"cats":["cat","cat","kitty"]}},
+        "lemma_rules":{"noun":[["s",""],["ies","y"]],"verb":{}}}"#,
+    )
+    .unwrap();
+    let nouns = &lemmas.lemma_index["noun"];
+    for word in ["cat", "café"] {
+        assert!(nouns.contains(&word.to_owned()));
+    }
+    for word in ["cats", "cafe", "", "CAT"] {
+        assert!(!nouns.contains(&word.to_owned()));
+    }
+    assert!(lemmas.lemma_index["verb"].is_empty());
+    assert_eq!(lemmas.lemma_exc["noun"]["cats"], ["cat", "cat", "kitty"]);
+    assert_eq!(lemmas.lemma_rules["noun"], [["s", ""], ["ies", "y"]]);
+    for index in [
+        r#"{"noun":{"cat":1}}"#,
+        r#"{"noun":[42]}"#,
+        r#"{"noun":null}"#,
+    ] {
+        let json = format!(r#"{{"lemma_index":{index},"lemma_exc":{{}},"lemma_rules":{{}}}}"#);
+        assert!(serde_json::from_str::<Lemmas>(&json).is_err());
+    }
+}

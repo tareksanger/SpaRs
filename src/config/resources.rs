@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[derive(Deserialize)]
 pub(crate) struct TokenizerConfig {
     pub prefix: String,
@@ -143,12 +143,25 @@ pub(crate) enum OutputAttribute {
 }
 #[derive(Deserialize)]
 pub(crate) struct Lemmas {
-    #[serde(deserialize_with = "tables")]
-    pub lemma_index: HashMap<String, Vec<String>>,
+    #[serde(deserialize_with = "membership_tables")]
+    pub lemma_index: HashMap<String, HashSet<String>>,
     pub lemma_exc: HashMap<String, HashMap<String, Vec<String>>>,
     #[serde(deserialize_with = "tables")]
     pub lemma_rules: HashMap<String, Vec<[String; 2]>>,
 }
+// Only membership is observed for the index; rule and exception order stays intact.
+fn membership_tables<'de, D>(d: D) -> Result<HashMap<String, HashSet<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    tables::<D, String>(d).map(|tables| {
+        tables
+            .into_iter()
+            .map(|(pos, words)| (pos, words.into_iter().collect()))
+            .collect()
+    })
+}
+
 fn tables<'de, D, T>(d: D) -> Result<HashMap<String, Vec<T>>, D::Error>
 where
     D: serde::Deserializer<'de>,
