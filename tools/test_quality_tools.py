@@ -6,11 +6,44 @@ import unittest
 from pathlib import Path
 
 from check_docs import rust_examples, rustdoc_passed
-from check_quality import check_fixtures, check_markdown
+from check_quality import check_fixtures, check_markdown, ReviewerConfig
+from benchmark import parse_measurements
+from json_types import ModelMetadata, json_int, parse_json, validate_json
 
 
 class QualityChecks(unittest.TestCase):
-    def test_modified_fixture_fails(self):
+    def test_json_boundary_rejects_invalid_values(self) -> None:
+        self.assertEqual(parse_json('{"values": [1, true, null]}'), {"values": [1, True, None]})
+        with self.assertRaises(ValueError):
+            validate_json({1: "invalid key"})
+        with self.assertRaises(ValueError):
+            validate_json(Path("unsupported"))
+        with self.assertRaises(ValueError):
+            json_int(True)
+
+    def test_model_metadata_validates_reference_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/"manifest.json"
+            path.write_text('{"model":"en_core_web_md","model_version":"3.8.0","versions":{"spacy":3},"weights_sha256":"abc"}')
+            with self.assertRaises(ValueError):
+                ModelMetadata.load(path)
+
+    def test_benchmark_rejects_malformed_measurements(self) -> None:
+        self.assertEqual(parse_measurements('{"load_seconds":0.5}', "load", 100, ["measure"]),
+                         {"load_seconds":0.5,"peak_process_rss_bytes":100,"command":["measure"]})
+        with self.assertRaises(ValueError):
+            parse_measurements('{"load_seconds":true}', "load", 100, [])
+        with self.assertRaises(KeyError):
+            parse_measurements('{"load_seconds":0.5}', "short", 100, [])
+
+    def test_reviewer_configuration_validates_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/"reviewer.toml"
+            path.write_text('name = 1')
+            with self.assertRaisesRegex(ValueError, "missing name"):
+                ReviewerConfig.load(path)
+
+    def test_modified_fixture_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root/'fixtures').mkdir()
@@ -25,7 +58,7 @@ class QualityChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'inventory'):
                 check_fixtures(root)
 
-    def test_examples_must_execute(self):
+    def test_examples_must_execute(self) -> None:
         self.assertEqual(rust_examples('```rust\nassert_eq!(1, 1);\n```'), 1)
         for flag in ('no_run', 'ignore', 'compile_fail'):
             with self.assertRaises(ValueError):
@@ -33,12 +66,12 @@ class QualityChecks(unittest.TestCase):
             with self.assertRaises(ValueError):
                 rust_examples(f'```{flag}\nassert!(false);\n```')
 
-    def test_noncanonical_rust_fences_fail(self):
+    def test_noncanonical_rust_fences_fail(self) -> None:
         for start, end in [('~~~rust', '~~~'), ('````rust', '````'), ('   ```rust', '   ```')]:
             with self.assertRaises(ValueError):
                 rust_examples(f'{start}\nassert!(false);\n{end}')
 
-    def test_only_executed_examples_pass(self):
+    def test_only_executed_examples_pass(self) -> None:
         output = 'test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;'
         self.assertTrue(rustdoc_passed(0, output, 2))
         self.assertFalse(rustdoc_passed(1, output, 2))
@@ -46,7 +79,7 @@ class QualityChecks(unittest.TestCase):
         self.assertFalse(rustdoc_passed(0, output.replace('0 ignored', '1 ignored'), 2))
         self.assertFalse(rustdoc_passed(0, output.replace('0 filtered out', '1 filtered out'), 2))
 
-    def test_markdown_keeps_structure_and_rejects_wrapping(self):
+    def test_markdown_keeps_structure_and_rejects_wrapping(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root/'doc.md'
@@ -56,7 +89,7 @@ class QualityChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'one source line'):
                 check_markdown(path, root)
 
-    def test_broken_link_fails(self):
+    def test_broken_link_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root/'doc.md'
@@ -64,7 +97,7 @@ class QualityChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'link'):
                 check_markdown(path, root)
 
-    def test_unclosed_fence_fails(self):
+    def test_unclosed_fence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root/'doc.md'

@@ -3,9 +3,18 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from typing import TypedDict
 
 
-def rust_examples(text):
+class DocumentationResult(TypedDict):
+    document: str
+    examples: int
+    passed: bool
+    stdout: str
+    stderr: str
+
+
+def rust_examples(text: str) -> int:
     count = 0
     fence = None
     for line in text.splitlines():
@@ -32,16 +41,16 @@ def rust_examples(text):
     return count
 
 
-def rustdoc_passed(returncode, stdout, count):
+def rustdoc_passed(returncode: int, stdout: str, count: int) -> bool:
     passed = re.search(r'test result: ok\. (\d+) passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;', stdout)
     return returncode == 0 and passed is not None and int(passed[1]) == count
 
 
-def main():
+def main() -> None:
     root = Path(__file__).resolve().parent.parent
     subprocess.run(['cargo', 'build', '--release', '--offline', '--lib'], cwd=root, check=True)
     docs = [root/'README.md', *sorted((root/'docs').glob('*.md'))]
-    results = []
+    results: list[DocumentationResult] = []
     for path in docs:
         count = rust_examples(path.read_text())
         if not count:

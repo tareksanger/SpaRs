@@ -5,13 +5,21 @@ import importlib.metadata as md
 import json
 from pathlib import Path
 
-def record():
-    packages={}
+from typing import TypedDict
+
+class PackageRecord(TypedDict):
+    version: str
+    release: str
+    files: dict[str, str]
+
+
+def record() -> dict[str, PackageRecord]:
+    packages: dict[str, PackageRecord] = {}
     for name in ('spacy','thinc','murmurhash','en_core_web_md'):
-        d=md.distribution(name);files={}
+        d=md.distribution(name);files: dict[str, str] = {}
         for f in d.files or []:
             if not (name=='en_core_web_md' and f.hash) and f.suffix not in ('.py','.pyx','.pxd','.pxi','.h','.cpp','.c') and 'LICENSE' not in str(f):continue
-            path=d.locate_file(f)
+            path=Path(str(d.locate_file(f)))
             sha=hashlib.sha256(path.read_bytes()).digest()
             if f.hash and f.hash.mode=='sha256':
                 assert base64.urlsafe_b64encode(sha).decode().rstrip('=')==f.hash.value, f'wheel RECORD mismatch: {f}'

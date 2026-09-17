@@ -8,38 +8,56 @@ import spacy
 import thinc
 
 
-def main():
+from reference_types import TokenRecord, SpanRecord, token_records, span_records, float_values
+from typing import TypedDict
+from json_types import json_object, json_array, json_string, parse_json
+
+
+class EvaluationCase(TypedDict):
+    id: str
+    category: str
+    text: str
+    tokens: list[TokenRecord]
+    entities: list[SpanRecord]
+    sentences: list[SpanRecord]
+    noun_chunks: list[SpanRecord]
+    vector: list[float]
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path)
     parser.add_argument('output', type=Path)
     args = parser.parse_args()
-    if args.output.exists():
+    input_path: object = args.input
+    output_path: object = args.output
+    if not isinstance(input_path, Path) or not isinstance(output_path, Path):
+        raise TypeError('Input and output must be paths')
+    if output_path.exists():
         parser.error('Output exists. Use a new version; frozen expectations stay unchanged.')
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         parser.error('Use the pinned reference environment.')
     model = spacy.load('en_core_web_md')
     assert model.meta['version'] == '3.8.0'
-    raw = args.input.read_bytes()
-    corpus = json.loads(raw)
-    cases = []
-    for case in corpus['cases']:
-        text = case['text']
+    raw = input_path.read_bytes()
+    corpus = json_object(parse_json(raw.decode()))
+    cases: list[EvaluationCase] = []
+    token_count = 0
+    for item in json_array(corpus['cases']):
+        case = json_object(item)
+        text = json_string(case['text'])
         doc = model(text)
-        def spans(items):
-            return [{'start': s.start, 'end': s.end, 'label': s.label_} for s in items]
-        cases.append({**case, 'tokens': [
-            {'start': len(text[:t.idx].encode()), 'end': len(text[:t.idx+len(t)].encode()),
-             'idx': t.idx, 'whitespace': bool(t.whitespace_), 'norm': t.norm_,
-             'tag': t.tag_, 'pos': t.pos_, 'morphology': str(t.morph), 'lemma': t.lemma_,
-             'head': t.head.i, 'dep': t.dep_, 'sentence_start': t.is_sent_start,
-             'entity_iob': t.ent_iob_, 'entity_type': t.ent_type_} for t in doc],
-            'entities': spans(doc.ents), 'sentences': spans(doc.sents),
-            'noun_chunks': spans(doc.noun_chunks), 'vector': doc.vector.tolist()})
+        token_count += len(doc)
+        if set(case) != {'id', 'category', 'text'}:
+            raise ValueError('Each input case must contain id, category, and text')
+        cases.append({'id': json_string(case['id']), 'category': json_string(case['category']), 'text': text, 'tokens': token_records(doc, text),
+            'entities': span_records(doc.ents), 'sentences': span_records(doc.sents),
+            'noun_chunks': span_records(doc.noun_chunks), 'vector': float_values(doc.vector)})
     result = {'versions': {'spacy': spacy.__version__, 'thinc': thinc.__version__},
               'model': 'en_core_web_md 3.8.0', 'input_sha256': hashlib.sha256(raw).hexdigest(),
               'cases': cases}
-    args.output.write_text(json.dumps(result, ensure_ascii=False) + '\n')
-    print(f'Wrote {len(cases)} cases, {sum(len(c["tokens"]) for c in cases)} tokens')
+    output_path.write_text(json.dumps(result, ensure_ascii=False) + '\n')
+    print(f'Wrote {len(cases)} cases, {token_count} tokens')
 
 
 if __name__ == '__main__':

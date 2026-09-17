@@ -1,13 +1,34 @@
 """Check frozen fixtures, Markdown structure, links, and reviewer configuration."""
 import hashlib
-import json
 import re
 import tomllib
 from pathlib import Path
+from dataclasses import dataclass
+from json_types import read_json, string_map, validate_json, json_object
 
 
-def check_fixtures(root):
-    lock = json.loads((root/'fixtures/checksums.json').read_text())
+@dataclass(frozen=True)
+class ReviewerConfig:
+    name: str
+    description: str
+    developer_instructions: str
+    sandbox_mode: str
+
+    @classmethod
+    def load(cls, path: Path) -> "ReviewerConfig":
+        raw: object = tomllib.loads(path.read_text())
+        data = json_object(validate_json(raw))
+        values: list[str] = []
+        for key in ("name", "description", "developer_instructions", "sandbox_mode"):
+            value = data.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{path}: missing {key}")
+            values.append(value)
+        return cls(*values)
+
+
+def check_fixtures(root: Path) -> None:
+    lock = string_map(read_json(root/'fixtures/checksums.json'))
     actual = {str(p.relative_to(root)) for p in (root/'fixtures').glob('*.json') if p.name != 'checksums.json'}
     if actual != set(lock):
         raise ValueError('Fixture inventory changed. Review new fixtures and their checksums.')
@@ -16,7 +37,7 @@ def check_fixtures(root):
             raise ValueError(f'Frozen fixture changed: {name}')
 
 
-def check_markdown(path, root):
+def check_markdown(path: Path, root: Path) -> None:
     lines = path.read_text().splitlines()
     fence = None
     paragraph = False
@@ -29,7 +50,7 @@ def check_markdown(path, root):
             continue
         if fence:
             continue
-        structural = not stripped or stripped.startswith(('#', '|', '>', '<!--')) or re.match(r'^\s*(?:[-+*]|\d+[.)])\s', line)
+        structural = not stripped or stripped.startswith(('#', '|', '>', '<!--')) or re.match(r'^\s*(?:[-+*]|\d+[.)])\s', line) is not None
         if not structural and paragraph:
             raise ValueError(f'{path}:{number}: keep a prose paragraph on one source line')
         paragraph = bool(stripped) and not structural
@@ -43,24 +64,21 @@ def check_markdown(path, root):
         raise ValueError(f'{path}: unclosed code fence')
 
 
-def check_agents(root):
+def check_agents(root: Path) -> None:
     paths = sorted((root/'.codex/agents').glob('*.toml'))
     if len(paths) != 3:
         raise ValueError('Expected the three documented reviewer configurations.')
-    names = set()
+    names: set[str] = set()
     for path in paths:
-        data = tomllib.loads(path.read_text())
-        for key in ('name', 'description', 'developer_instructions'):
-            if not isinstance(data.get(key), str) or not data[key].strip():
-                raise ValueError(f'{path}: missing {key}')
-        if data['name'] != path.stem or data['name'] in names:
+        data = ReviewerConfig.load(path)
+        if data.name != path.stem or data.name in names:
             raise ValueError(f'{path}: agent names must be unique and match filenames')
-        if data.get('sandbox_mode') != 'read-only':
+        if data.sandbox_mode != 'read-only':
             raise ValueError(f'{path}: reviewers should be read-only')
-        names.add(data['name'])
+        names.add(data.name)
 
 
-def main():
+def main() -> None:
     root = Path(__file__).resolve().parent.parent
     check_fixtures(root)
     paths = [*root.glob('*.md'), *sorted((root/'docs').glob('*.md')), root/'fixtures/README.md', *sorted((root/'.github').glob('*.md'))]

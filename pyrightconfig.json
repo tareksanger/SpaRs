@@ -1,0 +1,18 @@
+{
+  "include": ["tools"],
+  "exclude": ["tools/node_modules", "tools/__pycache__"],
+  "stubPath": "tools/typings",
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "strict",
+  "enableTypeIgnoreComments": false,
+  "reportUnnecessaryTypeIgnoreComment": "error",
+  "reportMissingParameterType": "error",
+  "reportMissingTypeArgument": "error",
+  "reportUnknownArgumentType": "error",
+  "reportUnknownLambdaType": "error",
+  "reportUnknownMemberType": "error",
+  "reportUnknownParameterType": "error",
+  "reportUnknownVariableType": "error"
+}

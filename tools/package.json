@@ -1,0 +1,9 @@
+{
+  "name": "spars-development-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Type checking for SpaRs development tools; not a runtime dependency",
+  "devDependencies": {
+    "pyright": "1.1.414"
+  }
+}

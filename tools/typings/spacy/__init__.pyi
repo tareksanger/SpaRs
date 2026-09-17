@@ -1,0 +1,3 @@
+from reference_types import Language
+__version__: str
+def load(name: str) -> Language: ...
