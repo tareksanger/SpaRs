@@ -46,6 +46,6 @@ The current lexical generator produces 5,367 cases and its regex generator produ
 
 ## Performance and remaining work
 
-See [performance measurements](PERFORMANCE.md) for hardware, loading time, throughput, and peak process memory. The implementation uses scalar CPU calculations and sequential batching. Measurements describe this machine and corpus; they do not promise a particular speed for other workloads.
+See [performance measurements](PERFORMANCE.md) for hardware, loading time, throughput, and peak process memory. The implementation uses native CPU matrix kernels and processes documents sequentially. Measurements describe this machine and corpus; they do not promise a particular speed for other workloads.
 
 The next library features are token matching and phrase matching, followed by dependency matching, document editing, broader serialization, additional pipelines and languages, and training. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, and runnable example before it is marked verified.

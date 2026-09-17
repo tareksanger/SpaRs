@@ -21,7 +21,7 @@ A floating-point number is an approximation. Rust and the numerical library used
 
 All values must be finite and all dimensions must match. The difference is `abs(actual - expected)`. A different tag or action fails even if its underlying score is within tolerance.
 
-Rust currently uses scalar F32 calculations; Thinc uses BLAS. F32 epsilon is about 1.19e-7, and the longest dot product has 672 terms. A simple worst-case relative accumulation estimate is about 8e-5 before cancellation or normalization. The chosen limits allow small observed arithmetic differences while still requiring exact decisions. They are engineering limits, not a proof for every possible input. Near ties can still produce a failed comparison.
+Rust uses native F32 matrix kernels; Thinc uses BLAS. F32 epsilon is about 1.19e-7, and the longest dot product has 672 terms. A simple worst-case relative accumulation estimate is about 8e-5 before cancellation or normalization. The chosen limits allow small observed arithmetic differences while still requiring exact decisions. They are engineering limits, not a proof for every possible input. Near ties can still produce a failed comparison.
 
 ## Empty input
 

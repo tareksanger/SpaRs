@@ -10,6 +10,8 @@ Production tokenization and inference must run natively in Rust. Python belongs 
 
 Keep each prose paragraph on one source line; do not hard-wrap Markdown to a fixed column width. Keep structural line breaks for headings, list items, tables, and code blocks.
 
+Commit documentation for lasting supported behavior, repeatable workflows, settled design decisions, and enduring limitations. Keep active-task notes, exploratory profiling, interim benchmark runs, and temporary findings in ignored `target/` files or temporary storage. Update public guides after the result is verified; do not commit a new document or report for each work step. Keep reusable diagnostic tools separate from their temporary output.
+
 Write repository documentation for users and contributors who have not read any development conversation. Describe the software, supported behavior, limitations, design rationale, setup, verification, and contribution requirements.
 
 - Exclude conversation summaries, agent handoffs, user requests, local workspace arrangements, commit organization, and repository-setup narration.
@@ -24,7 +26,7 @@ Write repository documentation for users and contributors who have not read any 
 
 ## Quality reviews
 
-Follow `docs/QUALITY.md` for every behavior change. Add a failing reference or invariant test before the fix, run focused checks and the full acceptance suite, and add an executed developer example. Keep fixture inputs and expected outputs frozen; review checksum changes explicitly.
+Follow `docs/QUALITY.md` for every behavior change. Add a failing reference or invariant test before the fix, run focused checks and the full acceptance suite, and add an executed developer example when public behavior changes. For internal refactors and optimizations, rerun the existing examples instead of adding redundant documentation. Keep fixture inputs and expected outputs frozen; review checksum changes explicitly.
 
 Delegate independent review of substantial behavior changes to the project agents `reference_review`, `test_review`, and `docs_review`, using `.codex/agents/*.toml`. Give each reviewer the changed files and a bounded question. Reviewers report findings; the main agent owns edits and test execution. If custom roles are unavailable, pass the matching instructions to a standard subagent. Wait for findings and resolve concrete issues before claiming verification. Documentation-only changes need the documentation review, not three redundant reviews.
 
@@ -35,6 +37,14 @@ Write plain English and explain necessary technical terms. Guide examples must r
 Use concrete types throughout Rust and Python, including tools and tests. Represent known records with structs, enums, dataclasses, or TypedDicts rather than generic dictionaries. Annotate Python function parameters and return values. Validate external JSON and upstream library values at the boundary, then pass typed records into computation. Generic JSON is appropriate for decoding, serialization, and deliberately malformed test inputs, not as a substitute for model or domain types.
 
 Run strict Pyright and `tools/check_typing_policy.py` through the acceptance script. Fix errors rather than adding `Any`, unchecked casts, ignored diagnostics, or weaker checker settings. Keep local stubs narrow and accurate to the pinned upstream interfaces; exercise those interfaces against the real reference environment. Type annotations do not replace shape, bounds, or semantic validation.
+
+## Performance changes
+
+Profile the actual workload before choosing an optimization. Measure the final implementation against the same baseline, model, corpus, build mode, thread limits, and warmup procedure. Keep loading, inference, and process memory separate. Run measurements without competing test or benchmark processes.
+
+Optimize measured hot paths with reusable buffers, precompiled immutable resources, cached per-call features, and matrix operations across token rows where appropriate. Preserve model reuse and call isolation. Keep numerical tolerances and discrete-output expectations unchanged; an optimization that fails parity is unfinished.
+
+Keep unsafe numerical code inside a small checked wrapper. Validate dimensions, strides, bounds, and nonaliasing assumptions, explain the safety argument, and test rectangular, empty, and malformed inputs against an independent calculation. Changes to such wrappers need independent review.
 
 ## Implementation and verification
 

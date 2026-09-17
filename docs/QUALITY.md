@@ -9,7 +9,7 @@ A passing test is useful only if it would catch an incorrect result. Every new f
 3. Add reference cases before implementing the behavior. Include an ordinary example, a boundary case, and an invalid input where the API can receive one. Add repeated-call or concurrent-call tests when shared state could matter.
 4. Confirm the new test fails for the missing or incorrect behavior. The failure should explain the input, expected result, and actual result. A deliberate small defect can also demonstrate that a test detects the behavior it claims to cover.
 5. Implement the behavior in Rust. Keep Python in the reference and export tools.
-6. Run the focused tests, then the full acceptance command below. Add a runnable Rust example to the developer guide and explain its result in plain English.
+6. Run the focused tests, then the full acceptance command below. Add a runnable Rust example when public behavior changes and explain its result in plain English. For internal refactors and optimizations, rerun the existing examples.
 7. Review the change and its test evidence. Resolve findings, update the compatibility inventory, and report any remaining limits before calling the feature verified.
 
 For a model or reference-version change, create a new fixture version and document the expected behavior changes. Do not silently replace the old comparison set.

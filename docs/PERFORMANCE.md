@@ -1,8 +1,8 @@
 # Performance measurements
 
-These measurements describe scalar Rust inference on one machine. The direct comparison below shows that the current SpaRs implementation is slower than official spaCy for this corpus. Results are a starting point for optimization, not a promise about other workloads.
+Use the commands below to measure the checked-out implementation. Model loading, inference, and process memory answer different questions and should be reported separately. The saved measurements on this page are historical baselines identified by their source hashes; they do not describe later optimizations.
 
-## Comparison with official spaCy
+## Historical comparison with official spaCy
 
 Both implementations processed the same `en_core_web_md` 3.8.0 pipeline on an Apple M3 Max with 96 GiB RAM. Rust used a release build. Python used spaCy 3.8.14 and Thinc 8.3.13. Each group reused its loaded model, ran one warmup pass, and then ran three measured passes. Processing was sequential, with Python numerical-library thread limits set to one. This compares individual calls, not batching.
 
@@ -15,27 +15,19 @@ The short group measured 288 document calls and 3,264 tokens; the long group mea
 
 Model loading took 0.185 seconds for SpaRs and 0.644 seconds for spaCy in the short group, and 0.188 versus 0.628 seconds in the long group. Peak process memory was about 141 versus 401 MiB for short inputs and 163 versus 456 MiB for long inputs. Python memory includes the interpreter. These peaks include model loading; they do not measure inference allocations alone.
 
-SpaRs uses scalar numerical kernels. Official spaCy uses compiled Cython and optimized numerical libraries. Profiling is needed to identify which operations account for the measured difference. Native Rust does not automatically imply faster inference.
+The measured baseline used scalar numerical kernels. SpaRs now groups token rows into native Rust matrix operations and compiles attribute-rule regexes when loading a model. Run a fresh comparison before making a speed claim about the current implementation.
 
 To repeat the comparison after the model setup, run:
 
 ```sh
-.venv/bin/python tools/compare_python.py
+.venv/bin/python tools/compare_python.py --output target/python-comparison.json
 ```
 
 The [comparison report](../reports/python-comparison.json) records raw timings, workload counts, hardware, versions, source hashes, and the limits of the measurement. Each profile ran SpaRs before spaCy in separate processes. Operating-system caches were not cleared, and the synthetic long documents repeat one sentence. This single run does not establish performance on other hardware, text, or batch sizes.
 
-## Where SpaRs spends time
+## Profile pipeline stages
 
-A five-second native sample on the long-document group found maxout neural layers (which compute and select scores) in 2,974 of 4,057 profiler observations (about 73%), and attribute rules in 553 observations (about 14%). These are approximate shares of sampled time, not exact component durations. The two encoders together appeared in about 78% of samples; that includes the 73% for maxout blocks and must not be added to it.
-
-The main difference is numerical execution. [The Rust encoder](../src/neural.rs) computes separate dot products for each token and output row. The pinned Thinc reference uses BLIS matrix multiplication across token rows. Both encoders are required by this model, so their cost is not accidental duplicated inference. Rust already precomputes parser and NER token features; those calculations also use small dot products.
-
-[Attribute matching](../src/attributes.rs) scans 180 patterns from 179 rules. It computes lowercase text for each candidate even when the pattern has no lowercase condition or an earlier condition has already failed. Three regex conditions also compile their expressions during matching. These are avoidable costs. Allocating temporary vectors, cloning layer buffers, and recomputing lexical features are additional code-level candidates whose individual costs have not been measured.
-
-The first optimization priorities are matrix kernels that process token rows together, followed by compiling attribute regexes when the model loads and avoiding repeated lowercase work. Each change must retain the exact annotation comparisons and existing numerical limits.
-
-[The profiling report](../reports/profiling.json) also records independent pipeline-prefix timings for both groups. Repeat those measurements with:
+Measure successive pipeline prefixes to locate expensive stages:
 
 ```sh
 cargo run --release --offline --example profile_stages -- assets/en_core_web_md-3.8.0 fixtures/evaluation-v1.json long 3
@@ -83,9 +75,9 @@ The long documents repeat one sentence. They test length, not the full variety o
 After model setup and dependency fetching, run from the repository root on macOS or Linux:
 
 ```sh
-.venv/bin/python tools/benchmark.py
+.venv/bin/python tools/benchmark.py --output target/benchmark.json
 ```
 
-The script builds the release measurement worker, runs the three groups, and writes `reports/benchmark.json`. It measures native Rust inference; Python only launches the worker and collects system information. The process needs permission to read CPU and RAM information. CI saves its own measurement report as a job artifact.
+The script builds the release measurement worker, runs the three groups, and writes `target/benchmark.json`. It measures native Rust inference; Python only launches the worker and collects system information. The process needs permission to read CPU and RAM information. CI saves its own measurement report as a job artifact.
 
 For a proposed optimization, first run the full acceptance suite. Then measure the old and new code on the same machine, with the same corpus, build mode, warmup, and number of passes. Report both results and keep annotation agreement exact. There is no automatic speed threshold yet; baseline variation needs to be measured before a trustworthy threshold can be chosen.
