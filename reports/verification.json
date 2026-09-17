@@ -46,7 +46,7 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": "    Checking spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.84s\n"
+      "stderr": "    Checking spars v0.1.0 (.)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.84s\n"
     },
     {
       "command": [
@@ -59,7 +59,7 @@
       ],
       "exit_code": 0,
       "stdout": "\nrunning 6 tests\ntest tests::document_snapshots_validate_offsets ... ok\ntest tests::hash_keys_match_thinc ... ok\ntest tests::lexical_and_vectors ... ok\ntest tests::tokenizer_and_features ... ok\ntest tests::regex_span_semantics ... ok\ntest tests::official_stage_parity ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s\n\n\nrunning 4 tests\ntest missing_model_is_an_error ... ok\ntest checked_views_and_similarity ... ok\ntest public_api_and_batch_isolation ... ok\ntest malformed_models_are_errors ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s\n\n\nrunning 3 tests\ntest official_holdout_parity ... ok\ntest official_development_parity ... ok\ntest official_regression_parity ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.70s\n\n\nrunning 2 tests\ntest src/lib.rs - (line 6) - compile ... ok\ntest src/lib.rs - (line 18) ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s\n\n",
-      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Finished `release` profile [optimized + debuginfo] target(s) in 3.06s\n     Running unittests src/lib.rs (target/release/deps/spars-cb476587bde9d3f3)\n     Running tests/api.rs (target/release/deps/api-802f15882d052041)\n     Running tests/parity.rs (target/release/deps/parity-4a449cea51097986)\n   Doc-tests spars\n"
+      "stderr": "   Compiling spars v0.1.0 (.)\n    Finished `release` profile [optimized + debuginfo] target(s) in 3.06s\n     Running unittests src/lib.rs (target/release/deps/spars-cb476587bde9d3f3)\n     Running tests/api.rs (target/release/deps/api-802f15882d052041)\n     Running tests/parity.rs (target/release/deps/parity-4a449cea51097986)\n   Doc-tests spars\n"
     },
     {
       "command": [
@@ -72,15 +72,15 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": "   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling native-consumer-check v0.0.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/consumer)\n    Finished `release` profile [optimized] target(s) in 2.41s\n"
+      "stderr": "   Compiling spars v0.1.0 (.)\n   Compiling native-consumer-check v0.0.0 (consumer)\n    Finished `release` profile [optimized] target(s) in 2.41s\n"
     },
     {
       "command": [
         "env",
         "-i",
-        "PATH=/nonexistent",
+        "PATH=<external-path>",
         "consumer/target/release/native-consumer-check",
-        "/Users/tareksanger/Developer/SideHustle/SpaCyRust/assets/en_core_web_md-3.8.0"
+        "assets/en_core_web_md-3.8.0"
       ],
       "exit_code": 0,
       "stdout": "Alice\tNNP\tAlice\t1\tnsubj\nworks\tVBZ\twork\t1\tROOT\nat\tIN\tat\t1\tprep\nMicrosoft\tNNP\tMicrosoft\t2\tpobj\nin\tIN\tin\t1\tprep\nNew\tNNP\tNew\t6\tcompound\nYork\tNNP\tYork\t4\tpobj\n.\t.\t.\t1\tpunct\n",
@@ -95,7 +95,7 @@
       ],
       "exit_code": 0,
       "stdout": "",
-      "stderr": "warning: manifest has no documentation, homepage or repository\n  |\n  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info\n   Packaging spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n    Packaged 92 files, 410.3KiB (120.3KiB compressed)\n   Verifying spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust)\n   Compiling spars v0.1.0 (/Users/tareksanger/Developer/SideHustle/SpaCyRust/target/package/spars-0.1.0)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.96s\n"
+      "stderr": "warning: manifest has no documentation, homepage or repository\n  |\n  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info\n   Packaging spars v0.1.0 (.)\n    Packaged 92 files, 410.3KiB (120.3KiB compressed)\n   Verifying spars v0.1.0 (.)\n   Compiling spars v0.1.0 (target/package/spars-0.1.0)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.96s\n"
     }
   ],
   "reexport_sha256": {

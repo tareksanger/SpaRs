@@ -56,10 +56,10 @@
   },
   "command": "cargo test --release --test evaluation -- --include-ignored",
   "differences": [],
-  "input_sha256": "18dc7638b786f7b770bc0e13104d9349d0b1d7ff9e78d48a9a234cb5a178c1fa",
+  "input_sha256": "e07288cbb004ce92f750215379853f6a87eae702adfd8815cbd08cc7f5149f03",
   "max_vector_absolute_error": 0.0,
   "model": "en_core_web_md 3.8.0",
-  "tokens": 5570,
+  "tokens": 5568,
   "versions": {
     "spacy": "3.8.14",
     "thinc": "8.3.13"

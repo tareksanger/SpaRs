@@ -395,7 +395,7 @@
     {
       "id": "web-07",
       "category": "web",
-      "text": "The path /var/tmp/report.json contains 3,072 bytes."
+      "text": "The path reports/report.json contains 3,072 bytes."
     },
     {
       "id": "web-08",

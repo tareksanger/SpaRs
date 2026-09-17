@@ -6,7 +6,7 @@ The reference is official spaCy 3.8.14 with Thinc 8.3.13, Python 3.12.5, and `en
 
 Tokens, offsets, feature IDs, tags, morphology, lemmas, dependency heads and labels, entity labels, sentence boundaries, and noun chunks must match the saved reference exactly. Tests of parser and entity recognition steps also compare valid actions and selected actions. Any difference fails the relevant suite.
 
-The full-pipeline suites now cover 190 documents and 7,031 tokens. [Implementation status](PROGRESS.md) breaks down the counts; [fixture provenance](../fixtures/README.md) explains where the inputs came from and which affected implementation. These checks measure agreement with spaCy, not whether spaCy's linguistic predictions are correct.
+The full-pipeline suites now cover 190 documents and 7,029 tokens. [Implementation status](PROGRESS.md) breaks down the counts; [fixture provenance](../fixtures/README.md) explains where the inputs came from and which affected implementation. These checks measure agreement with spaCy, not whether spaCy's linguistic predictions are correct.
 
 ## Small numerical differences
 
