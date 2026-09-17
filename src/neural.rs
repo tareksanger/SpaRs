@@ -1,38 +1,58 @@
 use crate::config::*;
 use crate::{Doc, Error, Model, Result, TokenIndex};
+mod matrix;
+use matrix::{product_transposed, Dense};
 pub(crate) type Matrix = Vec<Vec<f32>>;
-pub(crate) fn linear(model: &Model, p: &Linear, x: &[f32]) -> Vec<f32> {
+fn linear_into(model: &Model, p: &Linear, x: &[f32], output: &mut [f32]) {
     let w = model.tensor(&p.w);
     let b = model.tensor(&p.b);
-    w.data
-        .chunks_exact(x.len())
+    for ((value, row), bias) in output
+        .iter_mut()
+        .zip(w.data.chunks_exact(x.len()))
         .zip(&b.data)
-        .map(|(r, b)| r.iter().zip(x).map(|(a, b)| a * b).sum::<f32>() + b)
-        .collect()
+    {
+        *value = row.iter().zip(x).map(|(a, b)| a * b).sum::<f32>() + bias;
+    }
 }
-fn block(model: &Model, p: &Block, x: &[f32]) -> Vec<f32> {
+fn affine(model: &Model, p: &Linear, input: &Dense) -> Dense {
+    let w = model.tensor(&p.w);
+    let b = model.tensor(&p.b);
+    let mut output = product_transposed(input, &w.data, b.data.len());
+    for row in output.data.chunks_exact_mut(output.cols) {
+        for (value, bias) in row.iter_mut().zip(&b.data) {
+            *value += bias;
+        }
+    }
+    output
+}
+pub(crate) fn linear_rows(model: &Model, p: &Linear, input: &Matrix) -> Matrix {
+    if input.is_empty() {
+        return Vec::new();
+    }
+    affine(model, p, &Dense::from_rows(input)).into_rows()
+}
+fn block(model: &Model, p: &Block, input: &Dense) -> Dense {
     let w = model.tensor(&p.maxout.w);
-    let b = model.tensor(&p.maxout.b);
     let pieces = w.shape[1];
-    let a: Vec<f32> = w
-        .data
-        .chunks_exact(x.len())
-        .zip(&b.data)
-        .map(|(r, b)| r.iter().zip(x).map(|(a, b)| a * b).sum::<f32>() + b)
-        .collect();
-    let mut y: Vec<f32> = a
-        .chunks_exact(pieces)
-        .map(|p| p.iter().copied().fold(f32::NEG_INFINITY, f32::max))
-        .collect();
-    let mean = y.iter().sum::<f32>() / y.len() as f32;
-    let var = y.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / y.len() as f32 + 1e-8;
-    let inv = 1. / var.sqrt();
+    let width = w.shape[0];
+    let projected = affine(model, &p.maxout, input);
     let g = model.tensor(&p.norm.g);
     let b = model.tensor(&p.norm.b);
-    for (i, v) in y.iter_mut().enumerate() {
-        *v = (*v - mean) * inv * g.data[i] + b.data[i]
+    let mut output = Dense::zeroed(input.rows, width);
+    for i in 0..input.rows {
+        let row = output.row_mut(i);
+        for (value, candidates) in row.iter_mut().zip(projected.row(i).chunks_exact(pieces)) {
+            *value = candidates.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        }
+        let mean = row.iter().sum::<f32>() / width as f32;
+        let variance =
+            row.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / width as f32 + 1e-8;
+        let inv = 1. / variance.sqrt();
+        for (j, value) in row.iter_mut().enumerate() {
+            *value = (*value - mean) * inv * g.data[j] + b.data[j];
+        }
     }
-    y
+    output
 }
 impl Model {
     /// Contextual features from the shared tok2vec network (one row per token).
@@ -73,71 +93,74 @@ impl Model {
         if n == 0 {
             return vec![];
         }
-        let attrs = &p.attrs;
         let hashes = &p.hashes;
-        let mut mixed = Vec::with_capacity(n);
+        let mut input = Dense::zeroed(n, width * (hashes.len() + 1));
+        let projection = self.tensor(&p.static_vectors.w);
+        let mut vectors = Dense::zeroed(n, projection.shape[1]);
         for i in 0..n {
-            let ids = self.features(doc, i, attrs);
-            let mut concat = vec![];
-            for (id, h) in ids.iter().zip(hashes) {
+            let ids = self.features(doc, i, &p.attrs);
+            let row = input.row_mut(i);
+            for (feature, (id, h)) in ids.iter().zip(hashes).enumerate() {
                 let e = self.tensor(&h.params.e);
-                let rows = e.shape[0];
-                let keys = crate::hash::keys(*id, h.seed);
-                let mut v = vec![0.; width];
-                for key in keys {
-                    let at = (key as usize % rows) * width;
-                    for (a, b) in v.iter_mut().zip(&e.data[at..at + width]) {
-                        *a += b
+                let target = &mut row[feature * width..(feature + 1) * width];
+                for key in crate::hash::keys(*id, h.seed) {
+                    let at = (key as usize % e.shape[0]) * width;
+                    for (value, embedding) in target.iter_mut().zip(&e.data[at..at + width]) {
+                        *value += embedding;
                     }
                 }
-                concat.extend(v);
             }
-            let w = self.tensor(&p.static_vectors.w);
-            let v = self.vector(doc.token_text(TokenIndex(i)).unwrap());
-            for row in w.data.chunks_exact(w.shape[1]) {
-                concat.push(v.map_or(0., |v| row.iter().zip(v).map(|(a, b)| a * b).sum()))
+            if let Some(vector) = self.vector(doc.token_text(TokenIndex(i)).unwrap()) {
+                vectors.row_mut(i).copy_from_slice(vector);
             }
-            mixed.push(block(self, &p.mix, &concat));
         }
-        // Thinc with_array pads before the encoder; padding also evolves through residual layers.
+        let projected = product_transposed(&vectors, &projection.data, width);
+        for i in 0..n {
+            input.row_mut(i)[hashes.len() * width..].copy_from_slice(projected.row(i));
+        }
+        let mixed = block(self, &p.mix, &input);
         if let Some(t) = trace.as_mut() {
-            t.push(mixed.clone());
+            t.push((0..n).map(|i| mixed.row(i).to_vec()).collect());
         }
+        // Padding evolves through residual layers, matching Thinc with_array.
         let pad = p.pad;
-        let mut x = vec![vec![0.; width]; n + pad * 2];
-        x[pad..pad + n].clone_from_slice(&mixed);
+        let mut x = Dense::zeroed(n + pad * 2, width);
+        x.data[pad * width..(pad + n) * width].copy_from_slice(&mixed.data);
+        let mut context = Dense::zeroed(x.rows, 0);
         for (layer, window) in p.layers.iter().zip(&p.windows) {
-            let window = *window as isize;
-            let mut y = x.clone();
-            for (i, output) in y.iter_mut().enumerate() {
-                let mut input = Vec::with_capacity(width * (2 * window as usize + 1));
-                for j in i as isize - window..=i as isize + window {
-                    if j < 0 || j >= x.len() as isize {
-                        input.resize(input.len() + width, 0.)
-                    } else {
-                        input.extend_from_slice(&x[j as usize])
+            context.cols = width * (2 * window + 1);
+            context.data.resize(context.rows * context.cols, 0.);
+            context.data.fill(0.);
+            for i in 0..x.rows {
+                let target = context.row_mut(i);
+                for slot in 0..2 * window + 1 {
+                    if let Some(source) = (i + slot).checked_sub(*window).filter(|j| *j < x.rows) {
+                        target[slot * width..(slot + 1) * width].copy_from_slice(x.row(source));
                     }
                 }
-                let delta = block(self, layer, &input);
-                for (v, d) in output.iter_mut().zip(delta) {
-                    *v += d
-                }
             }
-            x = y;
+            let delta = block(self, layer, &context);
+            for (value, change) in x.data.iter_mut().zip(delta.data) {
+                *value += change;
+            }
             if let Some(t) = trace.as_mut() {
-                t.push(x[pad..pad + n].to_vec());
+                t.push((pad..pad + n).map(|i| x.row(i).to_vec()).collect());
             }
         }
-        x[pad..pad + n].to_vec()
+        (pad..pad + n).map(|i| x.row(i).to_vec()).collect()
     }
 }
+
 pub(crate) struct Scorer<'a> {
     model: &'a Model,
     p: &'a Transition,
-    cache: Matrix,
+    cache: Dense,
     nf: usize,
     no: usize,
     np: usize,
+    activation: Vec<f32>,
+    hidden: Vec<f32>,
+    output: Vec<f32>,
 }
 impl<'a> Scorer<'a> {
     pub fn new(model: &'a Model, p: &'a Transition, x: &Matrix) -> Self {
@@ -145,15 +168,15 @@ impl<'a> Scorer<'a> {
         let nf = w.shape[0];
         let no = w.shape[1];
         let np = w.shape[2];
-        let mut cache = vec![model.tensor(&p.lower.pad).data.clone()];
-        for row in x {
-            let r = linear(model, &p.reduce, row);
-            cache.push(
-                w.data
-                    .chunks_exact(r.len())
-                    .map(|w| w.iter().zip(&r).map(|(a, b)| a * b).sum())
-                    .collect(),
-            )
+        let columns = nf * no * np;
+        let mut cache = Dense::zeroed(x.len() + 1, columns);
+        cache
+            .row_mut(0)
+            .copy_from_slice(&model.tensor(&p.lower.pad).data);
+        if !x.is_empty() {
+            let reduced = affine(model, &p.reduce, &Dense::from_rows(x));
+            let projected = product_transposed(&reduced, &w.data, columns);
+            cache.data[columns..].copy_from_slice(&projected.data);
         }
         Self {
             model,
@@ -162,24 +185,35 @@ impl<'a> Scorer<'a> {
             nf,
             no,
             np,
+            activation: vec![0.; no * np],
+            hidden: vec![0.; no],
+            output: vec![0.; p.actions.len()],
         }
     }
-    pub fn scores(&self, ids: &[Option<usize>]) -> Vec<f32> {
-        let mut a = vec![0.; self.no * self.np];
+    pub fn scores(&mut self, ids: &[Option<usize>]) -> &[f32] {
+        self.activation.fill(0.);
         for (f, id) in ids.iter().enumerate().take(self.nf) {
-            let row = &self.cache[id.map_or(0, |i| i + 1)];
-            for (j, v) in a.iter_mut().enumerate() {
+            let row = self.cache.row(id.map_or(0, |i| i + 1));
+            for (j, v) in self.activation.iter_mut().enumerate() {
                 *v += row[f * self.no * self.np + j]
             }
         }
-        for (v, b) in a.iter_mut().zip(&self.model.tensor(&self.p.lower.b).data) {
+        for (v, b) in self
+            .activation
+            .iter_mut()
+            .zip(&self.model.tensor(&self.p.lower.b).data)
+        {
             *v += b
         }
-        let hidden: Vec<f32> = a
-            .chunks_exact(self.np)
-            .map(|p| p.iter().copied().fold(f32::NEG_INFINITY, f32::max))
-            .collect();
-        linear(self.model, &self.p.upper, &hidden)
+        for (value, pieces) in self
+            .hidden
+            .iter_mut()
+            .zip(self.activation.chunks_exact(self.np))
+        {
+            *value = pieces.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        }
+        linear_into(self.model, &self.p.upper, &self.hidden, &mut self.output);
+        &self.output
     }
 }
 pub(crate) fn validate(m: &Model) -> Result<()> {

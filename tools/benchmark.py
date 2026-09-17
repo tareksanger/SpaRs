@@ -114,7 +114,7 @@ def main() -> None:
         cpu = next((line.split(':', 1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')), platform.machine())
         ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
     report: BenchmarkReport = {'platform':platform.platform(), 'cpu':cpu,'logical_cpus':os.cpu_count(), 'ram_bytes':ram,
-              'rustc':command('rustc','--version'),'build':'release; scalar CPU kernels; one processing thread',
+              'rustc':command('rustc','--version'),'build':'release; matrixmultiply 0.3.10 CPU kernels; one processing thread',
               'model':manifest.model+' '+manifest.model_version,'reference_versions':manifest.versions,
               'weights_sha256':manifest.weights_sha256,'corpus_sha256':hashlib.sha256(corpus.read_bytes()).hexdigest(),
               'revision':command('git','rev-parse','HEAD'),'working_tree_dirty':bool(command('git','status','--porcelain')),

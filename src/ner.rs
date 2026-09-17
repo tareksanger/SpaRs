@@ -13,8 +13,9 @@ impl Model {
     ) -> Result<()> {
         let p = &self.config.ner;
         let x = self.encode(d, &p.tok2vec);
-        let scorer = Scorer::new(self, &p.transition, &x);
+        let mut scorer = Scorer::new(self, &p.transition, &x);
         let actions = &p.transition.actions;
+        let mut valid = Vec::with_capacity(actions.len());
         let mut open: Option<(usize, String)> = None;
         let mut ents = vec![];
         for i in 0..d.tokens.len() {
@@ -30,30 +31,29 @@ impl Model {
                 .all(crate::tokenizer::is_space);
             let next = i + 1 < d.tokens.len();
             let boundary = next && d.tokens[i + 1].sentence_start == Some(true);
-            let valid: Vec<bool> = (0..scores.len())
-                .map(|j| {
-                    let a = &actions[j];
-                    let label = a.label.as_str();
-                    match a.kind {
-                        ActionKind::Begin => {
-                            open.is_none() && next && !boundary && !space && !label.is_empty()
-                        }
-                        ActionKind::Inside => {
-                            open.as_ref().is_some_and(|(_, l)| l == label) && next && !boundary
-                        }
-                        ActionKind::Left => open.as_ref().is_some_and(|(_, l)| l == label),
-                        ActionKind::Unit => open.is_none() && !space && !label.is_empty(),
-                        ActionKind::Outside => open.is_none(),
-                        _ => false,
+            valid.clear();
+            valid.extend((0..scores.len()).map(|j| {
+                let a = &actions[j];
+                let label = a.label.as_str();
+                match a.kind {
+                    ActionKind::Begin => {
+                        open.is_none() && next && !boundary && !space && !label.is_empty()
                     }
-                })
-                .collect();
-            let a = best(&scores, |i| valid[i])?;
+                    ActionKind::Inside => {
+                        open.as_ref().is_some_and(|(_, l)| l == label) && next && !boundary
+                    }
+                    ActionKind::Left => open.as_ref().is_some_and(|(_, l)| l == label),
+                    ActionKind::Unit => open.is_none() && !space && !label.is_empty(),
+                    ActionKind::Outside => open.is_none(),
+                    _ => false,
+                }
+            }));
+            let a = best(scores, |i| valid[i])?;
             if let Some(t) = trace.as_mut() {
                 t.push(TransitionTrace {
                     ids: ids.map(|v| v.map_or(-1, |i| i as i64)).to_vec(),
-                    scores,
-                    valid,
+                    scores: scores.to_vec(),
+                    valid: valid.clone(),
                     action: a,
                 });
             }

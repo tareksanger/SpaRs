@@ -183,7 +183,7 @@ def main() -> None:
         reference_versions=metadata.versions, weights_sha256=metadata.weights_sha256,
         platform=platform.platform(), cpu=cpu, logical_cpus=os.cpu_count(), ram_bytes=ram,
         rustc=command('rustc', '--version'), python=platform.python_version(),
-        build='release; scalar Rust kernels; one processing thread; Python BLAS thread limits 1',
+        build='release; matrixmultiply 0.3.10 Rust kernels; one processing thread; Python BLAS thread limits 1',
         rounds=options.rounds, warmup_passes=options.warmup, profiles=profiles,
         revision=command('git', 'rev-parse', 'HEAD'),
         working_tree_dirty=bool(command('git', 'status', '--porcelain')),

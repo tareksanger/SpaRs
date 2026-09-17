@@ -17,8 +17,9 @@ impl Model {
         mut trace: Option<&mut Vec<TransitionTrace>>,
     ) -> Result<()> {
         let n = d.tokens.len();
-        let scorer = Scorer::new(self, &self.config.parser, x);
+        let mut scorer = Scorer::new(self, &self.config.parser, x);
         let actions = &self.config.parser.actions;
+        let mut valid = Vec::with_capacity(actions.len());
         let mut stack = Vec::<usize>::new();
         let mut rebuffer = vec![];
         let mut at = 0;
@@ -63,31 +64,30 @@ impl Model {
                 child(&right, s0),
             ];
             let scores = scorer.scores(&ids);
-            let valid: Vec<bool> = (0..scores.len())
-                .map(|i| {
-                    let action = &actions[i];
-                    match action.kind {
-                        ActionKind::Shift => {
-                            stack.is_empty()
-                                || (b1.is_some() && !starts[b0.unwrap()] && !unshift[b0.unwrap()])
-                        }
-                        ActionKind::Reduce => !stack.is_empty(),
-                        ActionKind::Left | ActionKind::Right => {
-                            s0.is_some() && b0.is_some_and(|v| !starts[v])
-                        }
-                        ActionKind::Begin => {
-                            b1.is_some_and(|v| Some(v) == b0.map(|u| u + 1) && !starts[v])
-                        }
-                        _ => false,
+            valid.clear();
+            valid.extend((0..scores.len()).map(|i| {
+                let action = &actions[i];
+                match action.kind {
+                    ActionKind::Shift => {
+                        stack.is_empty()
+                            || (b1.is_some() && !starts[b0.unwrap()] && !unshift[b0.unwrap()])
                     }
-                })
-                .collect();
-            let a = best(&scores, |i| valid[i])?;
+                    ActionKind::Reduce => !stack.is_empty(),
+                    ActionKind::Left | ActionKind::Right => {
+                        s0.is_some() && b0.is_some_and(|v| !starts[v])
+                    }
+                    ActionKind::Begin => {
+                        b1.is_some_and(|v| Some(v) == b0.map(|u| u + 1) && !starts[v])
+                    }
+                    _ => false,
+                }
+            }));
+            let a = best(scores, |i| valid[i])?;
             if let Some(t) = trace.as_mut() {
                 t.push(TransitionTrace {
                     ids: ids.map(|v| v.map_or(-1, |i| i as i64)).to_vec(),
-                    scores,
-                    valid,
+                    scores: scores.to_vec(),
+                    valid: valid.clone(),
                     action: a,
                 });
             }

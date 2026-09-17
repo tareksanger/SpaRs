@@ -15,6 +15,7 @@ thiserror = "2"
 fancy-regex = "0.16"
 sha2 = "0.10"
 safetensors = "0.6"
+matrixmultiply = { version = "=0.3.10", default-features = false, features = ["std"] }
 
 [profile.release]
 debug = 1

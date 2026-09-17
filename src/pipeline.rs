@@ -1,5 +1,5 @@
 use crate::chunks::chunks;
-use crate::{neural::linear, Doc, Error, Model, Result};
+use crate::{neural::linear_rows, Doc, Error, Model, Result};
 pub(crate) fn best(scores: &[f32], valid: impl Fn(usize) -> bool) -> Result<usize> {
     if scores.iter().any(|s| !s.is_finite()) {
         return Err(Error::Model("nonfinite inference score".into()));
@@ -33,8 +33,11 @@ impl Model {
             return Ok(doc);
         }
         let x = self.tok2vec(&doc);
-        for (t, row) in doc.tokens.iter_mut().zip(&x) {
-            let scores = linear(self, &self.config.tagger.params, row);
+        for (t, scores) in
+            doc.tokens
+                .iter_mut()
+                .zip(linear_rows(self, &self.config.tagger.params, &x))
+        {
             let i = best(&scores, |_| true)?;
             t.tag = Some(self.config.tagger.labels[i].clone());
         }
