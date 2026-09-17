@@ -1,18 +1,18 @@
+use crate::config::*;
 use crate::{Doc, Error, Model, Result, TokenIndex};
-use serde_json::Value;
 pub(crate) type Matrix = Vec<Vec<f32>>;
-pub(crate) fn linear(model: &Model, p: &Value, x: &[f32]) -> Vec<f32> {
-    let w = model.tensor(&p["W"]);
-    let b = model.tensor(&p["b"]);
+pub(crate) fn linear(model: &Model, p: &Linear, x: &[f32]) -> Vec<f32> {
+    let w = model.tensor(&p.w);
+    let b = model.tensor(&p.b);
     w.data
         .chunks_exact(x.len())
         .zip(&b.data)
         .map(|(r, b)| r.iter().zip(x).map(|(a, b)| a * b).sum::<f32>() + b)
         .collect()
 }
-fn block(model: &Model, p: &Value, x: &[f32]) -> Vec<f32> {
-    let w = model.tensor(&p["maxout"]["W"]);
-    let b = model.tensor(&p["maxout"]["b"]);
+fn block(model: &Model, p: &Block, x: &[f32]) -> Vec<f32> {
+    let w = model.tensor(&p.maxout.w);
+    let b = model.tensor(&p.maxout.b);
     let pieces = w.shape[1];
     let a: Vec<f32> = w
         .data
@@ -27,8 +27,8 @@ fn block(model: &Model, p: &Value, x: &[f32]) -> Vec<f32> {
     let mean = y.iter().sum::<f32>() / y.len() as f32;
     let var = y.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / y.len() as f32 + 1e-8;
     let inv = 1. / var.sqrt();
-    let g = model.tensor(&p["norm"]["G"]);
-    let b = model.tensor(&p["norm"]["b"]);
+    let g = model.tensor(&p.norm.g);
+    let b = model.tensor(&p.norm.b);
     for (i, v) in y.iter_mut().enumerate() {
         *v = (*v - mean) * inv * g.data[i] + b.data[i]
     }
@@ -37,53 +37,52 @@ fn block(model: &Model, p: &Value, x: &[f32]) -> Vec<f32> {
 impl Model {
     /// Contextual features from the shared tok2vec network (one row per token).
     pub fn tok2vec(&self, doc: &Doc) -> Vec<Vec<f32>> {
-        self.encode(doc, &self.config["tok2vec"])
+        self.encode(doc, &self.config.tok2vec)
     }
-    pub(crate) fn features(&self, doc: &Doc, i: usize, attrs: &[Value]) -> Vec<u64> {
+    pub(crate) fn features(&self, doc: &Doc, i: usize, attrs: &[Feature]) -> Vec<u64> {
         let t = &doc.tokens[i];
         let word = doc.token_text(TokenIndex(i)).unwrap();
         let chars: Vec<_> = word.chars().collect();
         attrs
             .iter()
-            .map(|a| match a.as_str().unwrap() {
-                "NORM" => self.string_id(&t.norm),
-                "PREFIX" => self.string_id(&chars[..1].iter().collect::<String>()),
-                "SUFFIX" => self.string_id(
+            .map(|a| match a {
+                Feature::Norm => self.string_id(&t.norm),
+                Feature::Prefix => self.string_id(&chars[..1].iter().collect::<String>()),
+                Feature::Suffix => self.string_id(
                     &chars[chars.len().saturating_sub(3)..]
                         .iter()
                         .collect::<String>(),
                 ),
-                "SHAPE" => self.string_id(&self.shape(word)),
-                "SPACY" => u64::from(t.whitespace),
-                "IS_SPACE" => u64::from(word.chars().all(crate::tokenizer::is_space)),
-                _ => unreachable!("validated features"),
+                Feature::Shape => self.string_id(&self.shape(word)),
+                Feature::Spacy => u64::from(t.whitespace),
+                Feature::IsSpace => u64::from(word.chars().all(crate::tokenizer::is_space)),
             })
             .collect()
     }
-    pub(crate) fn encode(&self, doc: &Doc, p: &Value) -> Matrix {
+    pub(crate) fn encode(&self, doc: &Doc, p: &Encoder) -> Matrix {
         self.encode_traced(doc, p, None)
     }
     pub(crate) fn encode_traced(
         &self,
         doc: &Doc,
-        p: &Value,
+        p: &Encoder,
         mut trace: Option<&mut Vec<Matrix>>,
     ) -> Matrix {
-        let width = p["width"].as_u64().unwrap() as usize;
+        let width = p.width;
         let n = doc.tokens.len();
         if n == 0 {
             return vec![];
         }
-        let attrs = p["attrs"].as_array().unwrap();
-        let hashes = p["hashes"].as_array().unwrap();
+        let attrs = &p.attrs;
+        let hashes = &p.hashes;
         let mut mixed = Vec::with_capacity(n);
         for i in 0..n {
             let ids = self.features(doc, i, attrs);
             let mut concat = vec![];
             for (id, h) in ids.iter().zip(hashes) {
-                let e = self.tensor(&h["params"]["E"]);
+                let e = self.tensor(&h.params.e);
                 let rows = e.shape[0];
-                let keys = crate::hash::keys(*id, h["seed"].as_u64().unwrap());
+                let keys = crate::hash::keys(*id, h.seed);
                 let mut v = vec![0.; width];
                 for key in keys {
                     let at = (key as usize % rows) * width;
@@ -93,27 +92,22 @@ impl Model {
                 }
                 concat.extend(v);
             }
-            let w = self.tensor(&p["static"]["W"]);
+            let w = self.tensor(&p.static_vectors.w);
             let v = self.vector(doc.token_text(TokenIndex(i)).unwrap());
             for row in w.data.chunks_exact(w.shape[1]) {
                 concat.push(v.map_or(0., |v| row.iter().zip(v).map(|(a, b)| a * b).sum()))
             }
-            mixed.push(block(self, &p["mix"], &concat));
+            mixed.push(block(self, &p.mix, &concat));
         }
         // Thinc with_array pads before the encoder; padding also evolves through residual layers.
         if let Some(t) = trace.as_mut() {
             t.push(mixed.clone());
         }
-        let pad = p["pad"].as_u64().unwrap() as usize;
+        let pad = p.pad;
         let mut x = vec![vec![0.; width]; n + pad * 2];
         x[pad..pad + n].clone_from_slice(&mixed);
-        for (layer, window) in p["layers"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .zip(p["windows"].as_array().unwrap())
-        {
-            let window = window.as_u64().unwrap() as isize;
+        for (layer, window) in p.layers.iter().zip(&p.windows) {
+            let window = *window as isize;
             let mut y = x.clone();
             for (i, output) in y.iter_mut().enumerate() {
                 let mut input = Vec::with_capacity(width * (2 * window as usize + 1));
@@ -139,21 +133,21 @@ impl Model {
 }
 pub(crate) struct Scorer<'a> {
     model: &'a Model,
-    p: &'a Value,
+    p: &'a Transition,
     cache: Matrix,
     nf: usize,
     no: usize,
     np: usize,
 }
 impl<'a> Scorer<'a> {
-    pub fn new(model: &'a Model, p: &'a Value, x: &Matrix) -> Self {
-        let w = model.tensor(&p["lower"]["W"]);
+    pub fn new(model: &'a Model, p: &'a Transition, x: &Matrix) -> Self {
+        let w = model.tensor(&p.lower.w);
         let nf = w.shape[0];
         let no = w.shape[1];
         let np = w.shape[2];
-        let mut cache = vec![model.tensor(&p["lower"]["pad"]).data.clone()];
+        let mut cache = vec![model.tensor(&p.lower.pad).data.clone()];
         for row in x {
-            let r = linear(model, &p["reduce"], row);
+            let r = linear(model, &p.reduce, row);
             cache.push(
                 w.data
                     .chunks_exact(r.len())
@@ -178,32 +172,26 @@ impl<'a> Scorer<'a> {
                 *v += row[f * self.no * self.np + j]
             }
         }
-        for (v, b) in a
-            .iter_mut()
-            .zip(&self.model.tensor(&self.p["lower"]["b"]).data)
-        {
+        for (v, b) in a.iter_mut().zip(&self.model.tensor(&self.p.lower.b).data) {
             *v += b
         }
         let hidden: Vec<f32> = a
             .chunks_exact(self.np)
             .map(|p| p.iter().copied().fold(f32::NEG_INFINITY, f32::max))
             .collect();
-        linear(self.model, &self.p["upper"], &hidden)
+        linear(self.model, &self.p.upper, &hidden)
     }
 }
 pub(crate) fn validate(m: &Model) -> Result<()> {
     let bad = |s: &str| Error::Model(s.into());
-    let tensor = |key: &Value| -> Result<&crate::model::Tensor> {
-        m.tensors
-            .get(
-                key.as_str()
-                    .ok_or_else(|| bad("invalid tensor reference"))?,
-            )
-            .ok_or_else(|| bad("missing tensor"))
+    let tensor = |key: &TensorRef| -> Result<&crate::model::Tensor> {
+        m.tensors.get(&key.0).ok_or_else(|| bad("missing tensor"))
     };
-    let shape = |key: &Value, expected: &[usize]| -> Result<()> {
+    let shape = |key: &TensorRef, expected: &[usize]| -> Result<()> {
         if tensor(key)?.shape != expected {
-            Err(bad(&format!("shape mismatch {key}, expected {expected:?}")))
+            Err(bad(&format!(
+                "shape mismatch {key:?}, expected {expected:?}"
+            )))
         } else {
             Ok(())
         }
@@ -218,77 +206,66 @@ pub(crate) fn validate(m: &Model) -> Result<()> {
     if m.vector_keys.values().any(|&r| r >= vectors.shape[0]) {
         return Err(bad("vector row out of bounds"));
     }
-    let enc = |p: &Value| -> Result<usize> {
-        let width = p["width"]
-            .as_u64()
-            .filter(|x| *x > 0 && *x <= 4096)
-            .ok_or_else(|| bad("invalid width"))? as usize;
-        let attrs = p["attrs"].as_array().ok_or_else(|| bad("attrs missing"))?;
-        let hashes = p["hashes"]
-            .as_array()
-            .ok_or_else(|| bad("hashes missing"))?;
+    let enc = |p: &Encoder| -> Result<usize> {
+        let width = p.width;
+        if width == 0 || width > 4096 {
+            return Err(bad("invalid width"));
+        }
+        let attrs = &p.attrs;
+        let hashes = &p.hashes;
         if attrs.len() != hashes.len() || attrs.is_empty() {
             return Err(bad("feature count mismatch"));
         }
-        for (a, h) in attrs.iter().zip(hashes) {
-            if !["NORM", "PREFIX", "SUFFIX", "SHAPE", "SPACY", "IS_SPACE"]
-                .contains(&a.as_str().unwrap_or(""))
-            {
-                return Err(Error::Unsupported(format!("feature {a}")));
-            }
-            let e = tensor(&h["params"]["E"])?;
-            if e.shape.len() != 2 || e.shape[1] != width || h["seed"].as_u64().is_none() {
+        for h in hashes {
+            let e = tensor(&h.params.e)?;
+            if e.shape.len() != 2 || e.shape[1] != width {
                 return Err(bad("embedding config"));
             }
         }
-        shape(&p["static"]["W"], &[width, vectors.shape[1]])?;
-        let block = |b: &Value, input: usize| -> Result<()> {
-            let w = tensor(&b["maxout"]["W"])?;
+        shape(&p.static_vectors.w, &[width, vectors.shape[1]])?;
+        let block = |b: &Block, input: usize| -> Result<()> {
+            let w = tensor(&b.maxout.w)?;
             if w.shape.len() != 3 || w.shape[0] != width || w.shape[2] != input {
                 return Err(bad("maxout shape"));
             }
-            shape(&b["maxout"]["b"], &[width, w.shape[1]])?;
-            shape(&b["norm"]["G"], &[width])?;
-            shape(&b["norm"]["b"], &[width])
+            shape(&b.maxout.b, &[width, w.shape[1]])?;
+            shape(&b.norm.g, &[width])?;
+            shape(&b.norm.b, &[width])
         };
-        block(&p["mix"], width * (attrs.len() + 1))?;
-        let layers = p["layers"]
-            .as_array()
-            .ok_or_else(|| bad("layers missing"))?;
-        let windows = p["windows"]
-            .as_array()
-            .ok_or_else(|| bad("windows missing"))?;
+        block(&p.mix, width * (attrs.len() + 1))?;
+        let layers = &p.layers;
+        let windows = &p.windows;
         if layers.len() != windows.len() {
             return Err(bad("window count"));
         }
         let mut total = 0;
         for (b, w) in layers.iter().zip(windows) {
-            let w = w
-                .as_u64()
-                .filter(|x| *x <= 16)
-                .ok_or_else(|| bad("invalid window"))? as usize;
+            let w = *w;
+            if w > 16 {
+                return Err(bad("invalid window"));
+            }
             total += w;
             block(b, width * (w * 2 + 1))?
         }
-        if p["pad"].as_u64() != Some(total as u64) {
+        if p.pad != total {
             return Err(bad("encoder padding"));
         }
         Ok(width)
     };
-    let width = enc(&m.config["tok2vec"])?;
-    let nerwidth = enc(&m.config["ner"]["tok2vec"])?;
-    let tag = &m.config["tagger"];
-    let labels = tag["labels"]
-        .as_array()
-        .ok_or_else(|| bad("tagger labels"))?;
-    if labels.is_empty() || labels.iter().any(|v| v.as_str().is_none()) {
+    let width = enc(&m.config.tok2vec)?;
+    let nerwidth = enc(&m.config.ner.tok2vec)?;
+    let tag = &m.config.tagger;
+    let labels = &tag.labels;
+    if labels.is_empty() {
         return Err(bad("invalid labels"));
     }
-    shape(&tag["params"]["W"], &[labels.len(), width])?;
-    shape(&tag["params"]["b"], &[labels.len()])?;
-    for (name, nf, input) in [("parser", 8, width), ("ner", 3, nerwidth)] {
-        let p = &m.config[name];
-        let low = tensor(&p["lower"]["W"])?;
+    shape(&tag.params.w, &[labels.len(), width])?;
+    shape(&tag.params.b, &[labels.len()])?;
+    for (p, nf, input) in [
+        (&m.config.parser, 8, width),
+        (&m.config.ner.transition, 3, nerwidth),
+    ] {
+        let low = tensor(&p.lower.w)?;
         if low.shape.len() != 4 || low.shape[0] != nf {
             return Err(bad("transition features"));
         }
@@ -300,29 +277,35 @@ pub(crate) fn validate(m: &Model) -> Result<()> {
             ));
         }
         let ni = low.shape[3];
-        shape(&p["lower"]["b"], &[no, np])?;
-        shape(&p["lower"]["pad"], &[1, nf, no, np])?;
-        shape(&p["reduce"]["W"], &[ni, input])?;
-        shape(&p["reduce"]["b"], &[ni])?;
-        let actions = p["actions"]
-            .as_array()
-            .ok_or_else(|| bad("missing actions"))?;
-        if actions.is_empty() || actions.iter().any(|v| v.as_str().is_none()) {
+        shape(&p.lower.b, &[no, np])?;
+        shape(&p.lower.pad, &[1, nf, no, np])?;
+        shape(&p.reduce.w, &[ni, input])?;
+        shape(&p.reduce.b, &[ni])?;
+        let actions = &p.actions;
+        if actions.is_empty() {
             return Err(bad("invalid actions"));
         }
-        shape(&p["upper"]["W"], &[actions.len(), no])?;
-        shape(&p["upper"]["b"], &[actions.len()])?;
+        shape(&p.upper.w, &[actions.len(), no])?;
+        shape(&p.upper.b, &[actions.len()])?;
     }
-    let expected = serde_json::json!([
-        "tok2vec",
-        "tagger",
-        "parser",
-        "attribute_ruler",
-        "lemmatizer",
-        "ner"
-    ]);
-    if m.config["pipeline"] != expected {
+    let expected = vec![
+        Component::Tok2vec,
+        Component::Tagger,
+        Component::Parser,
+        Component::AttributeRuler,
+        Component::Lemmatizer,
+        Component::Ner,
+    ];
+    if m.config.pipeline != expected {
         return Err(Error::Unsupported("pipeline order".into()));
     }
     Ok(())
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct TransitionTrace {
+    pub ids: Vec<i64>,
+    pub scores: Vec<f32>,
+    pub valid: Vec<bool>,
+    pub action: usize,
 }

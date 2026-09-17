@@ -34,9 +34,9 @@ impl Model {
         }
         let x = self.tok2vec(&doc);
         for (t, row) in doc.tokens.iter_mut().zip(&x) {
-            let scores = linear(self, &self.config["tagger"]["params"], row);
+            let scores = linear(self, &self.config.tagger.params, row);
             let i = best(&scores, |_| true)?;
-            t.tag = Some(self.config["tagger"]["labels"][i].as_str().unwrap().into());
+            t.tag = Some(self.config.tagger.labels[i].clone());
         }
         if stage == Stage::Tagger {
             return Ok(doc);

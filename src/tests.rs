@@ -46,7 +46,7 @@ fn official_stage_parity() {
         let text = c["text"].as_str().unwrap();
         let mut d = m.tokenize(text).unwrap();
         let mut stages = vec![];
-        let x = m.encode_traced(&d, &m.config["tok2vec"], Some(&mut stages));
+        let x = m.encode_traced(&d, &m.config.tok2vec, Some(&mut stages));
         max_activation = max_activation.max(compare_floats(
             &serde_json::json!(stages),
             &c["tok2vec_stages"],
@@ -64,7 +64,7 @@ fn official_stage_parity() {
                 }
                 trace.clear();
                 stages.clear();
-                m.encode_traced(&d, &m.config["ner"]["tok2vec"], Some(&mut stages));
+                m.encode_traced(&d, &m.config.ner.tok2vec, Some(&mut stages));
                 max_activation = max_activation.max(compare_floats(
                     &serde_json::json!(stages),
                     &c["ner_stages"],
@@ -76,6 +76,7 @@ fn official_stage_parity() {
             let expected = c[name].as_array().unwrap();
             assert_eq!(trace.len(), expected.len(), "{name} {text}");
             for (step, (a, b)) in trace.iter().zip(expected).enumerate() {
+                let a = serde_json::to_value(a).unwrap();
                 for field in ["ids", "valid", "action"] {
                     assert_eq!(a[field], b[field], "{name} step {step} {field} text={text}");
                 }
@@ -99,7 +100,7 @@ fn tokenizer_and_features() {
         let d = m.tokenize(c["text"].as_str().unwrap()).unwrap();
         let actual:Vec<Value>=d.tokens.iter().enumerate().map(|(i,t)|serde_json::json!({"text":d.token_text(TokenIndex(i)).unwrap(),"idx":t.idx.0,"whitespace":t.whitespace,"norm":t.norm})).collect();
         let features: Vec<Vec<u64>> = (0..d.tokens.len())
-            .map(|i| m.features(&d, i, m.config["tok2vec"]["attrs"].as_array().unwrap()))
+            .map(|i| m.features(&d, i, &m.config.tok2vec.attrs))
             .collect();
         count += d.tokens.len();
         if serde_json::json!(actual) != c["tokens"] || serde_json::json!(features) != c["features"]

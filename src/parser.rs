@@ -1,10 +1,11 @@
 use crate::chunks::left_edge;
+use crate::config::ActionKind;
+use crate::neural::TransitionTrace;
 use crate::pipeline::best;
 use crate::{
     neural::{Matrix, Scorer},
     Doc, Error, Model, Result, Span, TokenIndex,
 };
-use serde_json::Value;
 impl Model {
     pub(crate) fn parse(&self, d: &mut Doc, x: &Matrix) -> Result<()> {
         self.parse_traced(d, x, None)
@@ -13,11 +14,11 @@ impl Model {
         &self,
         d: &mut Doc,
         x: &Matrix,
-        mut trace: Option<&mut Vec<Value>>,
+        mut trace: Option<&mut Vec<TransitionTrace>>,
     ) -> Result<()> {
         let n = d.tokens.len();
-        let scorer = Scorer::new(self, &self.config["parser"], x);
-        let actions = self.config["parser"]["actions"].as_array().unwrap();
+        let scorer = Scorer::new(self, &self.config.parser, x);
+        let actions = &self.config.parser.actions;
         let mut stack = Vec::<usize>::new();
         let mut rebuffer = vec![];
         let mut at = 0;
@@ -64,26 +65,35 @@ impl Model {
             let scores = scorer.scores(&ids);
             let valid: Vec<bool> = (0..scores.len())
                 .map(|i| {
-                    let action = actions[i].as_str().unwrap();
-                    match action.as_bytes()[0] {
-                        b'S' => {
+                    let action = &actions[i];
+                    match action.kind {
+                        ActionKind::Shift => {
                             stack.is_empty()
                                 || (b1.is_some() && !starts[b0.unwrap()] && !unshift[b0.unwrap()])
                         }
-                        b'D' => !stack.is_empty(),
-                        b'L' | b'R' => s0.is_some() && b0.is_some_and(|v| !starts[v]),
-                        b'B' => b1.is_some_and(|v| Some(v) == b0.map(|u| u + 1) && !starts[v]),
+                        ActionKind::Reduce => !stack.is_empty(),
+                        ActionKind::Left | ActionKind::Right => {
+                            s0.is_some() && b0.is_some_and(|v| !starts[v])
+                        }
+                        ActionKind::Begin => {
+                            b1.is_some_and(|v| Some(v) == b0.map(|u| u + 1) && !starts[v])
+                        }
                         _ => false,
                     }
                 })
                 .collect();
             let a = best(&scores, |i| valid[i])?;
             if let Some(t) = trace.as_mut() {
-                t.push(serde_json::json!({"ids":ids.map(|v|v.map_or(-1,|i|i as i64)),"scores":scores,"valid":valid,"action":a}));
+                t.push(TransitionTrace {
+                    ids: ids.map(|v| v.map_or(-1, |i| i as i64)).to_vec(),
+                    scores,
+                    valid,
+                    action: a,
+                });
             }
-            let action = actions[a].as_str().unwrap();
-            match action.as_bytes()[0] {
-                b'S' => {
+            let action = &actions[a];
+            match action.kind {
+                ActionKind::Shift => {
                     let v = rebuffer.pop().unwrap_or_else(|| {
                         let v = at;
                         at += 1;
@@ -91,15 +101,15 @@ impl Model {
                     });
                     stack.push(v)
                 }
-                b'D' => {
+                ActionKind::Reduce => {
                     let v = stack.pop().unwrap();
                     if heads[v].is_none() && !stack.is_empty() {
                         rebuffer.push(v);
                         unshift[v] = true
                     }
                 }
-                b'L' | b'R' => {
-                    let (h, c) = if action.starts_with('L') {
+                ActionKind::Left | ActionKind::Right => {
+                    let (h, c) = if action.kind == ActionKind::Left {
                         (b0.unwrap(), s0.unwrap())
                     } else {
                         (s0.unwrap(), b0.unwrap())
@@ -113,13 +123,13 @@ impl Model {
                         arcs.retain(|v| *v != c)
                     }
                     heads[c] = Some(h);
-                    deps[c] = action[2..].into();
+                    deps[c] = action.label.clone();
                     if h > c {
                         left[h].push(c)
                     } else {
                         right[h].push(c)
                     }
-                    if action.starts_with('L') {
+                    if action.kind == ActionKind::Left {
                         unshift[b0.unwrap()] = false;
                         stack.pop();
                     } else {
@@ -131,7 +141,7 @@ impl Model {
                         stack.push(v)
                     }
                 }
-                b'B' => starts[b1.unwrap()] = true,
+                ActionKind::Begin => starts[b1.unwrap()] = true,
                 _ => unreachable!(),
             }
         }

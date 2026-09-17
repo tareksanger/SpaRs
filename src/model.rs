@@ -1,5 +1,5 @@
+use crate::config::{Dtype, Manifest, TensorRef};
 use crate::{tokenizer::Tokenizer, Error, Result};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, path::Path};
 #[derive(Debug)]
@@ -8,7 +8,7 @@ pub(crate) struct Tensor {
     pub data: Vec<f32>,
 }
 pub struct Model {
-    pub(crate) config: Value,
+    pub(crate) config: Manifest,
     pub(crate) tensors: HashMap<String, Tensor>,
     pub(crate) tokenizer: Tokenizer,
     pub(crate) vector_keys: HashMap<u64, usize>,
@@ -19,32 +19,28 @@ pub struct Model {
 impl Model {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        let config: Value = serde_json::from_slice(&std::fs::read(path.join("manifest.json"))?)?;
-        if config["format_version"] != 1 {
+        let config: Manifest = serde_json::from_slice(&std::fs::read(path.join("manifest.json"))?)?;
+        if config.format_version != 1 {
             return Err(Error::Unsupported("format_version".into()));
         }
-        if config["model"] != "en_core_web_md" || config["model_version"] != "3.8.0" {
+        if config.model != "en_core_web_md" || config.model_version != "3.8.0" {
             return Err(Error::Unsupported(
                 "only en_core_web_md 3.8.0 is supported".into(),
             ));
         }
         crate::validation::resources(&config)?;
         let bytes = std::fs::read(path.join("weights.safetensors"))?;
-        if format!("{:x}", Sha256::digest(&bytes))
-            != config["weights_sha256"].as_str().unwrap_or("")
-        {
+        if format!("{:x}", Sha256::digest(&bytes)) != config.weights_sha256 {
             return Err(Error::Model("weights checksum mismatch".into()));
         }
         let st = safetensors::SafeTensors::deserialize(&bytes)
             .map_err(|e| Error::Model(e.to_string()))?;
-        let specs = config["tensors"]
-            .as_object()
-            .ok_or_else(|| Error::Model("missing tensor inventory".into()))?;
+        let specs = &config.tensors;
         let mut tensors = HashMap::new();
         for (name, spec) in specs {
             let t = st.tensor(name).map_err(|e| Error::Model(e.to_string()))?;
-            let shape: Vec<usize> = serde_json::from_value(spec["shape"].clone())?;
-            if spec["dtype"] != "F32"
+            let shape = spec.shape.clone();
+            if spec.dtype != Dtype::F32
                 || t.dtype() != safetensors::Dtype::F32
                 || shape != t.shape()
                 || shape.contains(&0)
@@ -61,15 +57,11 @@ impl Model {
             }
             tensors.insert(name.clone(), Tensor { shape, data });
         }
-        let tokenizer = Tokenizer::new(&config["tokenizer"])?;
-        let vector_keys = serde_json::from_value(config["vector_keys"].clone())?;
-        let norms = serde_json::from_value(config["norms"].clone())?;
-        let symbols = serde_json::from_value(config["symbols"].clone())?;
-        let email_regex = fancy_regex::Regex::new(
-            config["lexical"]["email_regex"]
-                .as_str()
-                .ok_or_else(|| Error::Model("email regex missing".into()))?,
-        )?;
+        let tokenizer = Tokenizer::new(&config.tokenizer)?;
+        let vector_keys = config.vector_keys.clone();
+        let norms = config.norms.clone();
+        let symbols = config.symbols.clone();
+        let email_regex = fancy_regex::Regex::new(&config.lexical.email_regex)?;
         let model = Self {
             email_regex,
             config,
@@ -82,8 +74,8 @@ impl Model {
         model.validate()?;
         Ok(model)
     }
-    pub(crate) fn tensor(&self, key: &Value) -> &Tensor {
-        &self.tensors[key.as_str().expect("validated tensor key")]
+    pub(crate) fn tensor(&self, key: &TensorRef) -> &Tensor {
+        &self.tensors[&key.0]
     }
     pub(crate) fn string_id(&self, s: &str) -> u64 {
         if s.is_empty() {

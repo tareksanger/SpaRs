@@ -79,10 +79,12 @@ fn malformed_resource_types_and_missing_configuration_are_rejected() {
     let mut missing = manifest.clone();
     missing.as_object_mut().unwrap().remove("tokenizer");
     tmp.write(&missing, &weights);
-    assert!(matches!(
-        load_error(&tmp.0, "missing tokenizer"),
-        Error::Unsupported(_)
-    ));
+    let error = load_error(&tmp.0, "missing tokenizer");
+    assert!(matches!(error, Error::Json(_)), "{error}");
+    assert!(
+        error.to_string().contains("missing field `tokenizer`"),
+        "{error}"
+    );
 }
 
 #[test]

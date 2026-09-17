@@ -1,101 +1,80 @@
-use crate::{Doc, Error, Model, Result, TokenIndex};
-use serde_json::Value;
+use crate::{
+    config::{Constraint, OutputAttribute},
+    Doc, Model, Result, TokenIndex,
+};
+fn matches(constraint: &Option<Constraint>, actual: &str) -> Result<bool> {
+    Ok(match constraint {
+        None => true,
+        Some(Constraint::Exact(expected)) => actual == expected,
+        Some(Constraint::Operators(ops)) => {
+            let included = ops
+                .included
+                .as_ref()
+                .is_none_or(|v| v.iter().any(|s| s == actual));
+            let excluded = ops
+                .not_in
+                .as_ref()
+                .is_none_or(|v| v.iter().all(|s| s != actual));
+            let regex = match &ops.regex {
+                None => true,
+                Some(re) => fancy_regex::Regex::new(re)?.is_match(actual)?,
+            };
+            included && excluded && regex
+        }
+    })
+}
 impl Model {
     pub(crate) fn attributes(&self, d: &mut Doc) -> Result<()> {
-        // Matches are collected before attributes change, then applied in rule order.
-        let mut matches = vec![];
-        for (r, rule) in self.config["attribute_rules"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .enumerate()
-        {
-            for pattern in rule["patterns"].as_array().unwrap() {
-                let pat = pattern.as_array().unwrap();
+        // Collect matches before applying any output attributes.
+        let mut found = vec![];
+        for (r, rule) in self.config.attribute_rules.iter().enumerate() {
+            for pat in &rule.patterns {
                 for start in 0..=d.tokens.len().saturating_sub(pat.len()) {
                     if start + pat.len() > d.tokens.len() {
                         continue;
                     }
                     let mut yes = true;
                     for (off, p) in pat.iter().enumerate() {
-                        for (key, value) in p.as_object().unwrap() {
-                            let t = &d.tokens[start + off];
-                            let actual = match key.as_str() {
-                                "TAG" => Value::from(t.tag.as_deref().unwrap_or("")),
-                                "DEP" => Value::from(t.dep.as_deref().unwrap_or("")),
-                                "LOWER" => {
-                                    Value::from(self.lower(d.token_text(TokenIndex(start + off))?))
-                                }
-                                "IS_SPACE" => Value::from(
-                                    d.token_text(TokenIndex(start + off))?
-                                        .chars()
-                                        .all(crate::tokenizer::is_space),
-                                ),
-                                _ => {
-                                    return Err(Error::Unsupported(format!("rule attribute {key}")))
-                                }
-                            };
-                            let good = if let Some(obj) = value.as_object() {
-                                let mut good = true;
-                                for (op, v) in obj {
-                                    good &= match op.as_str() {
-                                        "IN" => v.as_array().unwrap().contains(&actual),
-                                        "NOT_IN" => !v.as_array().unwrap().contains(&actual),
-                                        "REGEX" => fancy_regex::Regex::new(v.as_str().unwrap())?
-                                            .is_match(actual.as_str().unwrap_or(""))?,
-                                        _ => {
-                                            return Err(Error::Unsupported(format!(
-                                                "rule operator {op}"
-                                            )))
-                                        }
-                                    };
-                                }
-                                good
-                            } else {
-                                actual == *value
-                            };
-                            yes &= good;
-                        }
+                        let t = &d.tokens[start + off];
+                        let word = d.token_text(TokenIndex(start + off))?;
+                        yes &= matches(&p.tag, t.tag.as_deref().unwrap_or(""))?;
+                        yes &= matches(&p.dep, t.dep.as_deref().unwrap_or(""))?;
+                        yes &= matches(&p.lower, &self.lower(word))?;
+                        yes &= p
+                            .is_space
+                            .is_none_or(|v| v == word.chars().all(crate::tokenizer::is_space));
                     }
                     if yes {
-                        let index = rule["index"].as_i64().unwrap();
-                        let at = if index < 0 {
-                            (start + pat.len()) as i64 + index
+                        let at = if rule.index < 0 {
+                            (start + pat.len()) as i64 + rule.index
                         } else {
-                            start as i64 + index
+                            start as i64 + rule.index
                         };
-                        if at < start as i64 || at >= (start + pat.len()) as i64 {
-                            return Err(Error::Model("attribute rule index".into()));
-                        }
-                        matches.push((r, at as usize));
+                        found.push((r, at as usize));
                     }
                 }
             }
         }
-        for (r, i) in matches {
-            for (key, v) in self.config["attribute_rules"][r]["attrs"]
-                .as_object()
-                .unwrap()
-            {
-                let value = Some(if key == "MORPH" && v == "_" {
+        for (r, i) in found {
+            for (key, v) in &self.config.attribute_rules[r].attrs {
+                let value = Some(if *key == OutputAttribute::Morph && v == "_" {
                     String::new()
                 } else {
-                    v.as_str().unwrap().into()
+                    v.clone()
                 });
                 let t = &mut d.tokens[i];
-                match key.as_str() {
-                    "POS" => t.pos = value,
-                    "TAG" => t.tag = value,
-                    "DEP" => t.dep = value,
-                    "MORPH" => t.morphology = value,
-                    "LEMMA" => t.lemma = value,
-                    _ => return Err(Error::Unsupported(format!("rule output {key}"))),
+                match key {
+                    OutputAttribute::Pos => t.pos = value,
+                    OutputAttribute::Tag => t.tag = value,
+                    OutputAttribute::Dep => t.dep = value,
+                    OutputAttribute::Morph => t.morphology = value,
+                    OutputAttribute::Lemma => t.lemma = value,
                 }
             }
         }
         for t in &mut d.tokens {
             if t.morphology.is_none() {
-                t.morphology = Some(String::new())
+                t.morphology = Some(String::new());
             }
         }
         Ok(())

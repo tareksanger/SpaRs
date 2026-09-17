@@ -1,43 +1,38 @@
+use crate::config::{Exception, TokenizerConfig};
 use crate::{Doc, Model, Result, Token};
 use fancy_regex::Regex;
-use serde_json::Value;
 use std::collections::HashMap;
 pub(crate) struct Tokenizer {
     prefix: Regex,
     suffix: Regex,
     infix: Regex,
     url: Regex,
-    rules: HashMap<String, Vec<Value>>,
+    rules: HashMap<String, Vec<Exception>>,
     matcher_patterns: HashMap<String, Vec<Vec<String>>>,
 }
 impl Tokenizer {
     pub(crate) fn url_match(&self, s: &str) -> Result<bool> {
         Ok(self.url.is_match(s)?)
     }
-    pub fn new(v: &Value) -> Result<Self> {
-        if !v["token_match"].is_null() {
+    pub fn new(v: &TokenizerConfig) -> Result<Self> {
+        if v.token_match.is_some() {
             return Err(crate::Error::Unsupported("token_match".into()));
         }
-        let re = |k: &str| -> Result<Regex> {
-            Ok(Regex::new(v[k].as_str().ok_or_else(|| {
-                crate::Error::Model(format!("missing tokenizer {k}"))
-            })?)?)
-        };
-        if v.get("faster_heuristics").is_some_and(|flag| flag != true) {
+        if v.faster_heuristics == Some(false) {
             return Err(crate::Error::Unsupported(
                 "tokenizer faster_heuristics must be true".into(),
             ));
         }
-        let prefix = re("prefix")?;
-        let suffix = re("suffix")?;
-        let infix = re("infix")?;
-        let rules: HashMap<String, Vec<Value>> = serde_json::from_value(v["rules"].clone())?;
+        let prefix = Regex::new(&v.prefix)?;
+        let suffix = Regex::new(&v.suffix)?;
+        let infix = Regex::new(&v.infix)?;
+        let rules = v.rules.clone();
         let mut tokenizer = Self {
             prefix,
             suffix,
             infix,
             matcher_patterns: HashMap::new(),
-            url: re("url")?,
+            url: Regex::new(&v.url)?,
             rules,
         };
         // spaCy builds phrase patterns with exception handling disabled.
@@ -138,8 +133,8 @@ impl Tokenizer {
             if let Some(rule) = self.rules.get(text).filter(|_| with_special_cases) {
                 let mut at = offset + start;
                 for t in rule {
-                    let len = t["ORTH"].as_str().unwrap().len();
-                    out.push((at, at + len, t["NORM"].as_str().map(str::to_owned)));
+                    let len = t.orth.as_str().len();
+                    out.push((at, at + len, t.norm.clone()));
                     at += len;
                 }
             } else if self.url.is_match(text)? {
@@ -213,8 +208,8 @@ impl Model {
             if let Some((j, r)) = selected.get(&i) {
                 let mut a = raw[i].0;
                 for t in *r {
-                    let word = t["ORTH"].as_str().unwrap();
-                    replaced.push((a, a + word.len(), t["NORM"].as_str().map(str::to_owned)));
+                    let word = t.orth.as_str();
+                    replaced.push((a, a + word.len(), t.norm.clone()));
                     a += word.len();
                     if text.as_bytes().get(a) == Some(&b' ') && a < raw[*j - 1].1 {
                         a += 1

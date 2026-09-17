@@ -26,6 +26,7 @@
 //! Compatibility is limited to the pinned English inference configuration.
 //! Training, additional architectures/languages and the wider spaCy API remain
 //! unimplemented. See the repository compatibility matrix and parity reports.
+mod config;
 mod document;
 mod hash;
 mod lexical;
