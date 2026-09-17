@@ -1,5 +1,8 @@
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+mod traversal;
+pub use traversal::{Ancestors, Children, DependencyError, Subtree};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ByteOffset(pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,13 +52,27 @@ pub struct Span {
     pub end: TokenIndex,
     pub label: String,
 }
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Doc {
     pub(crate) text: String,
     pub(crate) tokens: Vec<Token>,
     pub(crate) entities: Option<Vec<Span>>,
     pub(crate) sentences: Option<Vec<Span>>,
     pub(crate) noun_chunks: Option<Vec<Span>>,
+    // Public traversal begins after pipeline writes finish. Any future mutation
+    // of dependency heads must invalidate this cache before exposing the document.
+    #[serde(skip)]
+    pub(crate) dependency_index:
+        OnceLock<std::result::Result<traversal::DependencyIndex, DependencyError>>,
+}
+impl PartialEq for Doc {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+            && self.tokens == other.tokens
+            && self.entities == other.entities
+            && self.sentences == other.sentences
+            && self.noun_chunks == other.noun_chunks
+    }
 }
 impl Doc {
     pub fn text(&self) -> &str {
@@ -177,6 +194,7 @@ impl Doc {
             entities: s.entities,
             sentences: s.sentences,
             noun_chunks: s.noun_chunks,
+            dependency_index: OnceLock::new(),
         })
     }
 }

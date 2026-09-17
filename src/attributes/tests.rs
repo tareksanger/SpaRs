@@ -31,6 +31,7 @@ fn tagged_document(word: &str) -> Doc {
         entities: None,
         sentences: None,
         noun_chunks: None,
+        dependency_index: Default::default(),
     }
 }
 

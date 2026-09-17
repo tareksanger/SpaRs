@@ -5,7 +5,7 @@ Implemented means native code exists; only the evidence column establishes its v
 | Surface | State | Evidence / missing work |
 |---|---|---|
 | Language/Pipeline inference | Partial | Model::process, sequential pipe, stage controls, offline consumer; pinned English only |
-| Doc/Token/Span | Partial | Owned text, immutable indexed access; offset newtypes; checked borrowed views and native snapshots; no extensions |
+| Doc/Token/Span | Partial | Owned text, immutable indexed access; offset newtypes; checked borrowed views and native snapshots; children, ancestors, subtree and sentence access (98 documents / 5,568 reference tokens); no extensions |
 | Vocabulary/StringStore/Lexeme | Partial | Hashing, norm/shape/features and vector map; read-only lexical flags and pinned Unicode data; no mutable vocab/string store |
 | English tokenizer | Partial | 4,057 tokenizer/feature cases and 52,236 regex-span checks; English configuration only |
 | MultiHashEmbed.v2 | Implemented | Six/four features, source-derived Murmur hashing, static projection |
@@ -18,11 +18,13 @@ Implemented means native code exists; only the evidence column establishes its v
 | Sentence boundaries | Implemented | Parser roots/subtrees; independent senter/sentencizer not exposed |
 | English noun chunks | Implemented | Upstream dependency/POS rules |
 | Static vectors | Partial | Token/span/doc vectors and similarities verified; no floret or vector mutation |
-| Matcher/PhraseMatcher/DependencyMatcher | Unimplemented | Tokenizer's exception matcher is internal only |
+| DependencyMatcher | Unimplemented | Next matcher priority; reusable dependency patterns |
+| Matcher / PhraseMatcher | Unimplemented | Planned after DependencyMatcher; tokenizer exception matching is internal only |
 | EntityRuler/SpanRuler | Unimplemented | No public rule-based span annotation API |
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
 | Model serialization | Partial | Versioned native official-export format; not spaCy binary-compatible |
+| Downloadable native model exports | Unimplemented | Planned versioned downloads with checksums; currently consumers run the Python exporter |
 | Custom components / registry | Unimplemented | Only fixed ordered pipeline accepted |
 | Morphologizer / trainable senter | Unimplemented | Export excludes disabled senter |
 | Textcat, span categorizer/finder, entity linker, edit-tree lemmatizer | Unimplemented | No supported architectures |

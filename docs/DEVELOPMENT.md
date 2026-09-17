@@ -104,3 +104,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Follow the [quality process](QUALITY.md). Start with a small behavior you can compare against official spaCy, add a test that exposes the missing behavior, implement it, and run the acceptance command. Keep expected results fixed while fixing code. Update the [compatibility inventory](COMPATIBILITY.md) with the supported inputs and evidence.
 
 For example, `Wait—didn't you say that?` exercises how the tokenizer treats a contraction after a dash. A useful regression checks every token and its offset, then checks the resulting annotations against spaCy. Checking only the number of tokens would miss several incorrect outputs.
+
+## Inspect grammatical relationships
+
+A token's children are the words directly attached to it. Its ancestors follow the chain from its parent to the sentence root. Its subtree includes the token and all words attached below it. Load a parsed document before requesting these relationships.
+
+```rust
+use spars::{Model, TokenIndex};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let doc = model.process("Alice works in London.")?;
+    let works = doc.token(TokenIndex(1))?;
+    assert_eq!(works.children()?.map(|t| t.text()).collect::<Vec<_>>(), ["Alice", "in", "."]);
+    assert_eq!(doc.token(TokenIndex(3))?.ancestors()?.map(|t| t.text()).collect::<Vec<_>>(), ["in", "works"]);
+    assert_eq!(works.subtree()?.map(|t| t.text()).collect::<Vec<_>>(), ["Alice", "works", "in", "London", "."]);
+    assert_eq!(works.sentence()?.text(), "Alice works in London.");
+    assert_eq!(doc.sentence_views().unwrap().count(), 1);
+    Ok(())
+}
+```
+
+Children follow token order. Ancestors start with the parent and end at the root; a root has no ancestors. Subtree order matches spaCy: left child subtrees, the token itself, then right child subtrees. With crossing dependencies this may differ from text order, so a subtree is an iterator rather than a contiguous span.
+
+The first dependency query validates all heads in the document and builds a shared index in linear time and memory. An incomplete or cyclic dependency graph anywhere in the document rejects dependency queries. Later child queries visit only the immediate children, ancestor queries follow only the parent chain, and subtree queries visit only that subtree without recursion. Sentence lookup uses the stored sentence spans independently of dependency annotations. Token relationship and sentence queries return errors for missing annotations; `sentence_views()` returns `None` when sentence boundaries are unavailable. A computed empty result is an empty iterator. The cache does not change document equality or saved JSON.

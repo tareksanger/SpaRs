@@ -57,6 +57,12 @@ pub enum Error {
     Unsupported(String),
     #[error("invalid span or offset")]
     Bounds,
+    #[error("annotation unavailable: {0}")]
+    MissingAnnotation(&'static str),
+    #[error(transparent)]
+    Dependency(#[from] DependencyError),
+    #[error("no sentence contains token {0:?}")]
+    InvalidSentence(TokenIndex),
     #[error("regular expression: {0}")]
     Regex(Box<fancy_regex::Error>),
 }

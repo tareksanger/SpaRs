@@ -237,6 +237,7 @@ impl Model {
             entities: None,
             sentences: None,
             noun_chunks: None,
+            dependency_index: Default::default(),
         })
     }
 }

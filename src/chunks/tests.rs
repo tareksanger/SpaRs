@@ -16,6 +16,7 @@ fn document(heads: &[Option<usize>]) -> Doc {
         entities: None,
         sentences: None,
         noun_chunks: None,
+        dependency_index: Default::default(),
     }
 }
 

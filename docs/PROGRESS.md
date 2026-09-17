@@ -18,11 +18,12 @@ SpaRs implements native Rust inference for `en_core_web_md` 3.8.0, using spaCy 3
 | Regular-expression matching | 52,236 comparisons over 13,059 texts |
 | Parser and entity action traces | 634 action choices, context IDs, and valid-action masks |
 | New robustness checks | 9 malformed configurations, 4 damaged tensors, 27 malformed snapshots, 3 invalid UTF-8 offsets, and 28 processing results across repeated, batched, and concurrent calls |
-| Executed Markdown examples | 1 README example and 4 developer-guide examples |
+| Dependency traversal | 98 documents / 5,568 tokens compared with official children, ancestors, subtree order, and sentence spans |
+| Executed Markdown examples | 1 README example and 5 developer-guide examples |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python type checking, the typing policy, formatting, Clippy, Rust and Python tests, 2 source doc tests, the 5 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the five executed Markdown examples. The consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python type checking, the typing policy, formatting, Clippy, Rust and Python tests, 2 source doc tests, the 6 executed Markdown examples, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the six executed Markdown examples. The consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
@@ -48,4 +49,4 @@ The current lexical generator produces 5,367 cases and its regex generator produ
 
 See [performance measurements](PERFORMANCE.md) for commands to measure loading time, throughput, and peak process memory. The implementation uses native CPU matrix kernels and processes documents sequentially. Each measurement applies to its recorded machine, source version, and corpus; it does not promise a particular speed for other workloads.
 
-The next library features are token matching and phrase matching, followed by dependency matching, document editing, broader serialization, additional pipelines and languages, and training. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, and runnable example before it is marked verified.
+Development proceeds in this order: dependency traversal and sentence access; DependencyMatcher; token Matcher; PhraseMatcher; then versioned downloadable model exports with checksums. DependencyMatcher will build on the traversal helpers. Model distribution should let consumers load validated exports without Python; publishing model artifacts remains a separate release action. Document editing, broader serialization, additional pipelines and languages, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, and runnable example before it is marked verified.
