@@ -25,6 +25,24 @@ To repeat the comparison after the model setup, run:
 
 The [comparison report](../reports/python-comparison.json) records raw timings, workload counts, hardware, versions, source hashes, and the limits of the measurement. Each profile ran SpaRs before spaCy in separate processes. Operating-system caches were not cleared, and the synthetic long documents repeat one sentence. This single run does not establish performance on other hardware, text, or batch sizes.
 
+## Where SpaRs spends time
+
+A five-second native sample on the long-document group found maxout neural layers (which compute and select scores) in 2,974 of 4,057 profiler observations (about 73%), and attribute rules in 553 observations (about 14%). These are approximate shares of sampled time, not exact component durations. The two encoders together appeared in about 78% of samples; that includes the 73% for maxout blocks and must not be added to it.
+
+The main difference is numerical execution. [The Rust encoder](../src/neural.rs) computes separate dot products for each token and output row. The pinned Thinc reference uses BLIS matrix multiplication across token rows. Both encoders are required by this model, so their cost is not accidental duplicated inference. Rust already precomputes parser and NER token features; those calculations also use small dot products.
+
+[Attribute matching](../src/attributes.rs) scans 180 patterns from 179 rules. It computes lowercase text for each candidate even when the pattern has no lowercase condition or an earlier condition has already failed. Three regex conditions also compile their expressions during matching. These are avoidable costs. Allocating temporary vectors, cloning layer buffers, and recomputing lexical features are additional code-level candidates whose individual costs have not been measured.
+
+The first optimization priorities are matrix kernels that process token rows together, followed by compiling attribute regexes when the model loads and avoiding repeated lowercase work. Each change must retain the exact annotation comparisons and existing numerical limits.
+
+[The profiling report](../reports/profiling.json) also records independent pipeline-prefix timings for both groups. Repeat those measurements with:
+
+```sh
+cargo run --release --offline --example profile_stages -- assets/en_core_web_md-3.8.0 fixtures/evaluation-v1.json long 3
+```
+
+Use `short` in place of `long` for the short-document group. Each total includes all stages before the named stage. Subtracting adjacent totals estimates a component's cost, with timing noise; the tagger prefix includes the shared encoder, and the attribute prefix includes noun chunks. One warmup pass precedes three measured passes. Model loading and result destruction are excluded, and stage order rotates between passes. This helps diagnose the implementation; it does not predict the speedup of a proposed fix.
+
 ## Earlier native baseline
 
 The remaining measurements are the earlier baseline recorded in `reports/benchmark.json`. Its corpus predates the portable-path fixture update; its source hashes identify the implementation measured.

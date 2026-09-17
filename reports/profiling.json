@@ -1,0 +1,141 @@
+{
+  "model": "en_core_web_md",
+  "model_version": "3.8.0",
+  "spacy": "3.8.14",
+  "thinc": "8.3.13",
+  "cpu": "Apple M3 Max",
+  "ram_gib": 96,
+  "build": "release; scalar Rust kernels; one processing thread",
+  "revision": "77bac5de0420bbe40fa8203e027a06e0d350629b",
+  "corpus_sha256": "e07288cbb004ce92f750215379853f6a87eae702adfd8815cbd08cc7f5149f03",
+  "source_sha256": {
+    "examples/profile_stages.rs": "0b65615fa1a82b6a7438ec09c83b25e446974254617e44cceceb87f0b7c31368",
+    "src/attributes.rs": "884a43f475390e873d88d67008fa62a8aee4b96bc0dd8d0fbaa7ec9f68a30af1",
+    "src/chunks.rs": "b5bf556b078622130481fa9ff22cd1e4741abeaaa8f1ae121df8723fbf25de07",
+    "src/config/mod.rs": "67cd47865f5c20b381ed11687a1b2b68bd54a2a5b77efa530f4f459bd4019ddf",
+    "src/config/resources.rs": "bf04d12321ba2deaf16c8456d9ce61e922619c00641f04b5d1da0e6707706595",
+    "src/config/tests.rs": "474fa6f164d1d23fa7a1491fbc6590da39046611ae08c895c3a40e60b24aaa4a",
+    "src/document.rs": "c9db34a600a8f57de1a199dc92ffedc730a07c8101f2f5dc477b8dbcc3093323",
+    "src/hash.rs": "6418380c6daa06e694c1df20bfd1c05e64402adcf5fc67f0415a8871d01d382a",
+    "src/lemmatizer.rs": "504d8e2a9ea1bc831a31edfbc79a9f2b49cf1a1d270b4ed764710cddb60c7d72",
+    "src/lexical.rs": "8f3489b0d69880fce889baf9fdd854bff9fe6da3b717a01c0e1e3d3a51fa43aa",
+    "src/lib.rs": "849f5d5848a9c816672dd29d9ee1eec174093c2e76854e510867c44c1407820a",
+    "src/model.rs": "7366320933bea2a6572d1b523f0e55f17bd639f5610dcec229bbfb335901dc68",
+    "src/ner.rs": "475502b529f32adc12c9e785f5378e110c0a3a28d836f1ebe12ecf6ee249f8e2",
+    "src/neural.rs": "fc17b57d5a900f7f0bec7c3fddc237fbfcf49d95d7d27dd0095bd49ecd8d7de1",
+    "src/parser.rs": "27dacaa2cf982bd30fb1bbb635459206427e9600df5b4a4e0d937ce39b33ba2d",
+    "src/pipeline.rs": "fb0f04abf76c6d09a810dc95fd34070945907cb4616bfe2303fe239da4a43633",
+    "src/tests.rs": "b4e154d74fe9889c39cac3dad0122fa7d24634fbcf6f125bed6cf6b0005c6c97",
+    "src/tokenizer.rs": "31f82d9206ee920ff5e5da166a16191ab12ec5643d71af764acaf7d879ce1f7f",
+    "src/validation.rs": "d47ed038e800eae2c69387f116ba7391b17081757f66f4523aa05015359a2ff3"
+  },
+  "prefix_profiles": [
+    {
+      "group": "short",
+      "documents_per_pass": 96,
+      "rounds": 3,
+      "warmup_passes": 1,
+      "measurements": [
+        {
+          "stage": "tokenizer",
+          "cumulative_seconds": 0.040256040999999985
+        },
+        {
+          "stage": "tagger",
+          "cumulative_seconds": 1.305838133
+        },
+        {
+          "stage": "parser",
+          "cumulative_seconds": 1.3864387819999993
+        },
+        {
+          "stage": "attribute_ruler_and_chunks",
+          "cumulative_seconds": 1.647797878000001
+        },
+        {
+          "stage": "lemmatizer",
+          "cumulative_seconds": 1.6652669179999993
+        },
+        {
+          "stage": "ner",
+          "cumulative_seconds": 2.838535369000001
+        }
+      ],
+      "shared_encoder_seconds": 1.2567813789999993,
+      "note": "Prefix totals repeat earlier components. Differences estimate component costs and include timing noise. Shared encoder is measured separately on pretokenized documents. Load, corpus reading, and result destruction are excluded."
+    },
+    {
+      "group": "long",
+      "documents_per_pass": 2,
+      "rounds": 3,
+      "warmup_passes": 1,
+      "measurements": [
+        {
+          "stage": "tokenizer",
+          "cumulative_seconds": 0.1952585
+        },
+        {
+          "stage": "tagger",
+          "cumulative_seconds": 4.037077625
+        },
+        {
+          "stage": "parser",
+          "cumulative_seconds": 4.398714583
+        },
+        {
+          "stage": "attribute_ruler_and_chunks",
+          "cumulative_seconds": 5.678024498999999
+        },
+        {
+          "stage": "lemmatizer",
+          "cumulative_seconds": 5.742954168
+        },
+        {
+          "stage": "ner",
+          "cumulative_seconds": 9.138893207999999
+        }
+      ],
+      "shared_encoder_seconds": 3.824377126,
+      "note": "Prefix totals repeat earlier components. Differences estimate component costs and include timing noise. Shared encoder is measured separately on pretokenized documents. Load, corpus reading, and result destruction are excluded."
+    }
+  ],
+  "commands": [
+    [
+      "cargo",
+      "run",
+      "--release",
+      "--offline",
+      "--example",
+      "profile_stages",
+      "--",
+      "assets/en_core_web_md-3.8.0",
+      "fixtures/evaluation-v1.json",
+      "short",
+      "3"
+    ],
+    [
+      "cargo",
+      "run",
+      "--release",
+      "--offline",
+      "--example",
+      "profile_stages",
+      "--",
+      "assets/en_core_web_md-3.8.0",
+      "fixtures/evaluation-v1.json",
+      "long",
+      "3"
+    ]
+  ],
+  "sampling": {
+    "tool": "macOS sample",
+    "requested_duration_seconds": 5,
+    "requested_interval_ms": 1,
+    "workload": "measure long 5 1; sample started two seconds after launch; includes warmup and measured inference",
+    "main_thread_samples": 4057,
+    "neural_blocks_inclusive": 2974,
+    "encoders_inclusive": 3163,
+    "attribute_rules_inclusive": 553,
+    "note": "Block samples are included in encoder samples. Counts are sampled stacks, not exact elapsed time. Raw profiler data is excluded because it contains host filesystem paths."
+  }
+}
