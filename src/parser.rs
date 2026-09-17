@@ -1,4 +1,4 @@
-use crate::chunks::left_edge;
+use crate::chunks::left_edges;
 use crate::config::ActionKind;
 use crate::neural::TransitionTrace;
 use crate::pipeline::best;
@@ -185,11 +185,12 @@ impl Model {
                 d.tokens[i].dep = Some(dep.into());
             }
         }
+        let left_edges = left_edges(d);
         let mut sentence_starts = vec![];
-        for i in 0..n {
+        for (i, &left) in left_edges.iter().enumerate() {
             d.tokens[i].sentence_start = Some(false);
             if d.tokens[i].head == Some(TokenIndex(i)) {
-                sentence_starts.push(left_edge(d, i));
+                sentence_starts.push(left);
             }
         }
         sentence_starts.sort_unstable();
