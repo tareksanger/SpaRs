@@ -67,12 +67,17 @@ def main() -> None:
         ['.venv/bin/python', '-m', 'unittest', 'discover', '-s', 'tools', '-p', 'test_*.py'],
         ['cargo', 'fmt', '--check'],
         ['cargo', 'fmt', '--manifest-path', 'consumer/Cargo.toml', '--check'],
+        ['cargo', 'fmt', '--manifest-path', 'installer/Cargo.toml', '--check'],
+        ['cargo', 'clippy', '--offline', '--all-targets', '--manifest-path', 'installer/Cargo.toml', '--', '-D', 'warnings'],
+        ['cargo', 'test', '--release', '--offline', '--manifest-path', 'installer/Cargo.toml', '--', '--include-ignored'],
+        ['cargo', 'build', '--release', '--offline', '--manifest-path', 'installer/Cargo.toml'],
         ['cargo', 'clippy', '--offline', '--all-targets', '--', '-D', 'warnings'],
         ['cargo', 'test', '--release', '--offline', '--', '--include-ignored'],
         ['.venv/bin/python', 'tools/check_docs.py'],
         ['cargo', 'build', '--release', '--offline', '--manifest-path', 'consumer/Cargo.toml'],
         ['env', '-i', 'PATH=', 'consumer/target/release/native-consumer-check',
          'assets/en_core_web_md-3.8.0'],
+        ['.venv/bin/python', 'tools/check_installer.py'],
         ['cargo', 'package', '--allow-dirty', '--offline'],
     ]
     for cmd in commands:

@@ -24,6 +24,7 @@ jobs:
       - run: .venv/bin/python tools/export.py
       - run: cargo fetch --locked
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
+      - run: cargo fetch --locked --manifest-path installer/Cargo.toml
       - name: Run the same acceptance checks as local development
         run: .venv/bin/python tools/verify.py --report target/reports/verification-ci.json
       - name: Record performance separately from fidelity
@@ -34,3 +35,17 @@ jobs:
           name: fidelity-reports-${{ matrix.os }}
           path: target/reports/
           retention-days: 14
+
+  native-installation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release --manifest-path installer/Cargo.toml
+      - run: cargo build --locked --release --manifest-path consumer/Cargo.toml
+      - name: Download and install without interpreters
+        run: |
+          model_path=$(env -i PATH= installer/target/release/spars-model install --version 3.8.0 --root target/models)
+          env -i PATH= installer/target/release/spars-model verify "$model_path"
+          env -i PATH= consumer/target/release/native-consumer-check "$model_path"

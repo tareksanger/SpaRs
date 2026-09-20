@@ -25,7 +25,7 @@ Implemented means native code exists; only the evidence column establishes its v
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
 | Model serialization | Partial | Versioned native official-export format; not spaCy binary-compatible |
-| Model installation without Python | Unimplemented | [Staged plan](PROGRESS.md#versioned-model-installation-plan) for native official-package conversion, pinned releases, side-by-side installs and rollback; current installation uses the Python exporter |
+| Model installation without Python | Partial | [Native installer](MODEL_INSTALLATION.md) downloads or reads the pinned official package, converts and verifies all model data; one supported identity, no automatic updates or second validated release |
 | Custom components / registry | Unimplemented | Only fixed ordered pipeline accepted |
 | Morphologizer / trainable senter | Unimplemented | Export excludes disabled senter |
 | Textcat, span categorizer/finder, entity linker, edit-tree lemmatizer | Unimplemented | No supported architectures |

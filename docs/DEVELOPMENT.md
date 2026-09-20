@@ -1,14 +1,15 @@
 # Develop with SpaRs
 
-SpaRs turns text into tokens (words and punctuation), identifies names and places, and describes how words relate to each other. The supported model is `en_core_web_md` 3.8.0. It runs inside Rust; Python is needed only to prepare the official model and reference tests.
+SpaRs turns text into tokens (words and punctuation), identifies names and places, and describes how words relate to each other. The supported model is `en_core_web_md` 3.8.0. It runs inside Rust; The [native installer](MODEL_INSTALLATION.md) prepares the supported model without Python. Python is used for development exports and reference tests.
 
 ## Set up the project
 
-Install Rust, `uv`, `curl`, and Node.js 24 with npm, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. Fetch both sets of Rust dependencies before running the offline checks:
+Install Rust, `uv`, `curl`, and Node.js 24 with npm, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. Fetch the library, consumer, and installer Rust dependencies before running the offline checks:
 
 ```sh
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
+cargo fetch --locked --manifest-path installer/Cargo.toml
 ```
 
 The Rust examples below run directly from this Markdown file during verification. Run them on their own with:

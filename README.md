@@ -43,6 +43,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `vector`/`token_vector` return `None` for missing lexical keys. `span_vector` and `document_vector` average all tokens, including OOV zero rows. Similarity returns 1 for identical token sequences (including two empty sequences), otherwise cosine, or 0 when either vector norm is zero, following the pinned reference. No warnings are emitted for OOV similarity. Static vectors are distinct from `tok2vec` output.
 
+## Install a model without Python
+
+Build the separate native installer from this checkout:
+
+```sh
+cargo build --locked --release --manifest-path installer/Cargo.toml
+model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root target/models)
+cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
+```
+
+Pass the printed installation directory to `Model::load`. Only the pinned model is supported; installation does not select a new version for your application automatically. See [model installation](docs/MODEL_INSTALLATION.md) for local archives, verification, and version handling. The Python setup below is for development and reference testing.
+
 ## Acquire and export explicitly
 
 Requirements: Rust 1.85+ (each verification run records the tested toolchain), Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. Python and Node.js are only development tools; neither is needed by Rust consumers.
@@ -66,6 +78,7 @@ After acquiring and exporting the model, fetch the Rust dependencies before runn
 ```sh
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
+cargo fetch --locked --manifest-path installer/Cargo.toml
 ```
 
 Frozen fixtures are checked in. Do not regenerate expected outputs during fixes. To audit their provenance, generators under `tools/` run the pinned official reference. `fixtures/README.md` identifies the development, holdout and regression sets, numerical tolerances and source licenses.
@@ -86,6 +99,6 @@ Model-dependent tests are explicitly marked ignored for ordinary dependency buil
 
 ## Limits
 
-Only the exported English medium configuration above is accepted. Matching APIs, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Native CPU matrix kernels preserve the declared fidelity limits. See [performance](docs/PERFORMANCE.md) for commands to measure loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
+Only the exported English medium configuration above is accepted. Advanced matcher options, PhraseMatcher, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Native CPU matrix kernels preserve the declared fidelity limits. See [performance](docs/PERFORMANCE.md) for commands to measure loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
 
 MIT project license; translated upstream code and model resources retain their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `licenses/`.

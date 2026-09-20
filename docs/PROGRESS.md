@@ -52,7 +52,7 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Versioned model installation without Python or a project-hosted deployment, following the plan below. This is not implemented; current setup still uses the Python exporter.
+1. Versioned model installation without Python or a project-hosted deployment, following the plan below. The pinned installation path is implemented; support for further releases remains planned.
 2. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering. This remains the next matcher feature.
 
 Document editing, broader serialization, additional pipelines and languages, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
@@ -61,7 +61,7 @@ Document editing, broader serialization, additional pipelines and languages, and
 
 The first target is the official `en_core_web_md` 3.8.0 package. A native installer will download and verify official assets, convert them into the supported native format, and return an installed model location. Installation must work without Python, Node, WASM, or subprocess-based conversion. Loading and processing remain offline. No project-hosted model service or release attachment is required. Python remains available to maintainers for generating reference data and checking conversion.
 
-The installer and compatibility catalog described below are planned interfaces, not available commands. Each milestone needs independent review and executed acceptance evidence before its status changes.
+The [native installer](MODEL_INSTALLATION.md) implements the first pinned package conversion, downloads, verification, listing, and repeat-safe installation. Its model-dependent test compares every manifest field and all tensor bytes with the Python export. The versioned identities and catalog establish the boundary for updates; a second validated release, automatic update discovery, and removal commands remain unimplemented. The milestones below retain the acceptance requirements for extending this work.
 
 ### 1. Define model identity and account for every resource
 
