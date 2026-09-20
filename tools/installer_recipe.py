@@ -18,6 +18,7 @@ from spacy.strings import hash_string
 from spacy.symbols import IDS
 
 from export import export
+from installer_provenance import pinned_source_lock
 from json_types import JsonValue, json_object, json_string, read_json, validate_json
 from reference_types import FloatArray, Language, Model, is_float_array
 
@@ -238,11 +239,12 @@ def generate(output: Path) -> None:
                 PREFIX + 'LICENSE', PREFIX + 'LICENSES_SOURCES',
             }
             inputs = {entry: sha256(wheel.read(entry)) for entry in sorted(entries)}
+        source_lock = pinned_source_lock(read_json(work / 'export/source-lock.json'))
         output.mkdir(parents=True, exist_ok=True)
         write_json(output / 'manifest-template.json', template(manifest))
         resources: dict[str, str] = {}
         for notice in ('source-lock.json', 'spacy-MIT.txt', 'thinc-MIT.txt', 'Python.txt', 'Unicode.txt'):
-            data = (work / 'export' / notice).read_bytes()
+            data = source_lock if notice == 'source-lock.json' else (work / 'export' / notice).read_bytes()
             (output / notice).write_bytes(data)
             resources[notice] = sha256(data)
         field_sources = {field: 'Official exporter tools/export.py using pinned spaCy 3.8.14, Thinc 8.3.13 and model 3.8.0' for field in template(manifest)}

@@ -4,6 +4,8 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+import provenance
 
 import numpy as np
 
@@ -81,6 +83,29 @@ class InstallerRecipeTests(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), (committed / path.name).read_bytes(), path.name)
             with self.assertRaisesRegex(ValueError, 'must be empty'):
                 generate(output)
+
+    def test_installation_bookkeeping_does_not_change_recipe(self) -> None:
+        observed = provenance.record()
+        files = observed['en_core_web_md']['files']
+        for name in ('INSTALLER', 'REQUESTED', 'direct_url.json', 'uv_cache.json'):
+            files.pop('en_core_web_md-3.8.0.dist-info/' + name, None)
+        files['en_core_web_md-3.8.0.dist-info/uv_cache.json'] = '0' * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'resources'
+            with patch('provenance.record', return_value=observed), contextlib.redirect_stdout(io.StringIO()):
+                generate(output)
+            for path in output.iterdir():
+                self.assertEqual(path.read_bytes(), (Path('installer/resources') / path.name).read_bytes(), path.name)
+
+    def test_regeneration_rejects_changed_upstream_source_before_writing(self) -> None:
+        observed = provenance.record()
+        observed['spacy']['files']['spacy/tokenizer.pyx'] = '0' * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'resources'
+            with patch('provenance.record', return_value=observed), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ValueError, 'differ from the pinned reference'):
+                    generate(output)
+            self.assertFalse(output.exists())
 
 
 if __name__ == '__main__':
