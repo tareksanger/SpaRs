@@ -1,0 +1,22 @@
+{
+  "name": "@spars/node",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Native SpaRs inference for Node.js",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "napi build --platform --release --no-const-enum -- --locked --offline",
+    "postbuild": "node scripts/declarations.mts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --expose-gc --test tests/*.test.mts"
+  },
+  "napi": { "binaryName": "spars-node" },
+  "devDependencies": {
+    "@napi-rs/cli": "3.10.4",
+    "@types/node": "24.13.6",
+    "typescript": "5.9.3"
+  }
+}

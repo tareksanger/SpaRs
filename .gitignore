@@ -8,3 +8,10 @@ __pycache__/
 /reports/
 
 /installer/target/
+/bindings/node/target/
+/bindings/node/node_modules/
+/bindings/node/*.node
+/bindings/node/index.js
+/bindings/node/index.d.ts
+/bindings/node/dist/
+/bindings/node/.spars-doc-*.mts
