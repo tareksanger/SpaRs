@@ -52,7 +52,49 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering.
-2. Model installation without Python or a project-hosted deployment: investigate native download and conversion of the pinned official model package into the validated native format. Pin source versions and checksums, preserve resource licenses, and keep acquisition separate from offline loading and processing. This path is not implemented; the current setup still requires the Python exporter. Reading the official package alone is not enough: installation also needs the linguistic resources currently produced by the exporter.
+1. Versioned model installation without Python or a project-hosted deployment, following the plan below. This is not implemented; current setup still uses the Python exporter.
+2. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering. This remains the next matcher feature.
 
 Document editing, broader serialization, additional pipelines and languages, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
+
+## Versioned model installation plan
+
+The first target is the official `en_core_web_md` 3.8.0 package. A native installer will download and verify official assets, convert them into the supported native format, and return an installed model location. Installation must work without Python, Node, WASM, or subprocess-based conversion. Loading and processing remain offline. No project-hosted model service or release attachment is required. Python remains available to maintainers for generating reference data and checking conversion.
+
+The installer and compatibility catalog described below are planned interfaces, not available commands. Each milestone needs independent review and executed acceptance evidence before its status changes.
+
+### 1. Define model identity and account for every resource
+
+Add typed installation records that distinguish the upstream model name/version, official archive checksum, conversion recipe revision, linguistic-resource revision, and native format version. A conversion recipe is the set of rules used to turn official package data into native assets. Changing a recipe must not overwrite an existing installation of the same upstream model. Record the supported spaCy/Thinc versions, architectures, source URLs, notices, and expected archive sizes or limits. The initial compatibility catalog ships with the installer and lists explicitly supported releases; it does not automatically trust or install the latest upstream version.
+
+Trace every field written by `tools/export.py` and `tools/lexical.py` to its source. Classify it as stored package data, derived configuration, or pinned language data that must ship separately with the installer. Small language tables may be generated during development and distributed with their licenses and checksums. Do not assume the model archive contains Python-generated Unicode tables, normalization defaults, or symbol definitions.
+
+Acceptance: one reviewed mapping covers every current manifest field and tensor; typed records reject malformed digests, invalid versions, and unsupported combinations. Identify every required binary format from pinned upstream readers before choosing decoding dependencies. This is the first implementation increment.
+
+### 2. Convert a local official package entirely in Rust
+
+Read an already-downloaded, checksum-verified package without executing its contents. Implement only the stored formats needed by the pinned pipeline. Recover weights, configuration, ordered actions and labels, tokenizer rules, lookup tables, and vector mappings. Combine them with the pinned language resources to produce the existing native manifest and SafeTensors assets. Preserve applicable notices and source provenance. Reject unsupported architectures and malformed arrays before creating a usable installation.
+
+Acceptance: compare tensor names, shapes, values, configuration, and linguistic resources against the Python exporter, then run the existing stage and full-pipeline parity suites. Require exact data equality where the representation is unchanged; differences in JSON layout or provenance fields need explicit, tested rules. Preserve existing floating-point tolerances. A separate native program converts the local package and runs inference with interpreters absent and network access disabled.
+
+### 3. Add explicit downloads and reliable installation
+
+Keep networking and archive handling outside normal inference and consumer builds, in an optional installer target or a separate tooling crate if needed. Download from the catalog's official sources with bounded retries, timeouts, and streaming checksum verification. Support a local archive for disconnected installation. Validate archive entries and extraction limits, including path traversal, duplicate destinations, links, and oversized contents.
+
+Build in a temporary directory on the destination filesystem. Validate the complete output and its inventory before committing it with an atomic rename, which makes the complete model visible in one filesystem operation. Use locking or an equivalent mechanism so concurrent installs cannot corrupt each other. An interrupted or failed installation must leave existing models usable; rerunning the same installation must be safe.
+
+Acceptance: controlled download tests cover truncation, bad checksums, unavailable sources, interruption, malformed archives, concurrent attempts, and repeat installation. A pinned official download is an explicit end-to-end check; repeatable failure tests use local fixtures rather than public-network failures.
+
+### 4. Support explicit updates and rollback
+
+Store supported releases side by side, keyed by complete installation identity. Applications select an exact installed version or path. Installing a newer release does not switch an application's model. Provide listing, verification, and explicit removal; rollback means selecting the retained prior installation. Do not delete older models automatically or mutate a loaded model. A new supported release may initially require an installer/library update to obtain its reviewed catalog entry and conversion recipe.
+
+The current loader pins model and reference versions. Introduce explicit compatibility entries only as new releases pass evaluation; do not remove those checks or replace them with a broad version range. New weights on a supported architecture still require reference evaluation. Different architectures or resource semantics may require Rust changes and a new native format version.
+
+Acceptance: lifecycle tests install two distinct identities, select each deterministically, reject unsupported combinations, and preserve the old installation through failed updates. Synthetic records can test lifecycle mechanics but cannot establish compatibility with a real second model. Declare a second upstream release supported only after its own pinned reference and parity suite pass.
+
+### 5. Complete the consumer workflow and quality gates
+
+Add a plain-English installation guide with commands and a separate Rust consumer example that actually run. Extend CI to execute native local-package conversion and offline inference without silently skipping model tests. Keep Python reference/export jobs separate from the native installation acceptance job. Record checksums and fixtures in Git; generated mismatch and performance reports remain under ignored `target/reports/`.
+
+Acceptance: formatting, Clippy, typing, unit tests, malformed-input tests, reference comparisons, documentation examples, and package dry runs pass. Review installation security boundaries, source fidelity, test quality, and documentation independently. Measure download, conversion, disk usage, peak memory, and subsequent loading separately; check inference against the unchanged baseline if loader/runtime code changes. Public documentation must still distinguish this pinned installer from support for arbitrary spaCy packages.
