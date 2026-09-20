@@ -1,6 +1,6 @@
 # SpaRs
 
-Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. No Python, Node, WASM, subprocess, network client, or build-time model download exists in the runtime. The project is named **SpaRs**, with Cargo package and Rust import name `spars`.
+Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. The Rust crate needs no Python, JavaScript, WASM, subprocess, network client, or build-time model download. Optional [Node.js bindings](docs/NODE.md) live in a separate crate. The project is named **SpaRs**, with Cargo package and Rust import name `spars`.
 
 The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and static vectors. Local validation passes on 190 full-pipeline documents / 7,029 tokens, 4,057 tokenizer cases and 634 transition steps; all discrete outputs agree with the official reference. This is a bounded English inference milestone, **not a port of the entire spaCy library**. Start with the [developer guide](docs/DEVELOPMENT.md) for tested examples and the [quality process](docs/QUALITY.md) for contribution checks. See [compatibility](docs/COMPATIBILITY.md), [progress](docs/PROGRESS.md), and [validation](docs/VALIDATION.md).
 
@@ -57,12 +57,13 @@ Pass the printed installation directory to `Model::load`. Only the pinned model 
 
 ## Acquire and export explicitly
 
-Requirements: Rust 1.85+ (each verification run records the tested toolchain), Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. Python and Node.js are only development tools; neither is needed by Rust consumers.
+Requirements for full verification: Rust 1.88+, Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. The standalone Rust library requires Rust 1.85 and needs neither Python nor Node.js. Python is used for reference tooling; Node.js is used for the optional binding and development checks.
 
 ```sh
 uv venv --python 3.12.5 .venv
 uv pip sync --python .venv/bin/python tools/reference-requirements.lock
 npm --prefix tools ci --ignore-scripts --no-audit --no-fund
+npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
 .venv/bin/python tools/acquire.py
 .venv/bin/python tools/export.py
 .venv/bin/python tools/provenance.py
@@ -79,6 +80,7 @@ After acquiring and exporting the model, fetch the Rust dependencies before runn
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
 cargo fetch --locked --manifest-path installer/Cargo.toml
+cargo fetch --locked --manifest-path bindings/node/Cargo.toml
 ```
 
 Frozen fixtures are checked in. Do not regenerate expected outputs during fixes. To audit their provenance, generators under `tools/` run the pinned official reference. `fixtures/README.md` identifies the development, holdout and regression sets, numerical tolerances and source licenses.

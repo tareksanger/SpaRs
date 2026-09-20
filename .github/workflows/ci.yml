@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: 24
       - run: npm --prefix tools ci --ignore-scripts --no-audit --no-fund
+      - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
       - uses: astral-sh/setup-uv@v6
       - run: uv venv --python 3.12.5 .venv
       - run: uv pip sync --python .venv/bin/python tools/reference-requirements.lock
@@ -25,6 +26,7 @@ jobs:
       - run: cargo fetch --locked
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
       - run: cargo fetch --locked --manifest-path installer/Cargo.toml
+      - run: cargo fetch --locked --manifest-path bindings/node/Cargo.toml
       - name: Run the same acceptance checks as local development
         run: .venv/bin/python tools/verify.py --report target/reports/verification-ci.json
       - name: Record performance separately from fidelity
@@ -42,6 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
+      - run: cargo fetch --locked --manifest-path bindings/node/Cargo.toml
+      - run: npm --prefix bindings/node run build
       - run: cargo build --locked --release --manifest-path installer/Cargo.toml
       - run: cargo build --locked --release --manifest-path consumer/Cargo.toml
       - name: Download and install without interpreters
@@ -49,3 +57,5 @@ jobs:
           model_path=$(env -i PATH= installer/target/release/spars-model install --version 3.8.0 --root target/models)
           env -i PATH= installer/target/release/spars-model verify "$model_path"
           env -i PATH= consumer/target/release/native-consumer-check "$model_path"
+          node_bin=$(command -v node)
+          env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"

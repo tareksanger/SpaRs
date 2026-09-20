@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import TypedDict
 from report_paths import portable_text
+from node_docs import examples as node_examples, run_example
 
 
 class DocumentationResult(TypedDict):
@@ -31,11 +32,12 @@ def rust_examples(text: str) -> int:
         info = info.strip()
         if not info:
             raise ValueError('Guide code blocks need an explicit language.')
-        if info not in {'sh', 'bash', 'toml', 'json', 'text', 'python'} and info != 'rust':
+        if info not in {'sh', 'bash', 'toml', 'json', 'text', 'python', 'typescript'} and info != 'rust':
             raise ValueError(f'Unsupported guide fence {info!r}; use plain rust or a documented non-Rust language.')
+        if info in {'rust', 'typescript'}:
+            if line != '```' + info:
+                raise ValueError('Runnable guide examples must use an unindented language fence without flags.')
         if info == 'rust':
-            if line != '```rust':
-                raise ValueError('Runnable guide examples must use an unindented ```rust fence without flags.')
             count += 1
     if fence:
         raise ValueError('Unclosed guide code fence.')
@@ -54,6 +56,14 @@ def main() -> None:
     results: list[DocumentationResult] = []
     for path in docs:
         count = rust_examples(path.read_text())
+        for source in node_examples(path.read_text()):
+            executed = run_example(root, source)
+            print(executed.stdout, end='')
+            print(executed.stderr, end='')
+            results.append({'document': str(path.relative_to(root)), 'examples': 1,
+                            'passed': executed.returncode == 0,
+                            'stdout': portable_text(executed.stdout, root),
+                            'stderr': portable_text(executed.stderr, root)})
         if not count:
             continue
         cmd = ['rustdoc', '--test', str(path.relative_to(root)), '--edition', '2021',

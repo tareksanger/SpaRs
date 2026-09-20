@@ -4,15 +4,17 @@ SpaRs turns text into tokens (words and punctuation), identifies names and place
 
 ## Set up the project
 
-Install Rust, `uv`, `curl`, and Node.js 24 with npm, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. Fetch the library, consumer, and installer Rust dependencies before running the offline checks:
+Install Rust 1.88 or newer for the Node binding, `uv`, `curl`, and Node.js 24 with npm, then run the acquisition and export commands in the [README](../README.md#acquire-and-export-explicitly) from the repository root. The standalone Rust library still requires Rust 1.85. Fetch all Rust dependencies before running the offline checks:
 
 ```sh
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
 cargo fetch --locked --manifest-path installer/Cargo.toml
+cargo fetch --locked --manifest-path bindings/node/Cargo.toml
+npm --prefix bindings/node run build
 ```
 
-The Rust examples below run directly from this Markdown file during verification. Run them on their own with:
+The Rust examples below and the TypeScript examples in the [Node guide](NODE.md) run directly from Markdown during verification. Run them on their own after building the binding with:
 
 ```sh
 .venv/bin/python tools/check_docs.py
