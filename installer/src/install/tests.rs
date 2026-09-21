@@ -18,8 +18,25 @@ fn identities_distinguish_recipes_and_resources() {
     other.recipe_revision = 2.try_into().unwrap();
     assert_ne!(identity.directory_name(), other.directory_name());
     other = identity.clone();
-    other.resource_revision = 2.try_into().unwrap();
+    other.resource_revision = 3.try_into().unwrap();
     assert_ne!(identity.directory_name(), other.directory_name());
+}
+
+#[test]
+fn required_inventory_follows_the_receipt_resource_revision() {
+    let current = recipe::load().unwrap();
+    let mut original_identity = current.identity.clone();
+    original_identity.resource_revision = std::num::NonZeroU32::MIN;
+    let original_digest = Digest::try_from(
+        "5b2ade0c8fc4a6c34514083683d584e14b2a18f2e18c33a396ac1ffaf6f3681c".to_owned(),
+    )
+    .unwrap();
+    let original = recipe::for_receipt(&original_identity, &original_digest).unwrap();
+    let mut expected = required_files(&current);
+    assert!(!expected.iter().any(|name| name == "Python.txt"));
+    expected.push("Python.txt".to_owned());
+    expected.sort();
+    assert_eq!(required_files(&original), expected);
 }
 
 #[test]

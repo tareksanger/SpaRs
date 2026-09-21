@@ -38,11 +38,11 @@ There is no implicit “latest” version and no active-model switch. A future s
 
 ## What is converted and checked
 
-The installer checks the complete official archive checksum before decoding. It reads all 69 tensor arrays, the vector-key mapping, and lemma tables from the package. A reproducible, embedded recipe supplies the reviewed architecture configuration, tokenizer rules, normalization and language resources, and source notices. This is a converter for a pinned package, not a general reader for arbitrary spaCy or Thinc models. The recipe and support files total about 603 KB and contain no pretrained tensor arrays.
+The installer checks the complete official archive checksum before decoding. It reads all 69 tensor arrays, the vector-key mapping, and lemma tables from the package. A reproducible, embedded recipe supplies the reviewed architecture configuration, tokenizer rules, normalization and language resources, and source notices. This is a converter for a pinned package, not a general reader for arbitrary spaCy or Thinc models. The recipe and support files total about 589 KB and contain no pretrained tensor arrays.
 
 Conversion must reproduce the reference weights byte for byte, and the lookup sections must match their pinned checksums. The native loader validates the complete model before the directory becomes available. Installation writes to a temporary directory and renames the finished result into place. `verify` checks the complete expected file inventory against the receipt, the embedded resource and tensor digests, and the pinned manifest data; it does not trust a receipt alone. Archive links, unsafe paths, duplicate destinations, unsupported formats, and oversized entries return errors.
 
-The tool preserves model, spaCy, Thinc, Python, and Unicode notices. Recipe generation uses the official Python reference during development; consumer installation does not. To regenerate resources for review into a new directory:
+The tool preserves model, spaCy, Thinc, and Unicode notices. Python's license is not included because the tool does not redistribute Python. Resource revision 2 removes the redundant notice while leaving all model data unchanged. Existing revision 1 installations remain verifiable against their original checksums; installing revision 2 creates a separate directory. The installer retains only the old notice's checksum for that compatibility check, not its text. Recipe generation uses the official Python reference during development; consumer installation does not. To regenerate resources for review into a new directory:
 
 ```sh
 .venv/bin/python tools/installer_recipe.py --out target/recipe-review

@@ -25,7 +25,7 @@ Implemented means native code exists; only the evidence column establishes its v
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
 | Model serialization | Partial | Versioned native official-export format; not spaCy binary-compatible |
-| Model installation without Python | Partial | [Native installer](MODEL_INSTALLATION.md) downloads or reads the pinned official package, converts and verifies all model data; one supported identity, no automatic updates or second validated release |
+| Model installation without Python | Partial | [Native installer](MODEL_INSTALLATION.md) downloads or reads the pinned official package, converts and verifies all model data; new installations use resource revision 2, existing revision 1 installations remain verifiable; no automatic updates or second validated model release |
 | Node-API bindings | Partial | Separate [Node crate](NODE.md): asynchronous loading/inference, ordered batches, stage controls, owned typed output and static vectors; 190 documents / 7,029 tokens; no matcher/traversal bindings or prebuilt npm packages |
 | Browser WASM bindings | Unimplemented | Byte-backed loading, browser asset acquisition, compilation, fidelity and performance still need verification |
 | Custom components / registry | Unimplemented | Only fixed ordered pipeline accepted |

@@ -45,11 +45,12 @@ fn directory(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn required_files() -> Result<Vec<String>> {
-    let mut names: Vec<String> = recipe::load()?
+fn required_files(recipe: &recipe::Recipe) -> Vec<String> {
+    let mut names: Vec<String> = recipe
         .resources
-        .into_keys()
-        .filter(|n| n != "manifest-template.json")
+        .keys()
+        .filter(|n| n.as_str() != "manifest-template.json")
+        .cloned()
         .collect();
     names.extend(
         [
@@ -61,7 +62,7 @@ fn required_files() -> Result<Vec<String>> {
         .map(String::from),
     );
     names.sort();
-    Ok(names)
+    names
 }
 /// Convert an official local archive, or explicitly download it when `archive` is absent.
 /// Existing installations are verified and reused, never overwritten.
@@ -135,7 +136,7 @@ pub fn install(
     // used by applications before an installation becomes visible.
     drop(spars::Model::load(&stage.0)?);
     let mut files = BTreeMap::new();
-    for name in required_files()? {
+    for name in required_files(&recipe) {
         let path = stage.0.join(&name);
         files.insert(
             name,
@@ -173,11 +174,8 @@ pub fn verify(path: &Path) -> Result<InstalledModel> {
         return Err(invalid("installation receipt too large"));
     }
     let receipt: Receipt = serde_json::from_slice(&fs::read(receipt_path)?)?;
-    let recipe = recipe::load()?;
-    if receipt.identity != recipe.identity || receipt.recipe_sha256 != Digest::of(recipe::RECIPE) {
-        return Err(invalid("unsupported installation recipe"));
-    }
-    let expected = required_files()?;
+    let recipe = recipe::for_receipt(&receipt.identity, &receipt.recipe_sha256)?;
+    let expected = required_files(&recipe);
     if receipt.files.keys().ne(expected.iter()) {
         return Err(invalid("installation inventory differs from recipe"));
     }

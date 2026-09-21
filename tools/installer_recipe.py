@@ -47,7 +47,7 @@ class Identity:
     model_version: str = '3.8.0'
     wheel_sha256: str = WHEEL_SHA256
     recipe_revision: int = 1
-    resource_revision: int = 1
+    resource_revision: int = 2
     format_version: int = 1
 
 
@@ -243,7 +243,7 @@ def generate(output: Path) -> None:
         output.mkdir(parents=True, exist_ok=True)
         write_json(output / 'manifest-template.json', template(manifest))
         resources: dict[str, str] = {}
-        for notice in ('source-lock.json', 'spacy-MIT.txt', 'thinc-MIT.txt', 'Python.txt', 'Unicode.txt'):
+        for notice in ('source-lock.json', 'spacy-MIT.txt', 'thinc-MIT.txt', 'Unicode.txt'):
             data = source_lock if notice == 'source-lock.json' else (work / 'export' / notice).read_bytes()
             (output / notice).write_bytes(data)
             resources[notice] = sha256(data)

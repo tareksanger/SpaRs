@@ -161,11 +161,13 @@ def export(out: Path) -> None:
         'vector_keys':{str(k):v for k,v in nlp.vocab.vectors.key2row.items()}}
     (out/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,separators=(',',':'),sort_keys=True))
     (out/'source-lock.json').write_text(json.dumps(source_info,indent=2,sort_keys=True))
-    for notice in ('spacy-MIT.txt','thinc-MIT.txt','Python.txt','Unicode.txt'):
+    for notice in ('spacy-MIT.txt','thinc-MIT.txt','Unicode.txt'):
         (out/notice).write_bytes((Path('licenses')/notice).read_bytes())
     modeldir = Path(str(md.distribution('en_core_web_md').locate_file('en_core_web_md/en_core_web_md-3.8.0')))
     for name in ('LICENSE','LICENSES_SOURCES'):
         (out/name).write_bytes((modeldir/name).read_bytes())
+    # Remove the obsolete development-tool notice when refreshing an old export.
+    (out/'Python.txt').unlink(missing_ok=True)
     print(f'exported {len(tensors)} tensors to {out}')
 
 if __name__ == '__main__':

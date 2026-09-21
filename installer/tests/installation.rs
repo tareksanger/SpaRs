@@ -49,6 +49,8 @@ fn official_conversion_and_installation_lifecycle() {
     ));
     drop(lock);
     let model = install(&root, Some(&archive), ModelName::EnCoreWebMd, version).unwrap();
+    assert_eq!(model.identity.resource_revision.get(), 2);
+    assert!(!model.path.join("Python.txt").exists());
     assert!(!stale.exists());
     let reference = repo.join("assets/en_core_web_md-3.8.0");
     let actual: serde_json::Value =

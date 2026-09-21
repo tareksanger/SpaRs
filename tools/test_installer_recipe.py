@@ -8,12 +8,25 @@ from unittest.mock import patch
 import provenance
 
 import numpy as np
+from export import export as export_model
 
 from installer_recipe import ThincSource, decode_lemmas, decode_parameter, generate, lemma_lookup_ids, lookup_digest, sha256, template
 from json_types import JsonValue, json_object, json_string, read_json
 
 
 class InstallerRecipeTests(unittest.TestCase):
+    def test_export_removes_obsolete_notice_and_keeps_resource_notices(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'export'
+            output.mkdir()
+            (output / 'Python.txt').write_text('obsolete notice')
+            with contextlib.redirect_stdout(io.StringIO()):
+                export_model(output)
+            self.assertEqual({path.name for path in output.iterdir()}, {
+                'manifest.json', 'weights.safetensors', 'source-lock.json',
+                'spacy-MIT.txt', 'thinc-MIT.txt', 'Unicode.txt', 'LICENSE', 'LICENSES_SOURCES',
+            })
+
     def test_lemma_lookup_ids_respect_reserved_punctuation_symbol(self) -> None:
         positions = lemma_lookup_ids()
         self.assertEqual(positions['punct'], 445)
@@ -55,6 +68,9 @@ class InstallerRecipeTests(unittest.TestCase):
     def test_committed_recipe_inventory_and_resource_hashes(self) -> None:
         root = Path('installer/resources')
         recipe = json_object(read_json(root / 'recipe.json'))
+        self.assertEqual(json_object(recipe['identity'])['resource_revision'], 2)
+        self.assertNotIn('Python.txt', json_object(recipe['resources']))
+        self.assertFalse((root / 'Python.txt').exists())
         sources = json_object(recipe['sources'])
         self.assertEqual(len(sources), 69)
         self.assertEqual(json_object(sources['vectors'])['kind'], 'npy')
