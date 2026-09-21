@@ -5,3 +5,5 @@ Start with the [developer guide](docs/DEVELOPMENT.md) for setup and working Rust
 Keep each change focused on a clear behavior. Use official spaCy as the reference, add a test that can expose the problem, and preserve existing expected outputs. Describe what changed, how it was checked, and any remaining limitations.
 
 The [compatibility inventory](docs/COMPATIBILITY.md) lists supported and missing features. A feature is verified only for the configurations and cases covered by its evidence.
+
+Report bugs and propose features in the [issue tracker](https://github.com/tareksanger/SpaRs/issues). Include the commit or version, model version, a small input, expected and actual results, and a reproducible command. Remove personal data and machine-specific paths. Follow [SECURITY.md](SECURITY.md) for vulnerabilities and [the release checklist](docs/RELEASING.md) for distribution changes.

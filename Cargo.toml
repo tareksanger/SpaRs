@@ -6,7 +6,11 @@ rust-version = "1.85"
 description = "Experimental native Rust inference for official spaCy models"
 license = "MIT"
 readme = "README.md"
-include = ["src/**", "examples/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "docs/**", "licenses/**", "fixtures/hash.expected.json", "fixtures/token-match-v1.expected.json", "fixtures/token-match-exhaustive-v1.expected.json", "fixtures/token-match-branching-v1.expected.json", "fixtures/dependency-match-v1.expected.json", "fixtures/dependency-match-regressions-v1.expected.json", "reference/source-lock.json"]
+repository = "https://github.com/tareksanger/SpaRs"
+homepage = "https://github.com/tareksanger/SpaRs"
+keywords = ["nlp", "spacy", "tokenization", "parsing"]
+categories = ["text-processing", "science"]
+include = ["src/**", "examples/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "docs/**", "licenses/**", "fixtures/hash.expected.json", "fixtures/token-match-v1.expected.json", "fixtures/token-match-exhaustive-v1.expected.json", "fixtures/token-match-branching-v1.expected.json", "fixtures/dependency-match-v1.expected.json", "fixtures/dependency-match-regressions-v1.expected.json", "reference/source-lock.json", "reference/README.md"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

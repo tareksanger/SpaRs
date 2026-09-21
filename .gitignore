@@ -6,6 +6,10 @@ __pycache__/
 /consumer/target/
 /tools/node_modules/
 /reports/
+.DS_Store
+.env
+.env.*
+!.env.example
 
 /installer/target/
 /bindings/node/target/
