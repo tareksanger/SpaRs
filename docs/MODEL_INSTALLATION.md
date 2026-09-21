@@ -48,7 +48,7 @@ The tool preserves model, spaCy, Thinc, Python, and Unicode notices. Recipe gene
 .venv/bin/python tools/installer_recipe.py --out target/recipe-review
 ```
 
-Recipe regeneration checks source files, model files, licenses, versions, and release URLs against the pinned capture in `reference/source-lock.json`. Four Python installation bookkeeping files (`INSTALLER`, `REQUESTED`, `direct_url.json`, and `uv_cache.json`) may differ between machines and are excluded from that comparison. The installer keeps the original provenance bytes and installation identity.
+Recipe regeneration checks source files, model files, licenses, versions, and release URLs against the pinned capture in `reference/source-lock.json`. Four Python installation bookkeeping files (`INSTALLER`, `REQUESTED`, `direct_url.json`, and `uv_cache.json`) may differ between machines and are excluded from that comparison. One generated C source has a separately verified Linux hash because its build-directory comments differ; the exact allowed hashes are recorded in [source provenance](../reference/README.md). Unknown source changes still fail. The installer keeps the original provenance bytes and installation identity.
 
 ## Verification
 
