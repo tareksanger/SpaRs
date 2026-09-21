@@ -146,10 +146,11 @@ class QualityChecks(unittest.TestCase):
                 check_markdown(path, root)
 
     def test_markdown_rejects_absolute_paths_without_echoing_them(self) -> None:
-        examples = ['/Users/example/project/file.rs', '/opt/models/model',
-                    'C:\\Users\\example\\model', '\\\\server\\share\\model',
-                    'file:///Users/example/model', '~/models/model', '$HOME/models', '${PWD}/assets',
-                    '//server/share/model']
+        # Deliberately invalid paths use a fictional root, never a host directory.
+        examples = ['/__spars_test_root__/project/file.rs', '/__spars_test_root__/models/model',
+                    'Z:\\__spars_test_root__\\model', '\\\\fixture-server\\fixture-share\\model',
+                    'file:///__spars_test_root__/model', '~/models/model', '$HOME/models', '${PWD}/assets',
+                    '//fixture-server/fixture-share/model']
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root/'doc.md'

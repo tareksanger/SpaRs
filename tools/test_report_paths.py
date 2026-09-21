@@ -15,7 +15,7 @@ class ReportPathTests(unittest.TestCase):
             (root/'target/reports').mkdir(parents=True)
             (root/'target/reports/nested').mkdir(parents=True)
             report = root/'target/reports/nested/result.json'
-            report.write_text(json.dumps({'output': '/home/example/project/file'}))
+            report.write_text(json.dumps({'output': '/__spars_test_root__/project/file'}))
             with self.assertRaisesRegex(ValueError, 'absolute filesystem paths'):
                 check_portable_artifacts(root)
             report.write_text(json.dumps({'output': 'src/lib.rs'}))
@@ -27,15 +27,16 @@ class ReportPathTests(unittest.TestCase):
                          'Compiling (.) src/lib.rs')
 
     def test_external_paths_are_removed(self) -> None:
-        for prefix in ('/Users/example', '/home/example', '/private/tmp', '/var/folders/cache',
-                       'C:\\Users\\example', '/Éric/private', '/123', 'file:///Users/example',
-                       '\\\\server\\share'):
+        # Absolute paths are required here to exercise redaction, but all roots are fictional.
+        for prefix in ('/__spars_test_root__', '/synthetic-test-root', '/.synthetic-test-root',
+                       '/synthetic-test-root/nested', 'Z:\\__spars_test_root__', '/Δοκιμή/test-root',
+                       '/123', 'file:///__spars_test_root__', '\\\\fixture-server\\fixture-share'):
             with self.subTest(prefix=prefix):
                 self.assertEqual(portable_text(f'error: {prefix}/file.py:2', Path.cwd()),
                                  'error: <external-path>')
 
     def test_xml_paths_are_removed(self) -> None:
-        self.assertEqual(portable_text('</Users/example/file>', Path.cwd()), '<<external-path>>')
+        self.assertEqual(portable_text('</__spars_test_root__/file>', Path.cwd()), '<<external-path>>')
 
     def test_urls_and_relative_paths_are_preserved(self) -> None:
         text = 'https://example.org/source/file.rs tools/export.py target/model //://example.org </3'
