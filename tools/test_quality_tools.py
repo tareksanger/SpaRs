@@ -145,6 +145,40 @@ class QualityChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'link'):
                 check_markdown(path, root)
 
+    def test_markdown_rejects_absolute_paths_without_echoing_them(self) -> None:
+        examples = ['/Users/example/project/file.rs', '/opt/models/model',
+                    'C:\\Users\\example\\model', '\\\\server\\share\\model',
+                    'file:///Users/example/model', '~/models/model', '$HOME/models', '${PWD}/assets',
+                    '//server/share/model']
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root/'doc.md'
+            for value in examples:
+                for body in (f'Load `{value}`.\n', f'```sh\nload "{value}"\n```\n',
+                             f'[model]({value})\n', f'The model is at {value}.\n',
+                             f'[source](https://example.org)[local]({value})\n',
+                             f'[source](https://example.org)({value})\n',
+                             f'```text\n[source](https://example.org)[local]({value})\n```\n',
+                             f"```sh\nURL='https://example.org';MODEL='{value}'\n```\n"):
+                    with self.subTest(value=value, body=body):
+                        path.write_text(body)
+                        with self.assertRaisesRegex(ValueError, 'project-relative') as raised:
+                            check_markdown(path, root)
+                        self.assertNotIn(value, str(raised.exception))
+                        self.assertNotIn(str(root), str(raised.exception))
+
+    def test_markdown_preserves_relative_paths_urls_and_syntax(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root/'doc.md'
+            path.write_text('# Example\n\nUse `./assets/model`, `../SpaRs`, and `src/lib.rs`.\n\n'
+                            '[Source](https://example.org/source/LICENSE)\n\n'
+                            '[Topic](https://example.org/(topic)/source)\n\n'
+                            '<https://[::1]/source>\n\n'
+                            '```rust\n// A comment\nlet ratio = 12 / 3;\n/* Another comment */\n```\n\n'
+                            '<details>\n\nText and/or markup.\n\n</details>\n')
+            check_markdown(path, root)
+
     def test_unclosed_fence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

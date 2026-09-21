@@ -90,7 +90,7 @@ cargo fmt --manifest-path consumer/Cargo.toml --check
 cargo clippy --all-targets -- -D warnings
 cargo test --release -- --include-ignored
 cargo build --release --offline --manifest-path consumer/Cargo.toml
-env -i PATH=/nonexistent consumer/target/release/native-consumer-check "$PWD/assets/en_core_web_md-3.8.0"
+env -i PATH= consumer/target/release/native-consumer-check assets/en_core_web_md-3.8.0
 cargo package --allow-dirty --offline
 ```
 

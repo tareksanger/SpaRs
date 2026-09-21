@@ -5,6 +5,7 @@ import tomllib
 from pathlib import Path
 from dataclasses import dataclass
 from json_types import read_json, string_map, validate_json, json_object
+from doc_paths import check_paths
 
 
 REVIEWER_NAMES: frozenset[str] = frozenset({
@@ -47,6 +48,7 @@ def check_markdown(path: Path, root: Path) -> None:
     fence = None
     paragraph = False
     for number, line in enumerate(lines, 1):
+        check_paths(line, path, root, number)
         stripped = line.strip()
         if stripped.startswith(('```', '~~~')):
             marker = stripped[:3]
@@ -97,7 +99,8 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     check_fixtures(root)
     check_portable_artifacts(root)
-    paths = [*root.glob('*.md'), *sorted((root/'docs').glob('*.md')), root/'fixtures/README.md', *sorted((root/'.github').glob('*.md'))]
+    paths = [*root.glob('*.md'), *sorted((root/'docs').rglob('*.md')), root/'fixtures/README.md',
+             *sorted((root/'.github').rglob('*.md')), *sorted((root/'reference').glob('*.md'))]
     for path in paths:
         check_markdown(path, root)
     check_agents(root)

@@ -45,7 +45,7 @@ Pyright runs in strict mode over all Python tools. The policy check requires fun
 
 ## Keep saved data portable
 
-Fixtures and reports must not contain personal directories or absolute filesystem paths. Use project-relative paths when a path is needed. Report generators remove external host paths from captured output, and the quality check rejects absolute paths in saved JSON artifacts. Source URLs remain intact for attribution.
+Fixtures, reports, and documentation must not contain personal directories or absolute filesystem paths. Use project-relative paths when a path is needed. Report generators remove external host paths from captured output. The quality check rejects absolute paths in saved JSON artifacts and Markdown, including command examples, inline code, and links. It reports only the document's relative filename and line number. Source URLs remain intact for attribution.
 
 ## Keep evaluation data stable
 
