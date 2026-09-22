@@ -1,6 +1,6 @@
 # Install an official model without Python
 
-The separate `spars-model` tool downloads and converts the official `en_core_web_md` 3.8.0 package entirely natively. It requires a Rust toolchain to build from this checkout. Installation does not require Python, Node, WASM, `curl`, or a model service. Applications still depend only on the `spars` library; its builds and inference do not download anything.
+The separate `spars-model` tool downloads and converts the official `en_core_web_md` 3.8.0 package entirely natively. It requires a Rust toolchain to build from this checkout. Installation does not require Python, Node, WASM, `curl`, or a model service. Applications still depend only on the `spars-nlp` Cargo package, imported as `spars`; its builds and inference do not download anything.
 
 ## Download and install
 

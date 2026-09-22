@@ -45,7 +45,7 @@ def main() -> None:
         (consumer / 'Cargo.toml').write_text(
             '[package]\nname = "packaged-consumer-check"\nversion = "0.0.0"\n'
             'edition = "2021"\npublish = false\n\n[dependencies]\n'
-            f'{name} = {{ path = {dependency} }}\n\n[workspace]\n')
+            f'spars = {{ package = {json.dumps(name)}, version = {json.dumps(version)}, path = {dependency} }}\n\n[workspace]\n')
         subprocess.run([
             'cargo', 'build', '--release', '--offline', '--manifest-path',
             str((consumer / 'Cargo.toml').relative_to(root)),

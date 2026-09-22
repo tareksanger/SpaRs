@@ -1,6 +1,6 @@
 # Third-party attribution
 
-This is an independent, experimental port, not an Explosion product. spaCy and Thinc names identify compatibility targets, not affiliation. This project is named SpaRs (`spars` in Cargo).
+This is an independent, experimental port, not an Explosion product. spaCy and Thinc names identify compatibility targets, not affiliation. This project is named SpaRs (Cargo package `spars-nlp`, Rust import `spars`).
 
 SpaRs's own code uses the [MIT license](LICENSE). The Cargo crate contains the project license and the spaCy and Thinc notices for translated code. Model weights and linguistic resources are distributed separately and retain the model and Unicode notices listed below. SpaRs does not embed or run Python or Thinc.
 

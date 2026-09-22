@@ -1,6 +1,6 @@
 # SpaRs
 
-Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. The Rust crate needs no Python, JavaScript, WASM, subprocess, network client, or build-time model download. Optional [Node.js bindings](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) live in a separate crate. The project is named **SpaRs**, with Cargo package and Rust import name `spars`.
+Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. The Rust crate needs no Python, JavaScript, WASM, subprocess, network client, or build-time model download. Optional [Node.js bindings](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) live in a separate crate. The project is named **SpaRs**, with Cargo package name `spars-nlp` and Rust import name `spars`.
 
 The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and static vectors. The declared validation suite covers 190 full-pipeline documents / 7,029 tokens, 4,057 tokenizer cases and 634 transition steps, requiring exact agreement on discrete outputs with the official reference. This is a bounded English inference milestone, **not a port of the entire spaCy library**. Start with the [developer guide](https://github.com/tareksanger/SpaRs/blob/main/docs/DEVELOPMENT.md) for tested examples and the [quality process](https://github.com/tareksanger/SpaRs/blob/main/docs/QUALITY.md) for contribution checks. See [compatibility](https://github.com/tareksanger/SpaRs/blob/main/docs/COMPATIBILITY.md), [progress](https://github.com/tareksanger/SpaRs/blob/main/docs/PROGRESS.md), and [validation](https://github.com/tareksanger/SpaRs/blob/main/docs/VALIDATION.md).
 
@@ -10,7 +10,7 @@ Add SpaRs to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
-spars = "0.1.0"
+spars = { package = "spars-nlp", version = "0.1.0" }
 ```
 
 ```rust

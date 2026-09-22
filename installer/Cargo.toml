@@ -10,7 +10,7 @@ description = "Explicit native model installation for SpaRs"
 [workspace]
 
 [dependencies]
-spars = { path = ".." }
+spars = { package = "spars-nlp", path = ".." }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"

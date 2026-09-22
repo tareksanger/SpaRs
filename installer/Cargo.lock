@@ -514,19 +514,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
-name = "spars"
-version = "0.1.0"
-dependencies = [
- "fancy-regex",
- "matrixmultiply",
- "safetensors",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
-]
-
-[[package]]
 name = "spars-model"
 version = "0.1.0"
 dependencies = [
@@ -537,10 +524,23 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "spars",
+ "spars-nlp",
  "thiserror",
  "ureq",
  "zip",
+]
+
+[[package]]
+name = "spars-nlp"
+version = "0.1.0"
+dependencies = [
+ "fancy-regex",
+ "matrixmultiply",
+ "safetensors",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
