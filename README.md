@@ -6,11 +6,11 @@ The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14
 
 ## Use from Rust
 
-Use a local checkout as a Cargo path dependency. This example places your application beside the `SpaRs` checkout:
+Add SpaRs to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
-spars = { path = "../SpaRs" }
+spars = "0.1.0"
 ```
 
 ```rust
