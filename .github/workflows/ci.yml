@@ -25,7 +25,7 @@ jobs:
           node-version: 24
       - run: npm --prefix tools ci --ignore-scripts --no-audit --no-fund
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - run: uv venv --python 3.12.5 .venv
       - run: uv pip sync --python .venv/bin/python tools/reference-requirements.lock
       - run: .venv/bin/python tools/acquire.py
