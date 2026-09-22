@@ -11,7 +11,7 @@ Follow the [developer setup](DEVELOPMENT.md), then run:
 git status --short
 ```
 
-Verify the final commit in GitHub Actions: both Linux and macOS reference jobs and the separate native installation job must pass. Review the reference jobs' report artifacts and the native installation job's logs when investigating failures. A local pass or a pass from an earlier commit does not establish release verification.
+Verify the final commit in GitHub Actions: the Linux reference job and the separate native installation job must pass. Review the reference job's report artifacts and the native installation job's logs when investigating failures. A local pass or a pass from an earlier commit does not establish release verification.
 
 Review the README, compatibility inventory, model versions, and minimum toolchain versions. Confirm that examples execute and the Cargo package dry run succeeds. Keep generated binaries, models, reports, local environment files, and credentials out of the source distribution.
 
@@ -22,7 +22,9 @@ cargo package --list
 cargo publish --dry-run
 ```
 
-If Cargo lists unexpected files, correct the package's include rules before publishing. Explicit include rules override Git's ignore rules; a filename pattern without a directory can match files in nested folders. The [packaging regression test](../tools/test_package.py) checks that local model assets and development dependencies stay out of the archive while source files and notices remain included. Avoid bypassing unexpected-file errors with `--allow-dirty`.
+The Cargo archive contains production Rust source, package metadata, the README, and the project, spaCy, and Thinc notices. Tests, fixtures, examples, contributor guides, model assets, model-specific notices, and development tools stay in the repository. Run the test suite from a repository checkout; test modules are not distributed in the crate. Models and the native installer retain their own required notices.
+
+If Cargo lists unexpected files, correct the package's include rules before publishing. Explicit include rules override Git's ignore rules; a filename pattern without a directory can match files in nested folders. The [packaging regression test](../tools/test_package.py) checks those boundaries, and [package verification](../tools/check_package.py) builds a separate Rust application against the unpacked archive and runs model inference with an empty runtime PATH. Both checks run during acceptance. Avoid bypassing unexpected-file errors with `--allow-dirty`.
 
 ## Review what becomes public
 
