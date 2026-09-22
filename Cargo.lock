@@ -231,7 +231,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spars"
+name = "spars-nlp"
 version = "0.1.0"
 dependencies = [
  "fancy-regex",

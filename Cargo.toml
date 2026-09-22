@@ -1,5 +1,5 @@
 [package]
-name = "spars"
+name = "spars-nlp"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
@@ -20,6 +20,9 @@ include = [
     "/licenses/spacy-MIT.txt",
     "/licenses/thinc-MIT.txt",
 ]
+
+[lib]
+name = "spars"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

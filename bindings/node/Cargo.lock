@@ -438,7 +438,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
-name = "spars"
+name = "spars-nlp"
 version = "0.1.0"
 dependencies = [
  "fancy-regex",
@@ -457,7 +457,7 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
- "spars",
+ "spars-nlp",
 ]
 
 [[package]]
