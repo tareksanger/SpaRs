@@ -19,3 +19,15 @@ __pycache__/
 /bindings/node/index.d.ts
 /bindings/node/dist/
 /bindings/node/.spars-doc-*.mts
+
+# Local credentials, private keys, and package archives.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+.npmrc
+.pypirc
+*.crate
+*.tgz
