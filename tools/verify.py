@@ -83,7 +83,7 @@ def main() -> None:
         ['env', '-i', 'PATH=', 'consumer/target/release/native-consumer-check',
          'assets/en_core_web_md-3.8.0'],
         ['.venv/bin/python', 'tools/check_installer.py'],
-        ['cargo', 'package', '--allow-dirty', '--offline'],
+        ['.venv/bin/python', 'tools/check_package.py'],
     ]
     for cmd in commands:
         run(cmd)
