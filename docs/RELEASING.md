@@ -15,6 +15,15 @@ Verify the final commit in GitHub Actions: both Linux and macOS reference jobs a
 
 Review the README, compatibility inventory, model versions, and minimum toolchain versions. Confirm that examples execute and the Cargo package dry run succeeds. Keep generated binaries, models, reports, local environment files, and credentials out of the source distribution.
 
+From a clean checkout, inspect the package contents and run the publication check without uploading:
+
+```sh
+cargo package --list
+cargo publish --dry-run
+```
+
+If Cargo lists unexpected files, correct the package's include rules before publishing. Explicit include rules override Git's ignore rules; a filename pattern without a directory can match files in nested folders. The [packaging regression test](../tools/test_package.py) checks that local model assets and development dependencies stay out of the archive while source files and notices remain included. Avoid bypassing unexpected-file errors with `--allow-dirty`.
+
 ## Review what becomes public
 
 Inspect the current tree and all history reachable through branches and tags for credentials, private input, personal filesystem paths, and unwanted artifacts. Review GitHub Actions logs and artifacts separately. Deleting a file from the latest commit does not remove historical copies. Rotate exposed credentials if any are found; a history rewrite alone cannot revoke them.
