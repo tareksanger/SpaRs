@@ -1,7 +1,10 @@
 use spars::{Doc, Model, TokenIndex};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = Model::load(std::env::args().nth(1).expect("model directory"))?;
-    let doc = model.process("Alice works at Microsoft in New York.")?;
+    let text = "Alice works at Microsoft in New York.";
+    let doc = model.process(text)?;
+    assert_eq!(doc.text(), text);
+    assert_eq!(doc.tokens().len(), 8);
     assert!(doc.tokens().iter().all(|t| t.tag.is_some()
         && t.pos.is_some()
         && t.morphology.is_some()
