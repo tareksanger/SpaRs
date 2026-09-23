@@ -37,7 +37,7 @@ impl ArchiveFixture {
     }
 
     fn open(&self) -> Result<Wheel> {
-        Wheel::open(&self.path, &self.digest)
+        Wheel::open(&self.path, &self.digest, Limits::default())
     }
 }
 
@@ -65,6 +65,31 @@ fn error<T>(result: Result<T>) -> crate::Error {
 }
 
 #[test]
+fn release_limits_apply_to_archive_entries_and_expanded_total() {
+    let fixture = ArchiveFixture::new(&archive(&[("one", b"abc"), ("two", b"def")]));
+    let limits = Limits {
+        archive: fs::metadata(&fixture.path).unwrap().len(),
+        entry: 3,
+        expanded: 6,
+        installed_file: 6,
+    };
+    assert!(Wheel::open(&fixture.path, &fixture.digest, limits).is_ok());
+    for smaller in [
+        Limits {
+            archive: limits.archive - 1,
+            ..limits
+        },
+        Limits { entry: 2, ..limits },
+        Limits {
+            expanded: 5,
+            ..limits
+        },
+    ] {
+        assert!(Wheel::open(&fixture.path, &fixture.digest, smaller).is_err());
+    }
+}
+
+#[test]
 fn rejects_paths_and_size_limit() {
     for value in ["../x", "/x", "a/../b", "a\\b", "C:x", "a//b", "a/./b", ""] {
         assert!(valid_name(value).is_err(), "{value}");
@@ -81,9 +106,11 @@ fn rejects_paths_and_size_limit() {
 fn archive_and_entry_digests_are_checked_independently() {
     let fixture = ArchiveFixture::new(&archive(&[("model/weights", b"tensor bytes")]));
     let wrong_digest = Digest::of(b"wrong archive");
-    assert!(error(Wheel::open(&fixture.path, &wrong_digest))
-        .to_string()
-        .contains("SHA-256"));
+    assert!(
+        error(Wheel::open(&fixture.path, &wrong_digest, Limits::default()))
+            .to_string()
+            .contains("SHA-256")
+    );
 
     let mut wheel = fixture.open().unwrap();
     assert!(

@@ -28,8 +28,8 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - run: uv venv --python 3.12.5 .venv
       - run: uv pip sync --python .venv/bin/python tools/reference-requirements.lock
-      - run: .venv/bin/python tools/acquire.py
-      - run: .venv/bin/python tools/export.py
+      - run: .venv/bin/python tools/acquire.py --all
+      - run: .venv/bin/python tools/export.py --all
       - run: cargo fetch --locked
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
       - run: cargo fetch --locked --manifest-path installer/Cargo.toml
@@ -63,8 +63,10 @@ jobs:
       - run: cargo build --locked --release --manifest-path consumer/Cargo.toml
       - name: Download and install without interpreters
         run: |
-          model_path=$(env -i PATH= installer/target/release/spars-model install --version 3.8.0 --root target/models)
-          env -i PATH= installer/target/release/spars-model verify "$model_path"
-          env -i PATH= consumer/target/release/native-consumer-check "$model_path"
           node_bin=$(command -v node)
-          env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"
+          for model in en_core_web_sm en_core_web_md en_core_web_lg; do
+            model_path=$(env -i PATH= installer/target/release/spars-model install --model "$model" --version 3.8.0 --root target/models)
+            env -i PATH= installer/target/release/spars-model verify "$model_path"
+            env -i PATH= consumer/target/release/native-consumer-check "$model_path"
+            env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"
+          done

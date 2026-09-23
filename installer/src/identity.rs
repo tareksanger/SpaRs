@@ -38,14 +38,43 @@ impl Digest {
         Self(format!("{:x}", hash.finalize()))
     }
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ModelName {
-    #[serde(rename = "en_core_web_md")]
-    EnCoreWebMd,
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct ModelName(std::borrow::Cow<'static, str>);
+impl ModelName {
+    /// Legacy spelling retained for callers; model names are validated data.
+    #[allow(non_upper_case_globals)]
+    pub const EnCoreWebMd: Self = Self(std::borrow::Cow::Borrowed("en_core_web_md"));
+}
+impl FromStr for ModelName {
+    type Err = crate::Error;
+    fn from_str(value: &str) -> Result<Self> {
+        if value.is_empty()
+            || value.len() > 128
+            || !value.as_bytes()[0].is_ascii_lowercase()
+            || !value
+                .bytes()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+        {
+            return Err(invalid("model name must start with a lowercase ASCII letter and contain only lowercase letters, digits and underscores (maximum 128 bytes)"));
+        }
+        Ok(Self(std::borrow::Cow::Owned(value.to_owned())))
+    }
+}
+impl TryFrom<String> for ModelName {
+    type Error = crate::Error;
+    fn try_from(value: String) -> Result<Self> {
+        value.parse()
+    }
+}
+impl From<ModelName> for String {
+    fn from(value: ModelName) -> Self {
+        value.0.into_owned()
+    }
 }
 impl fmt::Display for ModelName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("en_core_web_md")
+        f.write_str(&self.0)
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

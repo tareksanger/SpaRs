@@ -1,6 +1,6 @@
 # Develop with SpaRs
 
-SpaRs turns text into tokens (words and punctuation), identifies names and places, and describes how words relate to each other. The supported model is `en_core_web_md` 3.8.0. It runs inside Rust; The [native installer](MODEL_INSTALLATION.md) prepares the supported model without Python. Python is used for development exports and reference tests.
+SpaRs turns text into tokens (words and punctuation), identifies names and places, and describes how words relate to each other. The supported models are `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0. Examples default to `en_core_web_md`. It runs inside Rust; The [native installer](MODEL_INSTALLATION.md) prepares the supported model without Python. Python is used for development exports and reference tests.
 
 ## Set up the project
 
@@ -134,3 +134,22 @@ The first dependency query validates all heads in the document and builds a shar
 For reusable patterns over these relationships, see [dependency matching](DEPENDENCY_MATCHER.md).
 
 For contiguous sequences and repetition, see [Token Matcher](TOKEN_MATCHER.md).
+
+## Select a model size
+
+After the README's `--all` acquisition and export commands, the same loader accepts all three pinned English sizes. The small model provides contextual document vectors; the other sizes provide static averages. This example runs during documentation acceptance.
+
+```rust
+use spars::Model;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    for (name, width) in [("en_core_web_sm", 96), ("en_core_web_md", 300), ("en_core_web_lg", 300)] {
+        let model = Model::load(format!("assets/{name}-3.8.0"))?;
+        let doc = model.process("Alice visited London.")?;
+        assert!(doc.entities().is_some());
+        assert_eq!(model.document_vector(&doc).len(), width);
+    }
+    Ok(())
+}
+```
+
+This does not establish support for other languages, transformer models, or custom components. Capability declarations and configuration are validated before inference; additional implementations and reference suites are required for those families.

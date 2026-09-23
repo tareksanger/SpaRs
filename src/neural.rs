@@ -94,9 +94,10 @@ impl Model {
             return vec![];
         }
         let hashes = &p.hashes;
-        let mut input = Dense::zeroed(n, width * (hashes.len() + 1));
-        let projection = self.tensor(&p.static_vectors.w);
-        let mut vectors = Dense::zeroed(n, projection.shape[1]);
+        let mut input = Dense::zeroed(
+            n,
+            width * (hashes.len() + usize::from(p.static_vectors.is_some())),
+        );
         for i in 0..n {
             let ids = self.features(doc, i, &p.attrs);
             let row = input.row_mut(i);
@@ -110,13 +111,19 @@ impl Model {
                     }
                 }
             }
-            if let Some(vector) = self.vector(doc.token_text(TokenIndex(i)).unwrap()) {
-                vectors.row_mut(i).copy_from_slice(vector);
-            }
         }
-        let projected = product_transposed(&vectors, &projection.data, width);
-        for i in 0..n {
-            input.row_mut(i)[hashes.len() * width..].copy_from_slice(projected.row(i));
+        if let Some(static_vectors) = &p.static_vectors {
+            let projection = self.tensor(&static_vectors.w);
+            let mut vectors = Dense::zeroed(n, projection.shape[1]);
+            for i in 0..n {
+                if let Some(vector) = self.vector(doc.token_text(TokenIndex(i)).unwrap()) {
+                    vectors.row_mut(i).copy_from_slice(vector);
+                }
+            }
+            let projected = product_transposed(&vectors, &projection.data, width);
+            for i in 0..n {
+                input.row_mut(i)[hashes.len() * width..].copy_from_slice(projected.row(i));
+            }
         }
         let mixed = block(self, &p.mix, &input);
         if let Some(t) = trace.as_mut() {
@@ -256,7 +263,12 @@ pub(crate) fn validate(m: &Model) -> Result<()> {
                 return Err(bad("embedding config"));
             }
         }
-        shape(&p.static_vectors.w, &[width, vectors.shape[1]])?;
+        if let Some(static_vectors) = &p.static_vectors {
+            if vectors.shape[1] == 0 {
+                return Err(bad("static projection requires vectors"));
+            }
+            shape(&static_vectors.w, &[width, vectors.shape[1]])?;
+        }
         let block = |b: &Block, input: usize| -> Result<()> {
             let w = tensor(&b.maxout.w)?;
             if w.shape.len() != 3 || w.shape[0] != width || w.shape[2] != input {
@@ -266,7 +278,10 @@ pub(crate) fn validate(m: &Model) -> Result<()> {
             shape(&b.norm.g, &[width])?;
             shape(&b.norm.b, &[width])
         };
-        block(&p.mix, width * (attrs.len() + 1))?;
+        block(
+            &p.mix,
+            width * (attrs.len() + usize::from(p.static_vectors.is_some())),
+        )?;
         let layers = &p.layers;
         let windows = &p.windows;
         if layers.len() != windows.len() {
@@ -330,9 +345,10 @@ pub(crate) fn validate(m: &Model) -> Result<()> {
         Component::Lemmatizer,
         Component::Ner,
     ];
-    if m.config.pipeline != expected {
+    if m.config.format_version == 1 && m.config.pipeline != expected {
         return Err(Error::Unsupported("pipeline order".into()));
     }
+    crate::pipeline::validate_order(&m.config.pipeline)?;
     Ok(())
 }
 

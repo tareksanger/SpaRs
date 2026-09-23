@@ -36,10 +36,10 @@ fn traversal_matches_official_spacy() {
     assert_eq!(fixture.versions["thinc"], "8.3.13");
     assert_eq!(
         fixture.input_sha256,
-        format!(
-            "{:x}",
-            Sha256::digest(std::fs::read("fixtures/evaluation-v1.expected.json").unwrap())
-        )
+        Sha256::digest(std::fs::read("fixtures/evaluation-v1.expected.json").unwrap())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
     );
     assert_eq!(fixture.cases.len(), 98);
     let model = Model::load("assets/en_core_web_md-3.8.0").unwrap();

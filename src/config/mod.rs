@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+mod capabilities;
 mod resources;
+pub(crate) use capabilities::Capabilities;
 pub(crate) use resources::*;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(transparent)]
@@ -22,6 +24,7 @@ pub(crate) struct Manifest {
     pub model_version: String,
     pub weights_sha256: String,
     pub versions: HashMap<String, String>,
+    pub capabilities: Option<Capabilities>,
     pub tensors: HashMap<String, TensorSpec>,
     pub tokenizer: TokenizerConfig,
     pub vector_keys: HashMap<u64, usize>,
@@ -36,7 +39,7 @@ pub(crate) struct Manifest {
     pub attribute_rules: Vec<AttributeRule>,
     pub lemmas: Lemmas,
 }
-#[derive(Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Component {
     Tok2vec,
@@ -101,7 +104,7 @@ pub(crate) struct Encoder {
     pub attrs: Vec<Feature>,
     pub hashes: Vec<HashEmbedding>,
     #[serde(rename = "static")]
-    pub static_vectors: Projection,
+    pub static_vectors: Option<Projection>,
     pub mix: Block,
     pub layers: Vec<Block>,
     pub windows: Vec<usize>,

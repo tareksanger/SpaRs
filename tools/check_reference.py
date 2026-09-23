@@ -73,6 +73,13 @@ def path_text(path: JsonPath) -> str:
 def numerical_kind(path: JsonPath) -> NumericalKind:
     # Permit tolerance only at the known fixture fields, never merely because a
     # value is numeric or because an unrelated field has a familiar name.
+    if len(path) >= 3 and path[0] == 'vector_cases' and isinstance(path[1], int):
+        if path[2] == 'tokens':
+            return NumericalKind.ACTIVATION
+        if path[2] in ('document', 'span', 'empty_span'):
+            return NumericalKind.VECTOR
+    if len(path) >= 3 and path[0] == 'reordered' and isinstance(path[1], int) and path[2] == 'vector':
+        return NumericalKind.VECTOR
     if len(path) >= 3 and path[0] == 'cases' and isinstance(path[1], int):
         if path[2] == 'tok2vec':
             return NumericalKind.ACTIVATION

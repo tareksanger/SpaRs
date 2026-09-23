@@ -36,7 +36,10 @@ fn check(split: &str) {
     let input = std::fs::read(format!("fixtures/{split}.json")).unwrap();
     assert_eq!(
         fixture["input_sha256"],
-        format!("{:x}", Sha256::digest(&input))
+        Sha256::digest(&input)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
     );
     let inputs: Value = serde_json::from_slice(&input).unwrap();
     assert_eq!(inputs["cases"].as_array().unwrap().len(), cases.len());

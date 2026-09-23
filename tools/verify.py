@@ -64,6 +64,7 @@ def main() -> None:
         [".venv/bin/python", "tools/check_typing_policy.py"],
         ['.venv/bin/python', 'tools/check_quality.py'],
         ['.venv/bin/python', 'tools/check_reference.py'],
+        ['.venv/bin/python', 'tools/check_models.py'],
         ['.venv/bin/python', '-m', 'unittest', 'discover', '-s', 'tools', '-p', 'test_*.py'],
         ['cargo', 'fmt', '--check'],
         ['cargo', 'fmt', '--manifest-path', 'consumer/Cargo.toml', '--check'],

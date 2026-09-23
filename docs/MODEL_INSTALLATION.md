@@ -1,6 +1,6 @@
 # Install an official model without Python
 
-The separate `spars-model` tool downloads and converts the official `en_core_web_md` 3.8.0 package entirely natively. It requires a Rust toolchain to build from this checkout. Installation does not require Python, Node, WASM, `curl`, or a model service. Applications still depend only on the `spars-nlp` Cargo package, imported as `spars`; its builds and inference do not download anything.
+The separate `spars-model` tool downloads and converts the official `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0 packages entirely natively. It requires a Rust toolchain to build from this checkout. Installation does not require Python, Node, WASM, `curl`, or a model service. Applications still depend only on the `spars-nlp` Cargo package, imported as `spars`; its builds and inference do not download anything.
 
 ## Download and install
 
@@ -12,7 +12,7 @@ model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root 
 cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 ```
 
-Installation prints the directory that you pass to `Model::load`. Diagnostic errors go to standard error and return a failing exit code. The model name defaults to `en_core_web_md`; `--model en_core_web_md` can also be supplied. The version and installation root are required. These commands install local files; they do not deploy or publish anything.
+Installation prints the directory that you pass to `Model::load`. Diagnostic errors go to standard error and return a failing exit code. The model name defaults to `en_core_web_md`; `--model en_core_web_sm` or `--model en_core_web_lg` selects a different size. The version and installation root are required. These commands install local files; they do not deploy or publish anything.
 
 To install an official package you already have, use `--archive`. After Rust dependencies have been fetched and the tool built, this path works without network access:
 
@@ -32,13 +32,13 @@ Keep the chosen directory in your application's configuration. Existing document
 installer/target/release/spars-model catalog
 ```
 
-Only `en_core_web_md` 3.8.0 is currently supported. The installation directory includes the model version, native format version, conversion-recipe revision, language-resource revision, and archive checksum. Installing an already-present identity verifies and reuses it. Failed conversion leaves prior installations intact. An abandoned staging directory is recovered on the next attempt; concurrent installers cannot write through the same root lock.
+The catalog contains `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0. The installation directory includes the model version, native format version, conversion-recipe revision, language-resource revision, and archive checksum. Installing an already-present identity verifies and reuses it. Failed conversion leaves prior installations intact. An abandoned staging directory is recovered on the next attempt; concurrent installers cannot write through the same root lock.
 
-There is no implicit “latest” version and no active-model switch. A future supported release will install alongside the old one; applications will switch by explicitly selecting its directory and can roll back by selecting the retained old directory. Future catalogs must retain supported older recipes to verify those installations. A second real model release, automatic update discovery, and model-removal commands are not implemented. New architectures still require native implementation and their own reference tests.
+There is no implicit “latest” version and no active-model switch. A future supported release will install alongside the old one; applications will switch by explicitly selecting its directory and can roll back by selecting the retained old directory. Future catalogs must retain supported older recipes to verify those installations. Other model families, automatic update discovery, and model-removal commands are not implemented. New architectures still require native implementation and their own reference tests.
 
 ## What is converted and checked
 
-The installer checks the complete official archive checksum before decoding. It reads all 69 tensor arrays, the vector-key mapping, and lemma tables from the package. A reproducible, embedded recipe supplies the reviewed architecture configuration, tokenizer rules, normalization and language resources, and source notices. This is a converter for a pinned package, not a general reader for arbitrary spaCy or Thinc models. The recipe and support files total about 589 KB and contain no pretrained tensor arrays.
+The installer checks the complete official archive checksum before decoding. It reads all 67 (`sm`) or 69 (`md`/`lg`) tensor arrays, the vector-key mapping, and lemma tables from the package. A reproducible, embedded recipe supplies the reviewed architecture configuration, tokenizer rules, normalization and language resources, and source notices. This is a converter for a pinned package, not a general reader for arbitrary spaCy or Thinc models. Recipes contain no pretrained tensor arrays. Download, entry, expanded archive, and installed-file limits come from each release in [the acquisition catalog](../models/catalog.json), so larger models do not require globally relaxed limits.
 
 Conversion must reproduce the reference weights byte for byte, and the lookup sections must match their pinned checksums. The native loader validates the complete model before the directory becomes available. Installation writes to a temporary directory and renames the finished result into place. `verify` checks the complete expected file inventory against the receipt, the embedded resource and tensor digests, and the pinned manifest data; it does not trust a receipt alone. Archive links, unsafe paths, duplicate destinations, unsupported formats, and oversized entries return errors.
 
@@ -48,7 +48,9 @@ The tool preserves model, spaCy, Thinc, and Unicode notices. Python's license is
 .venv/bin/python tools/installer_recipe.py --out target/recipe-review
 ```
 
-Recipe regeneration checks source files, model files, licenses, versions, and release URLs against the pinned capture in `reference/source-lock.json`. Four Python installation bookkeeping files (`INSTALLER`, `REQUESTED`, `direct_url.json`, and `uv_cache.json`) may differ between machines and are excluded from that comparison. One generated C source has a separately verified Linux hash because its build-directory comments differ; the exact allowed hashes are recorded in [source provenance](../reference/README.md). Unknown source changes still fail. The installer keeps the original provenance bytes and installation identity.
+Add `--model en_core_web_sm` or `--model en_core_web_lg` to generate their recipes into a separate empty directory. Their source records are checked against the checksum-pinned official wheels.
+
+Recipe regeneration checks shared implementation sources against `reference/source-lock.json`. Medium-model files, licenses, versions, and release URLs also match that pinned capture; small and large model records match their catalog-pinned official wheels. Four Python installation bookkeeping files (`INSTALLER`, `REQUESTED`, `direct_url.json`, and `uv_cache.json`) may differ between machines and are excluded from that comparison. One generated C source has a separately verified Linux hash because its build-directory comments differ; the exact allowed hashes are recorded in [source provenance](../reference/README.md). Unknown source changes still fail. The installer keeps the original provenance bytes and installation identity.
 
 ## Verification
 

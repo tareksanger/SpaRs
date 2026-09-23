@@ -1,4 +1,5 @@
 use crate::chunks::chunks;
+use crate::config::Component;
 use crate::{neural::linear_rows, Doc, Error, Model, Result};
 pub(crate) fn best(scores: &[f32], valid: impl Fn(usize) -> bool) -> Result<usize> {
     if scores.iter().any(|s| !s.is_finite()) {
@@ -22,42 +23,84 @@ pub enum Stage {
     Lemmatizer,
     Ner,
 }
+pub(crate) fn validate_order(pipeline: &[Component]) -> Result<()> {
+    let mut seen = std::collections::HashSet::new();
+    for component in pipeline {
+        let required: &[Component] = match component {
+            Component::Tok2vec | Component::Ner => &[],
+            Component::Tagger | Component::Parser => &[Component::Tok2vec],
+            Component::AttributeRuler => &[Component::Tagger, Component::Parser],
+            Component::Lemmatizer => &[Component::AttributeRuler],
+        };
+        if !required.iter().all(|dependency| seen.contains(dependency)) {
+            return Err(Error::Unsupported(format!(
+                "missing preceding dependency for {component:?}"
+            )));
+        }
+        if !seen.insert(*component) {
+            return Err(Error::Unsupported(format!(
+                "duplicate pipeline component {component:?}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl Model {
     pub fn process(&self, text: &str) -> Result<Doc> {
-        self.process_until(text, Stage::Ner)
+        self.execute(text, None)
     }
-    /// Run an ordered prefix of the official pipeline. Later annotations remain unavailable.
+    /// Run the declared pipeline through the requested component, inclusive.
     pub fn process_until(&self, text: &str, stage: Stage) -> Result<Doc> {
-        let mut doc = self.tokenize(text)?;
         if stage == Stage::Tokenizer {
-            return Ok(doc);
+            return self.tokenize(text);
         }
-        let x = self.tok2vec(&doc);
-        for (t, scores) in
-            doc.tokens
-                .iter_mut()
-                .zip(linear_rows(self, &self.config.tagger.params, &x))
-        {
-            let i = best(&scores, |_| true)?;
-            t.tag = Some(self.config.tagger.labels[i].clone());
+        let component = match stage {
+            Stage::Tokenizer => unreachable!(),
+            Stage::Tagger => Component::Tagger,
+            Stage::Parser => Component::Parser,
+            Stage::AttributeRuler => Component::AttributeRuler,
+            Stage::Lemmatizer => Component::Lemmatizer,
+            Stage::Ner => Component::Ner,
+        };
+        if !self.config.pipeline.contains(&component) {
+            return Err(Error::Unsupported(format!(
+                "pipeline does not contain {component:?}"
+            )));
         }
-        if stage == Stage::Tagger {
-            return Ok(doc);
+        self.execute(text, Some(component))
+    }
+    fn execute(&self, text: &str, until: Option<Component>) -> Result<Doc> {
+        let mut doc = self.tokenize(text)?;
+        let mut shared = Vec::new();
+        for component in &self.config.pipeline {
+            match component {
+                Component::Tok2vec => shared = self.tok2vec(&doc),
+                Component::Tagger => {
+                    for (token, scores) in doc.tokens.iter_mut().zip(linear_rows(
+                        self,
+                        &self.config.tagger.params,
+                        &shared,
+                    )) {
+                        let i = best(&scores, |_| true)?;
+                        token.tag = Some(self.config.tagger.labels[i].clone());
+                    }
+                }
+                Component::Parser => self.parse(&mut doc, &shared)?,
+                Component::AttributeRuler => {
+                    self.attributes(&mut doc)?;
+                    chunks(&mut doc);
+                }
+                Component::Lemmatizer => self.lemmatize(&mut doc),
+                Component::Ner => self.ner(&mut doc)?,
+            }
+            if Some(*component) == until {
+                break;
+            }
         }
-        self.parse(&mut doc, &x)?;
-        if stage == Stage::Parser {
-            return Ok(doc);
+        if self.tensors["vectors"].shape[1] == 0 {
+            doc.tensor = shared;
         }
-        self.attributes(&mut doc)?;
-        chunks(&mut doc);
-        if stage == Stage::AttributeRuler {
-            return Ok(doc);
-        }
-        self.lemmatize(&mut doc);
-        if stage == Stage::Lemmatizer {
-            return Ok(doc);
-        }
-        self.ner(&mut doc)?;
         Ok(doc)
     }
     pub fn pipe<'a>(

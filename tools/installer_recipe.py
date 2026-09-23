@@ -18,7 +18,8 @@ from spacy.strings import hash_string
 from spacy.symbols import IDS
 
 from export import export
-from installer_provenance import pinned_source_lock
+from installer_provenance import pinned_source_lock, model_source_lock
+from model_catalog import release
 from json_types import JsonValue, json_object, json_string, read_json, validate_json
 from reference_types import FloatArray, Language, Model, is_float_array
 
@@ -119,12 +120,12 @@ def decode_lemmas(data: object, positions: dict[str, int]) -> dict[str, dict[str
     return result
 
 
-def model_sources(nlp: Language) -> dict[str, ThincSource | NpySource]:
+def model_sources(nlp: Language, prefix: str = PREFIX) -> dict[str, ThincSource | NpySource]:
     """Use the same semantic model references as export.py, never tensor values."""
     sources: dict[str, ThincSource | NpySource] = {}
 
     def component(root: Model, name: str) -> tuple[list[Model], str]:
-        return list(root.walk()), PREFIX + name + '/model'
+        return list(root.walk()), prefix + name + '/model'
 
     def params(model: Model, prefix: str, nodes: list[Model], entry: str) -> None:
         node = next(i for i, candidate in enumerate(nodes) if candidate is model)
@@ -139,7 +140,9 @@ def model_sources(nlp: Language) -> dict[str, ThincSource | NpySource]:
         encode = list(model.get_ref('encode').walk())
         for i, node in enumerate(x for x in embed if x.name == 'hashembed'):
             params(node, f'{prefix}.hash{i}', nodes, entry)
-        params(next(x for x in embed if x.name == 'static_vectors'), prefix + '.static', nodes, entry)
+        static = next((x for x in embed if x.name == 'static_vectors'), None)
+        if static is not None:
+            params(static, prefix + '.static', nodes, entry)
         params(next(x for x in embed if x.name == 'maxout'), prefix + '.mix.max', nodes, entry)
         params(next(x for x in embed if x.name == 'layernorm'), prefix + '.mix.norm', nodes, entry)
         for i, (maximum, norm) in enumerate(zip(
@@ -161,7 +164,7 @@ def model_sources(nlp: Language) -> dict[str, ThincSource | NpySource]:
         params(model.get_ref('upper'), name + '.upper', nodes, entry)
         if name == 'ner':
             tok2vec(model.get_ref('tok2vec').layers[0], 'ner.tok2vec', nodes, entry)
-    sources['vectors'] = NpySource(PREFIX + 'vocab/vectors')
+    sources['vectors'] = NpySource(prefix + 'vocab/vectors')
     return sources
 
 
@@ -212,34 +215,37 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, separators=(',', ':'), sort_keys=True) + '\n')
 
 
-def generate(output: Path) -> None:
+def generate(output: Path, model_name: str = 'en_core_web_md') -> None:
+    entry = release(model_name)
+    prefix = entry.prefix
     if output.exists() and any(output.iterdir()):
         raise ValueError('Output directory must be empty; compare regenerated resources explicitly')
-    if sha256(WHEEL.read_bytes()) != WHEEL_SHA256:
+    if sha256(entry.wheel.read_bytes()) != entry.wheel_sha256:
         raise ValueError('Official wheel checksum mismatch')
     with tempfile.TemporaryDirectory(prefix='spars-recipe-') as temporary:
         work = Path(temporary)
-        export(work / 'export')
+        export(work / 'export', entry.model)
         manifest = json_object(read_json(work / 'export/manifest.json'))
-        sources = model_sources(spacy.load('en_core_web_md'))
-        if set(sources) != set(json_object(manifest['tensors'])) or len(sources) != 69:
+        sources = model_sources(spacy.load(entry.model), prefix)
+        if set(sources) != set(json_object(manifest['tensors'])):
             raise ValueError('Tensor source inventory differs from the official export')
-        with zipfile.ZipFile(WHEEL) as wheel:
+        with zipfile.ZipFile(entry.wheel) as wheel:
             save_file(reconstruct(wheel, sources), str(work / 'weights.safetensors'))
             if sha256((work / 'weights.safetensors').read_bytes()) != json_string(manifest['weights_sha256']):
                 raise ValueError('Direct wheel tensors differ from official exported tensors')
             decoder: object = importlib.import_module('srsly')
             if not isinstance(decoder, MsgpackDecoder):
                 raise TypeError('srsly must expose msgpack_loads')
-            lemma_data = decoder.msgpack_loads(wheel.read(PREFIX + 'lemmatizer/lookups/lookups.bin'))
+            lemma_data = decoder.msgpack_loads(wheel.read(prefix + 'lemmatizer/lookups/lookups.bin'))
             if decode_lemmas(lemma_data, lemma_lookup_ids()) != manifest['lemmas']:
                 raise ValueError('Direct wheel lemma lookups differ from the official export')
             entries = {source.entry for source in sources.values()} | {
-                PREFIX + 'vocab/key2row', PREFIX + 'lemmatizer/lookups/lookups.bin',
-                PREFIX + 'LICENSE', PREFIX + 'LICENSES_SOURCES',
+                prefix + 'vocab/key2row', prefix + 'lemmatizer/lookups/lookups.bin',
+                prefix + 'LICENSE', prefix + 'LICENSES_SOURCES',
             }
             inputs = {entry: sha256(wheel.read(entry)) for entry in sorted(entries)}
-        source_lock = pinned_source_lock(read_json(work / 'export/source-lock.json'))
+        observed = read_json(work / 'export/source-lock.json')
+        source_lock = pinned_source_lock(observed) if entry.format_version == 1 else model_source_lock(observed, entry.model)
         output.mkdir(parents=True, exist_ok=True)
         write_json(output / 'manifest-template.json', template(manifest))
         resources: dict[str, str] = {}
@@ -254,12 +260,12 @@ def generate(output: Path) -> None:
             'norms': 'Official spaCy BASE_NORMS plus model vocab/lookups.bin lexeme_norm',
             'symbols': 'Official spaCy symbols.IDS',
             'attribute_rules': 'Official model attribute_ruler/patterns',
-            'vector_keys': PREFIX + 'vocab/key2row',
-            'lemmas': PREFIX + 'lemmatizer/lookups/lookups.bin',
+            'vector_keys': prefix + 'vocab/key2row',
+            'lemmas': prefix + 'lemmatizer/lookups/lookups.bin',
         })
-        recipe = Recipe(Identity(), sources, inputs,
+        recipe = Recipe(Identity(model=entry.model, model_version=entry.version, wheel_sha256=entry.wheel_sha256, format_version=entry.format_version), sources, inputs,
             lemma_lookup_ids(),
-            PREFIX + 'vocab/key2row', PREFIX + 'lemmatizer/lookups/lookups.bin',
+            prefix + 'vocab/key2row', prefix + 'lemmatizer/lookups/lookups.bin',
             sha256((output / 'manifest-template.json').read_bytes()), resources, field_sources,
             LookupDigests(lookup_digest(manifest['vector_keys']), lookup_digest(manifest['lemmas'])))
         write_json(output / 'recipe.json', asdict(recipe))
@@ -268,10 +274,15 @@ def generate(output: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
-    output: object = parser.parse_args().out
+    parser.add_argument('--model', default='en_core_web_md')
+    args = parser.parse_args()
+    model_name: object = args.model
+    output: object = args.out
     if not isinstance(output, Path):
         raise TypeError('Output must be a path')
-    generate(output)
+    if not isinstance(model_name, str):
+        raise TypeError("Model must be a string")
+    generate(output, model_name)
 
 
 if __name__ == '__main__':

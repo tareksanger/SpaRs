@@ -13,12 +13,12 @@ class PackageRecord(TypedDict):
     files: dict[str, str]
 
 
-def record() -> dict[str, PackageRecord]:
+def record(model_name: str = 'en_core_web_md') -> dict[str, PackageRecord]:
     packages: dict[str, PackageRecord] = {}
-    for name in ('spacy','thinc','murmurhash','en_core_web_md'):
+    for name in ('spacy','thinc','murmurhash',model_name):
         d=md.distribution(name);files: dict[str, str] = {}
         for f in d.files or []:
-            if not (name=='en_core_web_md' and f.hash) and f.suffix not in ('.py','.pyx','.pxd','.pxi','.h','.cpp','.c') and 'LICENSE' not in str(f):continue
+            if not (name==model_name and f.hash) and f.suffix not in ('.py','.pyx','.pxd','.pxi','.h','.cpp','.c') and 'LICENSE' not in str(f):continue
             path=Path(str(d.locate_file(f)))
             sha=hashlib.sha256(path.read_bytes()).digest()
             if f.hash and f.hash.mode=='sha256':

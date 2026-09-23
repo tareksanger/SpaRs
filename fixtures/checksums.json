@@ -22,5 +22,8 @@
   "fixtures/dependency-match-regressions-v1.expected.json": "6924e730dc379b80c7e79a1ec184fec388d26b3b6a45531d05c3291b507fa78c",
   "fixtures/token-match-v1.expected.json": "dc87882195334a698b4f03166f4c98bab04d9cfda7bddcb9b57e9880b724d3fd",
   "fixtures/token-match-exhaustive-v1.expected.json": "e85ebb4f58e6b0d9155423648e681a54510c1a469cb9274965e40cd9fc30900f",
-  "fixtures/token-match-branching-v1.expected.json": "d196c64a75d5baa7944abd542492c79a92c9de037fdd1236c11dd569176dfc95"
+  "fixtures/token-match-branching-v1.expected.json": "d196c64a75d5baa7944abd542492c79a92c9de037fdd1236c11dd569176dfc95",
+  "fixtures/model-capabilities-v1.expected.json": "3fd7a38ead381822e731642222277eba14df64598a807fd561a0b75e152a751d",
+  "fixtures/model-lg-v1.expected.json": "e42e6f52e376cb0629e5159a6455601b5ccf38c2a94c755281dc8adcaf62afa6",
+  "fixtures/model-sm-v1.expected.json": "05f51b96739202c3209b22332745a9e1d0e14569d4fa45f3620afb809737865c"
 }

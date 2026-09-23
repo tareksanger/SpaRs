@@ -1,4 +1,14 @@
-# Native model format v1
+# Native model formats
+
+## Capability-declared format v2
+
+Format v2 retains the v1 resource and tensor layout below and adds a required `capabilities` record. Its typed identifiers declare the language, tok2vec architecture, embedding architecture, encoder, tagger, transition model, and lemmatizer semantics. Model name and version describe provenance rather than select inference code. Currently implemented identifiers are English, `spacy.Tok2Vec.v2`, `spacy.MultiHashEmbed.v2`, `spacy.MaxoutWindowEncoder.v2`, `spacy.Tagger.v2`, `spacy.TransitionBasedParser.v2`, and `en-rule-v1`. Unknown or missing capabilities fail loading. See [model-v2.schema.json](model-v2.schema.json).
+
+The ordered `pipeline` may select and reorder the built-in components subject to checked dependencies: tagger/parser require a preceding shared tok2vec, the English attribute ruler requires tagger/parser, and the English lemmatizer requires the attribute ruler. NER has its own encoder. Duplicate components and missing dependencies fail loading. A requested stage absent from the pipeline returns an error. The v2 manifest still requires the six component configurations; arbitrary component sets and other language/architecture implementations remain future work.
+
+Both encoder `static` fields may be null. Without a projection, the embedding concatenation omits the static-vector block. The only permitted empty tensor shape is `vectors: [0, 0]`, with an empty key map and no static projection. All other tensors require positive dimensions. The small English model has 67 tensors; medium and large have 69. Models without static vectors retain shared contextual rows in processed documents for token/span/document vector access. Such documents serialize as native snapshot version 2, which validates row counts, rectangular dimensions, and finite values on restoration. Documents without contextual rows retain snapshot version 1.
+
+## Legacy format v1
 
 The manifest is a JSON file that describes the model. Tensors are numbered arrays containing its learned weights. This format lets a Rust application load the exported model without Python.
 
@@ -22,4 +32,4 @@ Dimensions and label counts are loaded, from the validated official model config
 
 Unsupported versions, components, feature types or operators fail explicitly. Changing this representation or numerical semantics requires a new format version and fresh compatibility evidence. Model acquisition is never performed by loading or processing. The manifest uses ordinary JSON; [model-v1.schema.json](model-v1.schema.json) specifies its structural contract. The loader enforces structural and tensor constraints in [validation.rs](../src/validation.rs) and the `validate` function in [neural.rs](../src/neural.rs).
 
-The [native installer](MODEL_INSTALLATION.md) writes the same v1 model data and adds `installation.json`, which records the exact installation identity, conversion-recipe digest, and file inventory. This receipt belongs to the installation tool; the inference library continues to load the model directory without networking or installer dependencies.
+The [native installer](MODEL_INSTALLATION.md) writes v1 for `md` and v2 for `sm`/`lg`, and adds `installation.json`, which records the exact installation identity, conversion-recipe digest, and file inventory. This receipt belongs to the installation tool; the inference library continues to load the model directory without networking or installer dependencies.

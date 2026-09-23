@@ -26,6 +26,7 @@ class Span(Protocol):
     start: int
     end: int
     label_: str
+    vector: FloatArray
 
 class Token(Protocol):
     text: str
@@ -42,6 +43,7 @@ class Token(Protocol):
     is_sent_start: bool | None
     ent_iob_: str
     ent_type_: str
+    vector: FloatArray
     @property
     def children(self) -> Iterator['Token']: ...
     @property
@@ -57,6 +59,11 @@ class Doc(Protocol):
     sents: Iterable[Span]
     noun_chunks: Iterable[Span]
     vector: FloatArray
+    tensor: FloatArray
+    @overload
+    def __getitem__(self, index: int) -> Token: ...
+    @overload
+    def __getitem__(self, index: slice) -> Span: ...
     def __len__(self) -> int: ...
     def __iter__(self) -> Iterator[Token]: ...
     def to_array(self, attrs: list[int]) -> UIntArray: ...
@@ -124,6 +131,8 @@ class Strings(Protocol):
 class Vectors(Protocol):
     data: FloatArray
     key2row: Mapping[int, int]
+    mode: str
+    attr: int
 
 class Lexeme(Protocol):
     orth: int
@@ -141,6 +150,7 @@ class Vocab(Protocol):
     def __getitem__(self, text: str) -> Lexeme: ...
 
 class Tokenizer(Protocol):
+    def __call__(self, text: str) -> Doc: ...
     rules: dict[str, list[dict[int, str]]]
     prefix_search: RegexFunction
     suffix_search: RegexFunction

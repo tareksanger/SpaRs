@@ -10,6 +10,7 @@ import thinc
 
 from reference_types import TokenRecord, SpanRecord, token_records, span_records, float_values
 from typing import TypedDict
+from model_catalog import release
 from json_types import json_object, json_array, json_string, parse_json
 
 
@@ -26,6 +27,7 @@ class EvaluationCase(TypedDict):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--model', default='en_core_web_md')
     parser.add_argument('input', type=Path)
     parser.add_argument('output', type=Path)
     args = parser.parse_args()
@@ -37,7 +39,11 @@ def main() -> None:
         parser.error('Output exists. Use a new version; frozen expectations stay unchanged.')
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         parser.error('Use the pinned reference environment.')
-    model = spacy.load('en_core_web_md')
+    model_name: object = args.model
+    if not isinstance(model_name, str):
+        raise TypeError('Model must be a string')
+    entry = release(model_name)
+    model = spacy.load(entry.model)
     assert model.meta['version'] == '3.8.0'
     raw = input_path.read_bytes()
     corpus = json_object(parse_json(raw.decode()))
@@ -54,7 +60,7 @@ def main() -> None:
             'entities': span_records(doc.ents), 'sentences': span_records(doc.sents),
             'noun_chunks': span_records(doc.noun_chunks), 'vector': float_values(doc.vector)})
     result = {'versions': {'spacy': spacy.__version__, 'thinc': thinc.__version__},
-              'model': 'en_core_web_md 3.8.0', 'input_sha256': hashlib.sha256(raw).hexdigest(),
+              'model': entry.model + ' ' + entry.version, 'input_sha256': hashlib.sha256(raw).hexdigest(),
               'cases': cases}
     output_path.write_text(json.dumps(result, ensure_ascii=False) + '\n')
     print(f'Wrote {len(cases)} cases, {token_count} tokens')

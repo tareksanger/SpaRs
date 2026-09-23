@@ -38,3 +38,34 @@ def pinned_source_lock(observed: JsonValue) -> bytes:
         raise ValueError('Installed source files differ from the pinned reference: ' + ', '.join(changed))
     # Keep the existing immutable installation identity and every recorded notice.
     return path.read_bytes()
+
+
+def model_source_lock(observed: JsonValue, model_name: str) -> bytes:
+    """Pin shared implementation sources and omit machine-specific installation records."""
+    import json
+    import hashlib
+    import zipfile
+    from model_catalog import release
+    entry = release(model_name)
+    actual = source_records(observed)
+    expected = source_records(read_json(Path('reference/source-lock.json')))
+    for name in ('spacy', 'thinc', 'murmurhash'):
+        if actual.get(name) != expected[name]:
+            raise ValueError('Installed source files differ from the pinned reference: ' + name)
+    if set(actual) != {'spacy', 'thinc', 'murmurhash', model_name}:
+        raise ValueError('Unexpected model source inventory')
+    model = actual[model_name]
+    prefix = f"{model_name}-{model['version']}.dist-info/"
+    for local in ('INSTALLER', 'REQUESTED', 'direct_url.json', 'uv_cache.json'):
+        model['files'].pop(prefix + local, None)
+    with entry.wheel.open('rb') as archive:
+        if hashlib.file_digest(archive, 'sha256').hexdigest() != entry.wheel_sha256:
+            raise ValueError('Official wheel checksum mismatch')
+    with zipfile.ZipFile(entry.wheel) as wheel:
+        files = {name: hashlib.sha256(wheel.read(name)).hexdigest() for name in wheel.namelist()
+                 if not name.endswith('/') and not name.endswith('.dist-info/RECORD')}
+    expected_model: PackageRecord = {'version': entry.version,
+        'release': f'https://pypi.org/project/{entry.model}/{entry.version}/', 'files': files}
+    if model != expected_model:
+        raise ValueError('Installed model files differ from the pinned official wheel: ' + model_name)
+    return (json.dumps(actual, indent=2, sort_keys=True) + '\n').encode()

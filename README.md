@@ -2,7 +2,9 @@
 
 Experimental, standalone Rust NLP library using **official spaCy pretrained weights**, with native Rust tokenization and inference. The Rust crate needs no Python, JavaScript, WASM, subprocess, network client, or build-time model download. Optional [Node.js bindings](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) live in a separate crate. The project is named **SpaRs**, with Cargo package name `spars-nlp` and Rust import name `spars`.
 
-The implemented target is **en_core_web_md 3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and static vectors. The declared validation suite covers 190 full-pipeline documents / 7,029 tokens, 4,057 tokenizer cases and 634 transition steps, requiring exact agreement on discrete outputs with the official reference. This is a bounded English inference milestone, **not a port of the entire spaCy library**. Start with the [developer guide](https://github.com/tareksanger/SpaRs/blob/main/docs/DEVELOPMENT.md) for tested examples and the [quality process](https://github.com/tareksanger/SpaRs/blob/main/docs/QUALITY.md) for contribution checks. See [compatibility](https://github.com/tareksanger/SpaRs/blob/main/docs/COMPATIBILITY.md), [progress](https://github.com/tareksanger/SpaRs/blob/main/docs/PROGRESS.md), and [validation](https://github.com/tareksanger/SpaRs/blob/main/docs/VALIDATION.md).
+The supported models are **en_core_web_sm**, **en_core_web_md**, and **en_core_web_lg**, version **3.8.0**, exported with **spaCy 3.8.14 / Thinc 8.3.13**. It includes tokenization, lexical features, both tok2vec networks, tags, dependencies, attribute rules, lemmas, NER, sentences, English noun chunks, and vectors (static for `md`/`lg`, contextual for `sm`). The original `md` validation suite covers 190 full-pipeline documents / 7,029 tokens, 4,057 tokenizer cases and 634 transition steps, requiring exact agreement on discrete outputs with the official reference. Separate `sm` and `lg` suites each compare 98 documents / 5,568 tokens, with additional contextual-vector and component-order cases. This is a bounded English inference milestone, **not a port of the entire spaCy library**. Start with the [developer guide](https://github.com/tareksanger/SpaRs/blob/main/docs/DEVELOPMENT.md) for tested examples and the [quality process](https://github.com/tareksanger/SpaRs/blob/main/docs/QUALITY.md) for contribution checks. See [compatibility](https://github.com/tareksanger/SpaRs/blob/main/docs/COMPATIBILITY.md), [progress](https://github.com/tareksanger/SpaRs/blob/main/docs/PROGRESS.md), and [validation](https://github.com/tareksanger/SpaRs/blob/main/docs/VALIDATION.md).
+
+The compatibility target is native inference for all official spaCy pretrained pipelines, across languages and architectures. This is planned scope, not current support. The [model extensibility plan](docs/PROGRESS.md#model-extensibility-plan) separates model data from reusable runtime capabilities and preserves extension points for custom-trained pipelines later.
 
 ## Use from Rust
 
@@ -41,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `Doc` owns exact source text. `ByteOffset`, `CodePointOffset` and `TokenIndex` are distinct, with checked conversion. Whitespace tokens and trailing ASCII spaces are preserved. Checked `TokenView`/`SpanView` borrow documents safely. Native snapshot JSON is versioned and validates boundaries; it is not spaCy DocBin.
 
-`vector`/`token_vector` return `None` for missing lexical keys. `span_vector` and `document_vector` average all tokens, including OOV zero rows. Similarity returns 1 for identical token sequences (including two empty sequences), otherwise cosine, or 0 when either vector norm is zero, following the pinned reference. No warnings are emitted for OOV similarity. Static vectors are distinct from `tok2vec` output.
+`vector` returns static lexical vectors or `None` for missing keys. For `sm`, `token_vector` uses contextual rows produced by the shared encoder; it returns `None` before encoding. `span_vector` and `document_vector` average all tokens, including OOV zero rows for static models. Empty `sm` documents/spans return zero-length vectors. Contextual rows survive native v2 document snapshots. Similarity returns 1 for identical token sequences (including two empty sequences), otherwise cosine, or 0 when either vector norm is zero, following the pinned reference. No warnings are emitted for OOV similarity. Static vectors are distinct from `tok2vec` output.
 
 ## Install a model without Python
 
@@ -53,7 +55,7 @@ model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root 
 cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 ```
 
-Pass the printed installation directory to `Model::load`. Only the pinned model is supported; installation does not select a new version for your application automatically. See [model installation](https://github.com/tareksanger/SpaRs/blob/main/docs/MODEL_INSTALLATION.md) for local archives, verification, and version handling. The Python setup below is for development and reference testing.
+Pass the printed installation directory to `Model::load`. Use `--model en_core_web_sm`, `--model en_core_web_md` (the default), or `--model en_core_web_lg`; installation does not select a new version for your application automatically. See [model installation](https://github.com/tareksanger/SpaRs/blob/main/docs/MODEL_INSTALLATION.md) for local archives, verification, and version handling. The Python setup below is for development and reference testing.
 
 ## Acquire and export explicitly
 
@@ -64,12 +66,12 @@ uv venv --python 3.12.5 .venv
 uv pip sync --python .venv/bin/python tools/reference-requirements.lock
 npm --prefix tools ci --ignore-scripts --no-audit --no-fund
 npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
-.venv/bin/python tools/acquire.py
-.venv/bin/python tools/export.py
+.venv/bin/python tools/acquire.py --all
+.venv/bin/python tools/export.py --all
 cargo run --release --example analyze -- assets/en_core_web_md-3.8.0 'Alice met Bob.'
 ```
 
-The acquisition script verifies the official model wheel SHA-256. Export copies 69 F32 tensors plus configuration, tokenizer/lexical resources, ordered actions, lookup tables, vectors, licensing and source provenance. Weights are separate from the Cargo package. The loader checks the weight digest, tensor inventories, shapes, finite values, references and supported configurations before inference. See [model format](https://github.com/tareksanger/SpaRs/blob/main/docs/MODEL_FORMAT.md). Model assets remain local and are not published by these commands.
+The acquisition script verifies the official model wheel SHA-256. Export copies 67 (`sm`) or 69 (`md`/`lg`) F32 tensors plus configuration, tokenizer/lexical resources, ordered actions, lookup tables, vectors, licensing and source provenance. Weights are separate from the Cargo package. The loader checks the weight digest, tensor inventories, shapes, finite values, references and supported configurations before inference. See [model format](https://github.com/tareksanger/SpaRs/blob/main/docs/MODEL_FORMAT.md). Model assets remain local and are not published by these commands.
 
 ## Reproduce verification
 
@@ -100,6 +102,6 @@ Model-dependent tests are explicitly marked ignored for ordinary dependency buil
 
 ## Limits
 
-Only the exported English medium configuration above is accepted. Advanced matcher options, PhraseMatcher, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Native CPU matrix kernels preserve the declared fidelity limits. See [performance](https://github.com/tareksanger/SpaRs/blob/main/docs/PERFORMANCE.md) for commands to measure loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
+Only the declared English CNN capabilities are implemented; the three model releases above have reference coverage. The v2 loader validates capability declarations independently of model identity, while legacy v1 assets remain restricted to `md`. Advanced matcher options, PhraseMatcher, retokenization, other languages, transformers, training, GPU inference, beam search, preset NER annotations and spaCy binary serialization remain unsupported. The disabled `senter` is not executed; sentence boundaries come from the parser. Native CPU matrix kernels preserve the declared fidelity limits. See [performance](https://github.com/tareksanger/SpaRs/blob/main/docs/PERFORMANCE.md) for commands to measure loading time, throughput, and memory use. No linguistic-accuracy claim is made. Finite-corpus parity does not prove all-input compatibility or linguistic correctness. See `docs/COMPATIBILITY.md` for the broader implementation backlog.
 
 The Cargo crate includes the MIT project license and spaCy/Thinc notices for translated code. Separate model distributions include their model and resource notices. See [third-party attribution](THIRD_PARTY_NOTICES.md).
