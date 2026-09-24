@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "d51845f834cf606b058d470e550a5e85f4f05f6e",
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "spars-nlp",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "consumer/Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+        },
+        {
+          "type": "toml",
+          "path": "installer/Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+        },
+        {
+          "type": "toml",
+          "path": "bindings/node/Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+        }
+      ]
+    }
+  }
+}
