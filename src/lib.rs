@@ -1,4 +1,4 @@
-//! Native Rust inference for an explicitly exported en_core_web_md 3.8.0 model.
+//! Native Rust inference for explicitly exported English sm/md/lg 3.8.0 models.
 //!
 //! Model acquisition is separate from Cargo builds and inference. Python is only
 //! needed to produce official model exports and reference fixtures.

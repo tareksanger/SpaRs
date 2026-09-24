@@ -2,9 +2,19 @@
 
 ## Project scope
 
-SpaRs (Cargo package `spars-nlp`, Rust import `spars`) is a standalone native Rust NLP library. The current supported model is the official `en_core_web_md` 3.8.0 export, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. Keep broader compatibility status in `docs/COMPATIBILITY.md`; one English pipeline does not establish full spaCy parity.
+SpaRs (Cargo package `spars-nlp`, Rust import `spars`) is a standalone native Rust NLP library. The current supported models are the official `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0 exports, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. Keep broader compatibility status in `docs/COMPATIBILITY.md`; one English pipeline does not establish full spaCy parity.
 
 Production tokenization and inference must run natively in Rust. Python belongs only in development, export, and reference tooling. Keep acquisition explicit and processing offline. Use official spaCy, Thinc, and model sources identified by `reference/source-lock.json` and model metadata. Keep third-party executable demos and their assets out of the project. Record licenses and provenance when adding resources. Keep downstream application features in separate projects.
+
+## Model extensibility
+
+The compatibility target is native loading and inference for all official spaCy pretrained pipelines, across languages, model sizes, and architectures. The verified English models are an implementation milestone, not the design boundary. Loading custom-trained pipelines is future work; preserve extension points for their model data and native component implementations. Training models is a separate capability.
+
+Separate model identity and acquisition records from runtime capabilities. Model names, release URLs, checksums, archive limits, and provenance belong in typed catalog data. Runtime compatibility must ultimately depend on versioned component factories, neural architectures, language resources, and their validated configuration, rather than an enumeration of model names. A new model using supported capabilities should not require changes to inference code. A new capability should have one reusable implementation, not a model-specific branch.
+
+Build pipeline execution from declared component order and dependencies. Keep language behavior and resources separate from shared neural operations. Preserve strong typing and explicit validation at each boundary; extensibility does not justify generic unvalidated configuration, silent component omission, or Python execution in production. Future custom pipelines should use the same configuration and component contracts, with explicit registration for additional native implementations.
+
+Follow the staged architecture plan in `docs/PROGRESS.md`. Preserve existing compatibility checks until their replacements have reference and malformed-input coverage. Distinguish the ability to decode a package, the capabilities needed to execute it, and release-specific parity evidence. Do not claim that removing a model-name restriction establishes model support. Keep new model reference fixtures separate and retain existing model coverage.
 
 ## Before changing code
 

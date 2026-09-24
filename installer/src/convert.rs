@@ -1,7 +1,7 @@
 use crate::{
     archive::Wheel,
     invalid, lookups,
-    recipe::{self, Recipe, TensorSource},
+    recipe::{Recipe, TensorSource},
     tensors::{self, TensorData},
     Result,
 };
@@ -37,7 +37,7 @@ struct Manifest<'a> {
     lemmas: lookups::Lemmas,
 }
 pub(crate) fn convert(wheel: &mut Wheel, recipe: &Recipe, destination: &Path) -> Result<()> {
-    let metadata: TemplateMetadata = serde_json::from_slice(recipe::TEMPLATE)?;
+    let metadata: TemplateMetadata = serde_json::from_slice(recipe.bundle.template)?;
     let mut parameters = BTreeMap::new();
     let mut tensors: BTreeMap<String, TensorData> = BTreeMap::new();
     for (name, source) in &recipe.sources {
@@ -106,7 +106,7 @@ pub(crate) fn convert(wheel: &mut Wheel, recipe: &Recipe, destination: &Path) ->
         &wheel.read(&recipe.lemmas_entry, &recipe.inputs[&recipe.lemmas_entry])?,
         &recipe.lemma_pos,
     )?;
-    let template: BTreeMap<String, Box<RawValue>> = serde_json::from_slice(recipe::TEMPLATE)?;
+    let template: BTreeMap<String, Box<RawValue>> = serde_json::from_slice(recipe.bundle.template)?;
     let mut output = BufWriter::new(File::create(destination.join("manifest.json"))?);
     serde_json::to_writer(
         &mut output,
@@ -123,10 +123,10 @@ pub(crate) fn convert(wheel: &mut Wheel, recipe: &Recipe, destination: &Path) ->
         .keys()
         .filter(|name| name.as_str() != "manifest-template.json")
     {
-        std::fs::write(destination.join(name), recipe::resource(name)?)?;
+        std::fs::write(destination.join(name), recipe.bundle.resource(name)?)?;
     }
     for name in ["LICENSE", "LICENSES_SOURCES"] {
-        let entry = format!("en_core_web_md/en_core_web_md-3.8.0/{name}");
+        let entry = format!("{}{name}", recipe.prefix());
         std::fs::write(
             destination.join(name),
             wheel.read(&entry, &recipe.inputs[&entry])?,

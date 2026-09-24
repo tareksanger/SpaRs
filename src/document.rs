@@ -59,6 +59,8 @@ pub struct Doc {
     pub(crate) entities: Option<Vec<Span>>,
     pub(crate) sentences: Option<Vec<Span>>,
     pub(crate) noun_chunks: Option<Vec<Span>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) tensor: Vec<Vec<f32>>,
     // Public traversal begins after pipeline writes finish. Any future mutation
     // of dependency heads must invalidate this cache before exposing the document.
     #[serde(skip)]
@@ -72,6 +74,7 @@ impl PartialEq for Doc {
             && self.entities == other.entities
             && self.sentences == other.sentences
             && self.noun_chunks == other.noun_chunks
+            && self.tensor == other.tensor
     }
 }
 impl Doc {
@@ -123,7 +126,7 @@ impl Doc {
     /// Serialize an immutable document snapshot, preserving unavailable annotations.
     pub fn to_json(&self) -> Result<String> {
         Ok(serde_json::to_string(
-            &serde_json::json!({"format_version":1,"document":self}),
+            &serde_json::json!({"format_version":if self.tensor.is_empty() { 1 } else { 2 },"document":self}),
         )?)
     }
     /// Restore a snapshot after validating offsets, token indices and spans.
@@ -140,12 +143,31 @@ impl Doc {
             entities: Option<Vec<Span>>,
             sentences: Option<Vec<Span>>,
             noun_chunks: Option<Vec<Span>>,
+            #[serde(default)]
+            tensor: Vec<Vec<f32>>,
         }
         let s: Snapshot = serde_json::from_str(json)?;
-        if s.format_version != 1 {
+        if ![1, 2].contains(&s.format_version) {
             return Err(Error::Unsupported("document format version".into()));
         }
+        if s.format_version == 1 && !s.document.tensor.is_empty() {
+            return Err(Error::Unsupported(
+                "contextual vectors require document format v2".into(),
+            ));
+        }
         let s = s.document;
+        if !s.tensor.is_empty() {
+            let width = s.tensor[0].len();
+            if s.tensor.len() != s.tokens.len()
+                || width == 0
+                || width > 4096
+                || s.tensor
+                    .iter()
+                    .any(|row| row.len() != width || row.iter().any(|x| !x.is_finite()))
+            {
+                return Err(Error::Model("invalid document tensor".into()));
+            }
+        }
         let mut end = 0;
         let mut cp = 0;
         for (i, t) in s.tokens.iter().enumerate() {
@@ -194,6 +216,7 @@ impl Doc {
             entities: s.entities,
             sentences: s.sentences,
             noun_chunks: s.noun_chunks,
+            tensor: s.tensor,
             dependency_index: OnceLock::new(),
         })
     }

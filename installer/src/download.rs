@@ -5,18 +5,28 @@ use std::{
     path::Path,
     time::Duration,
 };
-const MAX_BYTES: u64 = 128 * 1024 * 1024;
-const URL:&str="https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl";
-pub(crate) fn download(destination: &Path, expected: &Digest) -> Result<()> {
+pub(crate) fn download(destination: &Path, release: &crate::catalog::Release) -> Result<()> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .https_only(true)
         .max_redirects(5)
-        .timeout_global(Some(Duration::from_secs(120)))
+        .timeout_global(Some(Duration::from_secs(600)))
         .build()
         .into();
-    fetch(&agent, URL, destination, expected)
+    fetch(
+        &agent,
+        &release.url,
+        destination,
+        &release.wheel_sha256,
+        release.limits.archive,
+    )
 }
-fn fetch(agent: &ureq::Agent, url: &str, destination: &Path, expected: &Digest) -> Result<()> {
+fn fetch(
+    agent: &ureq::Agent,
+    url: &str,
+    destination: &Path,
+    expected: &Digest,
+    limit: u64,
+) -> Result<()> {
     let mut last = None;
     for attempt in 0..3 {
         let result = (|| {
@@ -25,7 +35,7 @@ fn fetch(agent: &ureq::Agent, url: &str, destination: &Path, expected: &Digest) 
                 .call()
                 .map_err(|e| invalid(format!("download: {e}")))?;
             let reader = response.body_mut().as_reader();
-            copy_checked(reader, File::create(destination)?, expected)
+            copy_checked(reader, File::create(destination)?, expected, limit)
         })();
         match result {
             Ok(()) => return Ok(()),
@@ -38,7 +48,12 @@ fn fetch(agent: &ureq::Agent, url: &str, destination: &Path, expected: &Digest) 
     let _ = std::fs::remove_file(destination);
     Err(last.unwrap_or_else(|| invalid("download failed")))
 }
-fn copy_checked(mut reader: impl Read, mut output: File, expected: &Digest) -> Result<()> {
+fn copy_checked(
+    mut reader: impl Read,
+    mut output: File,
+    expected: &Digest,
+    limit: u64,
+) -> Result<()> {
     use sha2::{Digest as _, Sha256};
     let mut hash = Sha256::new();
     let mut count = 0u64;
@@ -49,7 +64,7 @@ fn copy_checked(mut reader: impl Read, mut output: File, expected: &Digest) -> R
             break;
         }
         count += n as u64;
-        if count > MAX_BYTES {
+        if count > limit {
             return Err(invalid("download exceeds size limit"));
         }
         hash.update(&bytes[..n]);

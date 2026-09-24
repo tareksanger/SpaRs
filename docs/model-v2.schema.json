@@ -1,0 +1,415 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:spars:model:2",
+  "title": "Native spaCy model manifest v2",
+  "$comment": "The Rust loader additionally validates tensor cross-dimensions, numeric bounds, rule reconstruction and operation-specific constraints.",
+  "type": "object",
+  "required": [
+    "format_version",
+    "model",
+    "model_version",
+    "versions",
+    "pipeline",
+    "config",
+    "metadata",
+    "source",
+    "wheel_sha256",
+    "weights_sha256",
+    "tensors",
+    "tokenizer",
+    "norms",
+    "symbols",
+    "lexical",
+    "tok2vec",
+    "tagger",
+    "parser",
+    "ner",
+    "attribute_rules",
+    "lemmas",
+    "vector_keys",
+    "capabilities"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 2
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "versions": {
+      "type": "object",
+      "required": [
+        "spacy",
+        "thinc"
+      ],
+      "properties": {
+        "spacy": {
+          "const": "3.8.14"
+        },
+        "thinc": {
+          "const": "8.3.13"
+        }
+      }
+    },
+    "pipeline": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "tok2vec",
+          "tagger",
+          "parser",
+          "attribute_ruler",
+          "lemmatizer",
+          "ner"
+        ]
+      }
+    },
+    "config": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "source": {
+      "type": "string",
+      "format": "uri"
+    },
+    "wheel_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "weights_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "tensors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "shape",
+          "dtype"
+        ],
+        "properties": {
+          "dtype": {
+            "const": "F32"
+          },
+          "shape": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "properties": {
+        "vectors": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "shape",
+                "dtype"
+              ],
+              "properties": {
+                "dtype": {
+                  "const": "F32"
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "shape",
+                "dtype"
+              ],
+              "properties": {
+                "shape": {
+                  "const": [
+                    0,
+                    0
+                  ]
+                },
+                "dtype": {
+                  "const": "F32"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "tokenizer": {
+      "type": "object",
+      "required": [
+        "prefix",
+        "suffix",
+        "infix",
+        "url",
+        "token_match",
+        "rules",
+        "python_patterns",
+        "regex_dialect"
+      ],
+      "properties": {
+        "faster_heuristics": {
+          "const": true,
+          "default": true
+        },
+        "regex_dialect": {
+          "const": "fancy-regex-explicit-python-unicode-v1"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "infix": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "token_match": {
+          "type": "null"
+        },
+        "rules": {
+          "type": "object"
+        },
+        "python_patterns": {
+          "type": "object"
+        }
+      }
+    },
+    "norms": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "symbols": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "lexical": {
+      "type": "object",
+      "required": [
+        "unicode_version",
+        "ranges",
+        "lower",
+        "stops",
+        "number_words",
+        "tlds",
+        "email_regex",
+        "is_bracket",
+        "is_quote",
+        "is_left_punct",
+        "is_right_punct"
+      ]
+    },
+    "tok2vec": {
+      "$ref": "#/$defs/encoder"
+    },
+    "tagger": {
+      "type": "object",
+      "required": [
+        "labels",
+        "params"
+      ]
+    },
+    "parser": {
+      "$ref": "#/$defs/transition"
+    },
+    "ner": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/transition"
+        },
+        {
+          "required": [
+            "tok2vec"
+          ],
+          "properties": {
+            "tok2vec": {
+              "$ref": "#/$defs/encoder"
+            }
+          }
+        }
+      ]
+    },
+    "attribute_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "patterns",
+          "attrs",
+          "index"
+        ]
+      }
+    },
+    "lemmas": {
+      "type": "object",
+      "required": [
+        "lemma_index",
+        "lemma_exc",
+        "lemma_rules"
+      ]
+    },
+    "vector_keys": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "language",
+        "tok2vec",
+        "embed",
+        "encode",
+        "tagger",
+        "transition",
+        "lemmatizer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "const": "en"
+        },
+        "tok2vec": {
+          "const": "spacy.Tok2Vec.v2"
+        },
+        "embed": {
+          "const": "spacy.MultiHashEmbed.v2"
+        },
+        "encode": {
+          "const": "spacy.MaxoutWindowEncoder.v2"
+        },
+        "tagger": {
+          "const": "spacy.Tagger.v2"
+        },
+        "transition": {
+          "const": "spacy.TransitionBasedParser.v2"
+        },
+        "lemmatizer": {
+          "const": "en-rule-v1"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "encoder": {
+      "type": "object",
+      "required": [
+        "width",
+        "attrs",
+        "hashes",
+        "static",
+        "mix",
+        "pad",
+        "windows",
+        "layers"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "attrs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "NORM",
+              "PREFIX",
+              "SUFFIX",
+              "SHAPE",
+              "SPACY",
+              "IS_SPACE"
+            ]
+          }
+        },
+        "pad": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          }
+        },
+        "hashes": {
+          "type": "array"
+        },
+        "static": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "mix": {
+          "type": "object"
+        },
+        "layers": {
+          "type": "array"
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": [
+        "actions",
+        "reduce",
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reduce": {
+          "type": "object"
+        },
+        "lower": {
+          "type": "object"
+        },
+        "upper": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

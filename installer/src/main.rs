@@ -56,16 +56,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unknown command".into());
     }
     let model = model.unwrap_or_else(|| OsString::from("en_core_web_md"));
-    if model != "en_core_web_md" {
-        return Err("unsupported model name".into());
-    }
+    let model: ModelName = model.to_str().ok_or("model must be UTF-8")?.parse()?;
     let version: Version = version
         .ok_or("--version is required; no implicit latest model")?
         .to_str()
         .ok_or("version must be UTF-8")?
         .parse()?;
     let archive = archive.map(PathBuf::from);
-    let installed = install(&root, archive.as_deref(), ModelName::EnCoreWebMd, version)?;
+    let installed = install(&root, archive.as_deref(), model, version)?;
     println!("{}", installed.path.display());
     Ok(())
 }

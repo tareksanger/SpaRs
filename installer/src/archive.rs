@@ -1,4 +1,4 @@
-use crate::{invalid, Digest, Result};
+use crate::{catalog::Limits, invalid, Digest, Result};
 use sha2::{Digest as _, Sha256};
 use std::{
     collections::HashSet,
@@ -7,11 +7,9 @@ use std::{
     path::{Component, Path},
 };
 use zip::ZipArchive;
-const MAX_ARCHIVE: u64 = 128 * 1024 * 1024;
-const MAX_ENTRY: u64 = 128 * 1024 * 1024;
-const MAX_TOTAL: u64 = 256 * 1024 * 1024;
 pub(crate) struct Wheel {
     archive: ZipArchive<File>,
+    limits: Limits,
 }
 pub(crate) fn hash_file(path: &Path) -> Result<Digest> {
     let mut file = File::open(path)?;
@@ -37,12 +35,12 @@ pub(crate) fn hash_reader(reader: &mut impl Read, limit: u64) -> Result<Digest> 
     Ok(Digest::from_hash(hash))
 }
 impl Wheel {
-    pub(crate) fn open(path: &Path, expected: &Digest) -> Result<Self> {
+    pub(crate) fn open(path: &Path, expected: &Digest, limits: Limits) -> Result<Self> {
         let mut file = File::open(path)?;
-        if file.metadata()?.len() > MAX_ARCHIVE {
+        if file.metadata()?.len() > limits.archive {
             return Err(invalid("archive too large"));
         }
-        if hash_reader(&mut file, MAX_ARCHIVE)? != *expected {
+        if hash_reader(&mut file, limits.archive)? != *expected {
             return Err(invalid("official archive SHA-256 mismatch"));
         }
         let declared = entry_count(&mut file)?;
@@ -71,19 +69,21 @@ impl Wheel {
             total = total
                 .checked_add(entry.size())
                 .ok_or_else(|| invalid("archive size overflow"))?;
-            if entry.size() > MAX_ENTRY || total > MAX_TOTAL {
+            if entry.size() > limits.entry || total > limits.expanded {
                 return Err(invalid("expanded archive exceeds size limit"));
             }
         }
-        Ok(Self { archive })
+        Ok(Self { archive, limits })
     }
     pub(crate) fn read(&mut self, name: &str, expected: &Digest) -> Result<Vec<u8>> {
         valid_name(name)?;
         let entry = self.archive.by_name(name)?;
         let size = usize::try_from(entry.size()).map_err(|_| invalid("entry size overflow"))?;
         let mut bytes = Vec::with_capacity(size);
-        entry.take(MAX_ENTRY + 1).read_to_end(&mut bytes)?;
-        if bytes.len() != size || bytes.len() as u64 > MAX_ENTRY || Digest::of(&bytes) != *expected
+        entry.take(self.limits.entry + 1).read_to_end(&mut bytes)?;
+        if bytes.len() != size
+            || bytes.len() as u64 > self.limits.entry
+            || Digest::of(&bytes) != *expected
         {
             return Err(invalid(format!(
                 "archive entry checksum/size mismatch: {name}"

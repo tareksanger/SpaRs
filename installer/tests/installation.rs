@@ -19,6 +19,102 @@ impl Drop for Scratch {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+
+#[test]
+#[ignore = "requires official sm/lg wheels and exports; acceptance runs it"]
+fn distinct_models_install_side_by_side_and_match_official_exports() {
+    use sha2::{Digest as _, Sha256};
+    use std::io::Read;
+    let scratch = Scratch(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("multi-model-{}", std::process::id())),
+    );
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let digest = |path: PathBuf| {
+        let mut file = fs::File::open(path).unwrap();
+        let mut hash = Sha256::new();
+        let mut bytes = [0u8; 65536];
+        loop {
+            let count = file.read(&mut bytes).unwrap();
+            if count == 0 {
+                break;
+            }
+            hash.update(&bytes[..count]);
+        }
+        hash.finalize()
+    };
+    let identities = catalog().unwrap();
+    assert_eq!(identities.len(), 3);
+    for identity in identities
+        .into_iter()
+        .filter(|entry| entry.model != ModelName::EnCoreWebMd)
+    {
+        let stem = format!("{}-{}", identity.model, identity.model_version);
+        let archive = repo.join(format!("assets/{stem}-py3-none-any.whl"));
+        let installed = install(
+            &scratch.0,
+            Some(&archive),
+            identity.model.clone(),
+            identity.model_version,
+        )
+        .unwrap();
+        assert_eq!(installed.identity, identity);
+        assert_eq!(verify(&installed.path).unwrap().identity, identity);
+        let reference = repo.join(format!("assets/{stem}"));
+        let actual: serde_json::Value =
+            serde_json::from_slice(&fs::read(installed.path.join("manifest.json")).unwrap())
+                .unwrap();
+        let expected: serde_json::Value =
+            serde_json::from_slice(&fs::read(reference.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(actual, expected, "{stem} complete manifest");
+        assert_eq!(
+            digest(installed.path.join("weights.safetensors")),
+            digest(reference.join("weights.safetensors")),
+            "{stem} tensors"
+        );
+        let repeated = install(
+            &scratch.0,
+            Some(&archive),
+            identity.model,
+            identity.model_version,
+        )
+        .unwrap();
+        assert_eq!(installed.path, repeated.path);
+        let model = spars::Model::load(&installed.path).unwrap();
+        assert!(!model
+            .process("Alice visited London.")
+            .unwrap()
+            .tokens()
+            .is_empty());
+    }
+    assert_eq!(list(&scratch.0).unwrap().len(), 2);
+    let installed = list(&scratch.0).unwrap();
+    let small = installed
+        .iter()
+        .find(|entry| entry.identity.model.to_string() == "en_core_web_sm")
+        .unwrap();
+    let large = installed
+        .iter()
+        .find(|entry| entry.identity.model.to_string() == "en_core_web_lg")
+        .unwrap();
+    let preserved_large = scratch.0.join(".saved-large");
+    fs::rename(&large.path, &preserved_large).unwrap();
+    fs::rename(&small.path, &large.path).unwrap();
+    let error = install(
+        &scratch.0,
+        None,
+        large.identity.model.clone(),
+        large.identity.model_version,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("different model identity"));
+    assert_eq!(verify(&large.path).unwrap().identity, small.identity);
+    assert_eq!(verify(&preserved_large).unwrap().identity, large.identity);
+}
 #[test]
 #[ignore = "requires official model archive and Python reference export; acceptance runs it"]
 fn official_conversion_and_installation_lifecycle() {

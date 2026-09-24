@@ -77,3 +77,16 @@ fn legacy_receipt_cannot_authorize_other_identities() {
         assert!(for_receipt(&identity, &original_digest()).is_err());
     }
 }
+
+#[test]
+fn model_receipts_cannot_authorize_another_models_recipe() {
+    for left in BUNDLES {
+        let recipe = left.load().unwrap();
+        assert!(for_receipt(&recipe.identity, &Digest::of(left.recipe)).is_ok());
+        for right in BUNDLES {
+            if left.recipe != right.recipe {
+                assert!(for_receipt(&recipe.identity, &Digest::of(right.recipe)).is_err());
+            }
+        }
+    }
+}

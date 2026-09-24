@@ -16,8 +16,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(doc.entities().is_some());
     assert!(doc.sentences().is_some());
     assert!(doc.noun_chunks().is_some());
-    assert_eq!(model.document_vector(&doc).len(), 300);
-    assert!(model.vector("Microsoft").is_some());
+    let vector = model.document_vector(&doc);
+    assert!(!vector.is_empty());
+    assert!(vector.iter().all(|value| value.is_finite()));
+    assert_eq!(
+        model.token_vector(doc.token(TokenIndex(3))?).unwrap().len(),
+        vector.len()
+    );
     assert_eq!(Doc::from_json(&doc.to_json()?)?, doc);
     for (i, t) in doc.tokens().iter().enumerate() {
         println!(

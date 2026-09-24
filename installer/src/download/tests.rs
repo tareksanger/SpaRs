@@ -5,13 +5,22 @@ fn download_stream_checks_digest_and_propagates_read_errors() {
     assert!(copy_checked(
         &b"abc"[..],
         File::create(&path).unwrap(),
-        &Digest::of(b"abc")
+        &Digest::of(b"abc"),
+        3
     )
     .is_ok());
     assert!(copy_checked(
         &b"ab"[..],
         File::create(&path).unwrap(),
-        &Digest::of(b"abc")
+        &Digest::of(b"abc"),
+        3
+    )
+    .is_err());
+    assert!(copy_checked(
+        &b"abc"[..],
+        File::create(&path).unwrap(),
+        &Digest::of(b"abc"),
+        2
     )
     .is_err());
     struct Broken;
@@ -20,7 +29,7 @@ fn download_stream_checks_digest_and_propagates_read_errors() {
             Err(std::io::Error::other("interrupted network"))
         }
     }
-    assert!(copy_checked(Broken, File::create(&path).unwrap(), &Digest::of(b"abc")).is_err());
+    assert!(copy_checked(Broken, File::create(&path).unwrap(), &Digest::of(b"abc"), 3).is_err());
     std::fs::remove_file(path).unwrap();
 }
 
@@ -54,12 +63,12 @@ fn retries_status_and_rejects_truncation() {
         b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nabc",
     ]);
-    fetch(&agent, &url, &path, &Digest::of(b"abc")).unwrap();
+    fetch(&agent, &url, &path, &Digest::of(b"abc"), 3).unwrap();
     worker.join().unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), b"abc");
     let (url, worker) =
         server(vec![b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nab"; 3]);
-    assert!(fetch(&agent, &url, &path, &Digest::of(b"abc")).is_err());
+    assert!(fetch(&agent, &url, &path, &Digest::of(b"abc"), 3).is_err());
     worker.join().unwrap();
     assert!(!path.exists());
     std::fs::remove_dir_all(dir).unwrap();
@@ -77,7 +86,8 @@ fn https_only_prevents_downgrade_and_timeouts_are_bounded() {
         &secure,
         "http://127.0.0.1:1/model",
         &path,
-        &Digest::of(b"abc")
+        &Digest::of(b"abc"),
+        3
     )
     .is_err());
     use std::net::TcpListener;
@@ -94,7 +104,7 @@ fn https_only_prevents_downgrade_and_timeouts_are_bounded() {
         .timeout_global(Some(Duration::from_millis(30)))
         .build()
         .into();
-    assert!(fetch(&agent, &url, &path, &Digest::of(b"abc")).is_err());
+    assert!(fetch(&agent, &url, &path, &Digest::of(b"abc"), 3).is_err());
     worker.join().unwrap();
     assert!(!path.exists());
     std::fs::remove_dir_all(dir).unwrap();

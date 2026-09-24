@@ -72,12 +72,8 @@ pub fn install(
     model: ModelName,
     version: Version,
 ) -> Result<InstalledModel> {
-    let recipe = recipe::load()?;
-    if recipe.identity.model != model || recipe.identity.model_version != version {
-        return Err(invalid(
-            "unsupported model release; update the installer compatibility catalog",
-        ));
-    }
+    let release = crate::catalog::find(&model, version)?;
+    let recipe = recipe::select(&model, version)?;
     fs::create_dir_all(root)?;
     directory(root)?;
     let lock_path = root.join(".install.lock");
@@ -106,7 +102,13 @@ pub fn install(
     })?;
     let destination = root.join(recipe.identity.directory_name());
     if destination.try_exists()? {
-        return verify(&destination);
+        let installed = verify(&destination)?;
+        if installed.identity != recipe.identity {
+            return Err(invalid(
+                "installation directory contains a different model identity",
+            ));
+        }
+        return Ok(installed);
     }
     // The OS lock is released on process exit; a later invocation can clean up
     // the deterministic staging directory left by an interrupted installation.
@@ -121,11 +123,11 @@ pub fn install(
     let archive = match archive {
         Some(path) => path,
         None => {
-            download::download(&downloaded, &recipe.identity.wheel_sha256)?;
+            download::download(&downloaded, &release)?;
             &downloaded
         }
     };
-    let mut wheel = Wheel::open(archive, &recipe.identity.wheel_sha256)?;
+    let mut wheel = Wheel::open(archive, &recipe.identity.wheel_sha256, release.limits)?;
     convert::convert(&mut wheel, &recipe, &stage.0)?;
     drop(wheel);
     crate::integrity::manifest(&stage.0.join("manifest.json"), &recipe)?;
@@ -149,7 +151,7 @@ pub fn install(
     }
     let receipt = Receipt {
         identity: recipe.identity.clone(),
-        recipe_sha256: Digest::of(recipe::RECIPE),
+        recipe_sha256: Digest::of(recipe.bundle.recipe),
         files,
     };
     let receipt_path = stage.0.join("installation.json");
@@ -175,6 +177,7 @@ pub fn verify(path: &Path) -> Result<InstalledModel> {
     }
     let receipt: Receipt = serde_json::from_slice(&fs::read(receipt_path)?)?;
     let recipe = recipe::for_receipt(&receipt.identity, &receipt.recipe_sha256)?;
+    let release = crate::catalog::find(&recipe.identity.model, recipe.identity.model_version)?;
     let expected = required_files(&recipe);
     if receipt.files.keys().ne(expected.iter()) {
         return Err(invalid("installation inventory differs from recipe"));
@@ -188,7 +191,7 @@ pub fn verify(path: &Path) -> Result<InstalledModel> {
         {
             return Err(invalid("receipt differs from pinned file checksum"));
         }
-        if record.bytes > 128 * 1024 * 1024 {
+        if record.bytes > release.limits.installed_file {
             return Err(invalid("installed file exceeds size limit"));
         }
         if fs::metadata(&file)?.len() != record.bytes || hash_file(&file)? != record.sha256 {

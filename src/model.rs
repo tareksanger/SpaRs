@@ -20,17 +20,39 @@ impl Model {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let config: Manifest = serde_json::from_slice(&std::fs::read(path.join("manifest.json"))?)?;
-        if config.format_version != 1 {
-            return Err(Error::Unsupported("format_version".into()));
-        }
-        if config.model != "en_core_web_md" || config.model_version != "3.8.0" {
-            return Err(Error::Unsupported(
-                "only en_core_web_md 3.8.0 is supported".into(),
-            ));
+        match config.format_version {
+            1 if config.model == "en_core_web_md"
+                && config.model_version == "3.8.0"
+                && config.capabilities.is_none()
+                && config.tok2vec.static_vectors.is_some()
+                && config.ner.tok2vec.static_vectors.is_some() => {}
+            1 => {
+                return Err(Error::Unsupported(
+                    "legacy v1 requires en_core_web_md 3.8.0 and its static encoders".into(),
+                ))
+            }
+            2 => {
+                config
+                    .capabilities
+                    .as_ref()
+                    .ok_or_else(|| {
+                        Error::Unsupported("v2 requires explicit runtime capabilities".into())
+                    })?
+                    .validate();
+                if config.model.trim().is_empty() || config.model_version.trim().is_empty() {
+                    return Err(Error::Model("missing model identity".into()));
+                }
+            }
+            _ => return Err(Error::Unsupported("format_version".into())),
         }
         crate::validation::resources(&config)?;
         let bytes = std::fs::read(path.join("weights.safetensors"))?;
-        if format!("{:x}", Sha256::digest(&bytes)) != config.weights_sha256 {
+        if Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+            != config.weights_sha256
+        {
             return Err(Error::Model("weights checksum mismatch".into()));
         }
         let st = safetensors::SafeTensors::deserialize(&bytes)
@@ -43,7 +65,8 @@ impl Model {
             if spec.dtype != Dtype::F32
                 || t.dtype() != safetensors::Dtype::F32
                 || shape != t.shape()
-                || shape.contains(&0)
+                || (shape.contains(&0)
+                    && !(config.format_version == 2 && name == "vectors" && shape == [0, 0]))
             {
                 return Err(Error::Model(format!("invalid shape/dtype for {name}")));
             }
@@ -57,6 +80,8 @@ impl Model {
             }
             tensors.insert(name.clone(), Tensor { shape, data });
         }
+        drop(st);
+        drop(bytes);
         let tokenizer = Tokenizer::new(&config.tokenizer)?;
         let vector_keys = config.vector_keys.clone();
         let norms = config.norms.clone();
@@ -114,9 +139,23 @@ impl Model {
         end: crate::TokenIndex,
     ) -> Result<Vec<f32>> {
         doc.span_text(start, end)?;
-        let mut v = vec![0.; self.tensors["vectors"].shape[1]];
+        let static_width = self.tensors["vectors"].shape[1];
+        let contextual = static_width == 0 && start != end && !doc.tensor.is_empty();
+        let mut v = vec![
+            0.;
+            if contextual {
+                doc.tensor[0].len()
+            } else {
+                static_width
+            }
+        ];
         for i in start.0..end.0 {
-            if let Some(x) = self.vector(doc.token_text(crate::TokenIndex(i))?) {
+            let vector = if contextual {
+                Some(doc.tensor[i].as_slice())
+            } else {
+                self.vector(doc.token_text(crate::TokenIndex(i))?)
+            };
+            if let Some(x) = vector {
                 for (a, b) in v.iter_mut().zip(x) {
                     *a += b
                 }
@@ -154,8 +193,17 @@ impl Model {
     }
 }
 impl Model {
-    pub fn token_vector(&self, token: crate::TokenView<'_>) -> Option<&[f32]> {
-        self.vector(token.text())
+    pub fn token_vector<'a>(&'a self, token: crate::TokenView<'a>) -> Option<&'a [f32]> {
+        if self.tensors["vectors"].shape[1] == 0 {
+            token
+                .span()
+                .doc
+                .tensor
+                .get(token.index().0)
+                .map(Vec::as_slice)
+        } else {
+            self.vector(token.text())
+        }
     }
     pub fn span_similarity(&self, a: crate::SpanView<'_>, b: crate::SpanView<'_>) -> f32 {
         if a.end.0 - a.start.0 == b.end.0 - b.start.0

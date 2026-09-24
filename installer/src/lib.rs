@@ -1,5 +1,6 @@
 //! Explicit native installation of pinned official spaCy packages.
 mod archive;
+mod catalog;
 mod convert;
 mod download;
 mod identity;

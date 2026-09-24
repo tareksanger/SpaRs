@@ -19,6 +19,11 @@ class ReferenceComparisonTests(unittest.TestCase):
             ((0, 'ner_stages', 0, 0, 0), NumericalKind.ACTIVATION, 3e-5),
             ((0, 'parser', 0, 'scores', 0), NumericalKind.SCORE, 2.1e-4),
             (('cases', 0, 'vector', 0), NumericalKind.VECTOR, 3e-6),
+            (('vector_cases', 0, 'tokens', 0, 0), NumericalKind.ACTIVATION, 3e-5),
+            (('vector_cases', 0, 'document', 0), NumericalKind.VECTOR, 3e-6),
+            (('vector_cases', 0, 'span', 0), NumericalKind.VECTOR, 3e-6),
+            (('vector_cases', 0, 'empty_span', 0), NumericalKind.VECTOR, 3e-6),
+            (('reordered', 0, 'vector', 0), NumericalKind.VECTOR, 3e-6),
         ]
         for path, kind, delta in cases:
             with self.subTest(kind=kind):

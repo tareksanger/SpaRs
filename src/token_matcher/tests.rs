@@ -13,6 +13,7 @@ fn doc(text: &str) -> Doc {
         entities: None,
         sentences: None,
         noun_chunks: None,
+        tensor: Vec::new(),
         dependency_index: OnceLock::new(),
     }
 }

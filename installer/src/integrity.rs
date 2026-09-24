@@ -1,9 +1,5 @@
 //! Compare installed JSON data with the independently generated reference recipe.
-use crate::{
-    invalid,
-    recipe::{self, Recipe},
-    Digest, Result,
-};
+use crate::{invalid, recipe::Recipe, Digest, Result};
 use serde_json::Value;
 use std::{io::Read, path::Path};
 pub(crate) fn manifest(path: &Path, recipe: &Recipe) -> Result<()> {
@@ -13,7 +9,7 @@ pub(crate) fn manifest(path: &Path, recipe: &Recipe) -> Result<()> {
     let Value::Object(mut actual) = checked.0 else {
         return Err(invalid("manifest must be an object"));
     };
-    let expected: serde_json::Map<String, Value> = serde_json::from_slice(recipe::TEMPLATE)?;
+    let expected: serde_json::Map<String, Value> = serde_json::from_slice(recipe.bundle.template)?;
     for (name, digest) in [
         ("vector_keys", &recipe.lookup_sha256.vector_keys),
         ("lemmas", &recipe.lookup_sha256.lemmas),
@@ -41,9 +37,9 @@ pub(crate) fn expected_file(name: &str, recipe: &Recipe) -> Result<Digest> {
         struct Weights {
             weights_sha256: Digest,
         }
-        return Ok(serde_json::from_slice::<Weights>(recipe::TEMPLATE)?.weights_sha256);
+        return Ok(serde_json::from_slice::<Weights>(recipe.bundle.template)?.weights_sha256);
     }
-    let entry = format!("en_core_web_md/en_core_web_md-3.8.0/{name}");
+    let entry = format!("{}{name}", recipe.prefix());
     recipe
         .inputs
         .get(&entry)

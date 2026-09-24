@@ -116,7 +116,10 @@ fn damaged_tensor_files_reach_validation_after_checksum_is_updated() {
         }),
     ] {
         let mut invalid = manifest.clone();
-        invalid["weights_sha256"] = json!(format!("{:x}", Sha256::digest(&bytes)));
+        invalid["weights_sha256"] = json!(Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>());
         tmp.write(&invalid, &bytes);
         let error = load_error(&tmp.0, name);
         assert!(matches!(error, Error::Model(_)), "{name}: {error}");
@@ -191,7 +194,7 @@ fn malformed_snapshots_reject_unicode_offsets_indices_and_spans() {
         }
     }
     let mut unsupported = valid.clone();
-    unsupported["format_version"] = json!(2);
+    unsupported["format_version"] = json!(3);
     assert!(matches!(
         Doc::from_json(&unsupported.to_string()),
         Err(Error::Unsupported(_))

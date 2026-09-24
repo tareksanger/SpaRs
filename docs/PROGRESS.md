@@ -1,14 +1,14 @@
 # SpaRs implementation status
 
-## English inference — verified 2026-09-16
+## English inference
 
-SpaRs implements native Rust inference for `en_core_web_md` 3.8.0, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. The supported pipeline includes tokenization, lexical features, neural encoding, tags, dependencies, attribute rules, lemmas, entities, sentences, noun chunks, and static vectors. The [compatibility inventory](COMPATIBILITY.md) lists remaining library features.
+SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. The supported pipeline includes tokenization, lexical features, neural encoding, tags, dependencies, attribute rules, lemmas, entities, sentences, noun chunks, static vectors for `md`/`lg`, and contextual vectors for `sm`. The [compatibility inventory](COMPATIBILITY.md) lists remaining library features.
 
 ## Current evidence
 
 | Check | Verified scope |
 |---|---|
-| Original full-pipeline suites | 44 documents / 1,035 tokens |
+| Original md full-pipeline suites | 44 documents / 1,035 tokens |
 | Expanded domain and length coverage | 98 documents / 5,568 tokens, including documents of 896 and 3,584 tokens |
 | Tokenizer boundary regressions | 24 documents / 120 tokens |
 | Fresh post-fix comparison | 24 documents / 306 tokens; evaluated after the tokenizer correction |
@@ -20,17 +20,19 @@ SpaRs implements native Rust inference for `en_core_web_md` 3.8.0, using spaCy 3
 | New robustness checks | 9 malformed configurations, 4 damaged tensors, 27 malformed snapshots, 3 invalid UTF-8 offsets, and 28 processing results across repeated, batched, and concurrent calls |
 | Dependency traversal | 98 documents / 5,568 tokens compared with official children, ancestors, subtree order, and sentence spans |
 | Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
-| Executed Rust Markdown examples | 1 README example and 7 guide examples |
+| Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `tests/model_parity.rs` |
+| Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `tests/model_loading.rs` and `tests/model_parity.rs` |
+| Executed Rust Markdown examples | 1 README example and 8 guide examples |
 | Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API and async lifecycle/error tests |
 | Executed TypeScript guide examples | 2 examples checked and run from Markdown |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 8 Rust and 2 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 9 Rust and 2 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
-Runtime model configuration uses typed Rust records and enums instead of generic JSON values. Python tools use strict Pyright checking, named records, and checked conversions at external-data boundaries. Regression tests reject wrong field types, unknown operators, invalid null constraints, booleans used as integers, and typing-policy bypasses. The exported model format and frozen reference expectations remain unchanged.
+Runtime model configuration uses typed Rust records and enums instead of generic JSON values. Python tools use strict Pyright checking, named records, and checked conversions at external-data boundaries. Regression tests reject wrong field types, unknown operators, invalid null constraints, booleans used as integers, and typing-policy bypasses. Legacy v1 assets and existing frozen reference expectations remain unchanged; additional models use v2.
 
 ## What the expanded evaluation found
 
@@ -42,7 +44,7 @@ These are synthetic, project-authored examples. They broaden coverage but do not
 
 ## Model provenance
 
-The official model wheel has SHA-256 `5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310`. The exporter copies 69 F32 tensors, configuration, linguistic resources, and license notices. Source hashes verified against the official wheel are recorded in [source-lock.json](../reference/source-lock.json). For spaCy 3.8.14, wheel-shipped source was used because a source archive was unavailable at acquisition.
+The official `en_core_web_md` 3.8.0 wheel has SHA-256 `5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310`. Other supported releases are pinned in [the model catalog](../models/catalog.json). The medium-model exporter copies 69 F32 tensors, configuration, linguistic resources, and license notices. Source hashes verified against the official wheel are recorded in [source-lock.json](../reference/source-lock.json). For spaCy 3.8.14, wheel-shipped source was used because a source archive was unavailable at acquisition.
 
 ## Fixture generator limitation
 
@@ -54,18 +56,42 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Versioned model installation without Python or a project-hosted deployment, following the plan below. The pinned installation path is implemented; support for further releases remains planned.
+1. Model extensibility for all official pretrained pipelines, following the plan below. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
 2. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering. This remains the next matcher feature.
 
-Document editing, broader serialization, additional pipelines and languages, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
+Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
 The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, and static word vectors. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, explicit model installation, and binary packaging for supported platforms. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
+
+## Model extensibility plan
+
+The target is native loading and inference for all official spaCy pretrained pipelines across languages, sizes, and architectures. Official releases must be identified by version and source provenance; this target does not promise automatic compatibility with unknown future release formats. Custom-trained pipeline loading is future scope. Its model data and additional native components should fit the same contracts, without a second loader or a requirement that every model originate in the official catalog. Executing arbitrary Python components and training models are separate capabilities, not prerequisites for this target.
+
+The [v2 loader](../src/model.rs) checks explicit capability declarations independently of model identity. [Pipeline execution](../src/pipeline.rs) follows declared component order and validates dependencies; shared and NER encoders allow static vectors to be absent. The [installer](../installer/src/recipe.rs) selects conversion recipes by typed catalog identity and applies per-release limits. The three English sizes have separate reference coverage. Remaining constraints include a manifest that still requires all six English component configurations, English language behavior, and the implemented CNN and greedy-transition architectures. These must be extended before other pipeline families can execute.
+
+### Separate acquisition, configuration, and execution
+
+The architecture separates three responsibilities: decode model assets, check that the runtime implements the declared capabilities, and construct an executable pipeline. Track release-specific reference evidence separately from those capability checks. A catalog entry supplies identity, source locations, checksums, resource provenance, and archive limits; it must not define inference behavior through model-name branches. A new official model using implemented capabilities should need model data, acquisition metadata, and reference evidence without a runtime source change.
+
+Use typed, versioned configuration for component factories (constructors for pipeline stages) and neural architectures, including tensor references and operation-specific validation. Resolve component instances from their declared order and dependencies on shared encoders, which are networks that produce token features for multiple components. Do not assume every model has a tagger, parser, lemmatizer, and NER in the English medium sequence. Language-specific tokenization, lexical rules, lemmatization, and noun chunks need their own resources or native implementations. Missing capabilities must identify the component, architecture, language behavior, or format that is unsupported; never silently substitute English behavior or omit a requested component.
+
+Keep registration of native component implementations separate from the model catalog. Future custom-trained pipelines built from supported components should reuse the same loading and execution contracts. Additional custom behavior will require a registered native implementation and its validation contract. This extension point does not require a Python fallback, loading separately compiled native plugins, or a training API now. Loaded models remain immutable and reusable, with state owned by each processing call.
+
+### Implementation order and acceptance
+
+1. Inventory the components, architectures, language resources, and serialization requirements of version-pinned official pipelines. Group work by shared capabilities and record gaps in the compatibility inventory. Include transformer and language-specific families; the English sizes are initial acceptance cases, not the complete scope.
+2. Separate typed model identity and acquisition metadata from reusable conversion and runtime configuration. Introduce the required versioned format changes with an explicit path for existing v1 assets. Preserve checksum, tensor, resource, and unsupported-configuration checks. Test two distinct model identities without duplicating conversion or inference logic.
+3. Construct pipeline execution from typed component configurations and dependencies. Add independent cases for shared encoders, missing or reordered components, unavailable annotations, and invalid dependencies. Preserve the existing English pipeline's reference outputs and performance while removing its role as the universal pipeline shape.
+4. Validate `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` as initial real model cases, implementing their actual declared requirements, including models without static vectors. Each needs its own official reference outputs. Keep the existing frozen `md` suite; measure installation, loading, peak memory, and inference separately for each size.
+5. Implement the remaining shared components, neural architectures, and language behavior identified by the official-model inventory, including transformer pipelines. Extend native conversion, reference tests, and consumer examples for each family. The all-official-pipelines target remains incomplete until every release in the declared version-pinned inventory passes its required checks.
+
+Use the [quality process](QUALITY.md) for each bounded change. Synthetic configuration tests establish validation and extension mechanics, not compatibility with a real model. New weights and languages require their own reference evidence even when they reuse existing runtime code. The following installation requirements also apply to additional models.
 
 ## Versioned model installation plan
 
 The first target is the official `en_core_web_md` 3.8.0 package. A native installer will download and verify official assets, convert them into the supported native format, and return an installed model location. Installation must work without Python, Node, WASM, or subprocess-based conversion. Loading and processing remain offline. No project-hosted model service or release attachment is required. Python remains available to maintainers for generating reference data and checking conversion.
 
-The [native installer](MODEL_INSTALLATION.md) implements the first pinned package conversion, downloads, verification, listing, and repeat-safe installation. Its model-dependent test compares every manifest field and all tensor bytes with the Python export. The versioned identities and catalog establish the boundary for updates; a second validated release, automatic update discovery, and removal commands remain unimplemented. The milestones below retain the acceptance requirements for extending this work.
+The [native installer](MODEL_INSTALLATION.md) implements catalog-selected package conversion, downloads, verification, listing, and repeat-safe installation. Its model-dependent test compares every manifest field and all tensor bytes with the Python export. The versioned identities and catalog establish the boundary for updates; sm/md/lg 3.8.0 have native conversion comparisons; automatic update discovery and removal commands remain unimplemented. The milestones below retain the acceptance requirements for extending this work.
 
 ### 1. Define model identity and account for every resource
 
@@ -93,7 +119,7 @@ Acceptance: controlled download tests cover truncation, bad checksums, unavailab
 
 Store supported releases side by side, keyed by complete installation identity. Applications select an exact installed version or path. Installing a newer release does not switch an application's model. Provide listing, verification, and explicit removal; rollback means selecting the retained prior installation. Do not delete older models automatically or mutate a loaded model. A new supported release may initially require an installer/library update to obtain its reviewed catalog entry and conversion recipe.
 
-The current loader pins model and reference versions. Introduce explicit compatibility entries only as new releases pass evaluation; do not remove those checks or replace them with a broad version range. New weights on a supported architecture still require reference evaluation. Different architectures or resource semantics may require Rust changes and a new native format version.
+Legacy v1 loading pins the original model identity. V2 loading uses typed capability contracts, while the installer catalog and frozen reference suites retain release-specific evidence. Preserve capability and reference-version validation; broad version ranges are not evidence of compatibility. New weights on a supported architecture still require reference evaluation. Different architectures or resource semantics may require reusable Rust implementations and a new native format version.
 
 Acceptance: lifecycle tests install two distinct identities, select each deterministically, reject unsupported combinations, and preserve the old installation through failed updates. Synthetic records can test lifecycle mechanics but cannot establish compatibility with a real second model. Declare a second upstream release supported only after its own pinned reference and parity suite pass.
 

@@ -1,0 +1,41 @@
+[
+  {
+    "model": "en_core_web_md",
+    "version": "3.8.0",
+    "wheel_sha256": "5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310",
+    "url": "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+    "format_version": 1,
+    "limits": {
+      "archive": 134217728,
+      "entry": 134217728,
+      "expanded": 268435456,
+      "installed_file": 134217728
+    }
+  },
+  {
+    "model": "en_core_web_sm",
+    "version": "3.8.0",
+    "wheel_sha256": "1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85",
+    "url": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "format_version": 2,
+    "limits": {
+      "archive": 134217728,
+      "entry": 134217728,
+      "expanded": 268435456,
+      "installed_file": 134217728
+    }
+  },
+  {
+    "model": "en_core_web_lg",
+    "version": "3.8.0",
+    "wheel_sha256": "293e9547a655b25499198ab15a525b05b9407a75f10255e405e8c3854329ab63",
+    "url": "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
+    "format_version": 2,
+    "limits": {
+      "archive": 400658291,
+      "entry": 411501728,
+      "expanded": 445159665,
+      "installed_file": 445159665
+    }
+  }
+]
