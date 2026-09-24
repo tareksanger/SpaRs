@@ -565,16 +565,6 @@ dependencies = [
 
 [[package]]
 name = "safetensors"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "172dd94c5a87b5c79f945c863da53b2ebc7ccef4eca24ac63cca66a41aab2178"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "safetensors"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79b079b829cb27a1c3c374341345ed2e8b2c0c839034522cee576c140bd7f846"
@@ -680,7 +670,7 @@ dependencies = [
  "fs2",
  "libc",
  "rmpv",
- "safetensors 0.6.2",
+ "safetensors",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -696,7 +686,7 @@ version = "0.1.0"
 dependencies = [
  "fancy-regex",
  "matrixmultiply",
- "safetensors 0.8.0",
+ "safetensors",
  "serde",
  "serde_json",
  "sha2 0.11.0",
