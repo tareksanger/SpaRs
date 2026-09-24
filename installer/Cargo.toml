@@ -13,7 +13,7 @@ description = "Explicit native model installation for SpaRs"
 spars = { package = "spars-nlp", path = ".." }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
-sha2 = "0.10"
+sha2 = "0.11"
 thiserror = "2"
 fs2 = "0.4"
 libc = "0.2"
