@@ -33,16 +33,52 @@ class WorkflowTests(unittest.TestCase):
             with self.subTest(workflow=path.name):
                 check_action_pins(path.read_text())
 
-    def test_model_reference_regeneration_has_a_required_canonical_job(self) -> None:
+    def test_platform_checks_keep_required_coverage_without_full_duplication(self) -> None:
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/ci.yml').read_text()
-        self.assertRegex(workflow, r"os: ubuntu-latest\n\s+model-reference-args: --model-exports-only")
-        self.assertRegex(workflow, r"os: macos-latest\n\s+model-reference-args: ''")
-        self.assertIn('test "$(uname -m)" = arm64', workflow)
-        self.assertIn('tools/verify.py ${{ matrix.model-reference-args }}', workflow)
         job = workflow.split('  reference-and-rust:', 1)[1].split('  native-installation:', 1)[0]
+        self.assertIn('os: [ubuntu-latest, macos-latest]', job)
         self.assertIn('name: reference-and-rust (${{ matrix.os }})', job)
         self.assertNotIn('continue-on-error:', job)
-        self.assertEqual(re.findall(r'^\s+if: (.*)$', job, re.MULTILINE), ["runner.os == 'macOS'", 'always()'])
+        self.assertIn('test "$(uname -m)" = arm64', job)
+        steps = job.split('      - ')
+        for command, condition in (
+            ('npm --prefix tools ci', "runner.os == 'Linux'"),
+            ('tools/verify.py --model-exports-only', "runner.os == 'Linux'"),
+            ('tools/benchmark.py', "runner.os == 'Linux'"),
+            ('tools/check_models.py', "runner.os == 'macOS'"),
+            ('native-consumer-check "$model_path"', "runner.os == 'macOS'"),
+        ):
+            matches = [step for step in steps if command in step]
+            self.assertEqual(len(matches), 1, command)
+            self.assertEqual(re.findall(r'^        if: (.*)$', matches[0], re.MULTILINE), [condition])
+            self.assertNotIn('continue-on-error:', matches[0])
+        reference = next(step for step in steps if 'tools/check_models.py' in step)
+        self.assertEqual(re.findall(r'^        run: (.*)$', reference, re.MULTILINE),
+                         ['.venv/bin/python tools/check_models.py'])
+        smoke = next(step for step in steps if 'native-consumer-check "$model_path"' in step)
+        self.assertIn('en_core_web_sm en_core_web_md en_core_web_lg', smoke)
+        self.assertIn('npm --prefix bindings/node run build', smoke)
+        self.assertIn('cargo build --release --locked --offline --manifest-path crates/spars-model/Cargo.toml', smoke)
+        self.assertIn('cargo build --release --locked --offline --manifest-path consumer/Cargo.toml', smoke)
+        self.assertIn('--archive "assets/$model-3.8.0-py3-none-any.whl" --root target/macos-smoke-models', smoke)
+        self.assertIn('env -i PATH= target/release/spars-model verify "$model_path"', smoke)
+        self.assertIn('env -i PATH= consumer/target/release/native-consumer-check', smoke)
+        self.assertIn('bindings/node/scripts/smoke.mts "$model_path"', smoke)
+        self.assertIn('if: always()', next(step for step in steps if 'actions/upload-artifact@' in step))
+
+    def test_rust_jobs_cache_both_workspaces_without_skipping_checks(self) -> None:
+        workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/ci.yml').read_text()
+        for name in ('reference-and-rust', 'native-installation'):
+            # Job boundaries have exactly two leading spaces.
+            job = re.split(r'\n  [a-z][a-z-]*:', workflow.split('  ' + name + ':', 1)[1])[0]
+            steps = job.split('      - ')
+            cache = next(step for step in steps if 'Swatinem/rust-cache@' in step)
+            self.assertIn('. -> target', cache)
+            self.assertIn('consumer -> target', cache)
+            self.assertIn("save-if: ${{ github.ref == 'refs/heads/main' }}", cache)
+            self.assertLess(job.index('dtolnay/rust-toolchain@'), job.index('Swatinem/rust-cache@'))
+            self.assertLess(job.index('Swatinem/rust-cache@'), job.index('cargo fetch'))
+            self.assertNotIn('cache-hit', job)
 
     def test_unpinned_and_alternate_action_declarations_fail(self) -> None:
         pinned = '  - uses: example/action@' + 'a' * 40 + ' # v1\n'
