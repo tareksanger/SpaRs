@@ -1,22 +1,49 @@
-// Publish only the merged release PR whose exact commit passed native-fidelity.
-module.exports = async ({ github, context, core }) => {
-  const run = context.payload.workflow_run;
+// Only merging a prepared release PR starts publication; registry uploads remain manual.
+module.exports = async ({ github, context, core,
+  wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  attempts = 120 }) => {
   const repo = context.repo;
-  if (run.conclusion !== 'success' || run.event !== 'push' ||
-      run.head_branch !== 'main' || run.head_repository.full_name !== `${repo.owner}/${repo.repo}`) {
-    throw new Error('Expected successful main-branch push CI from this repository');
+  const event = context.payload.pull_request;
+  if (context.eventName !== 'pull_request' || context.payload.action !== 'closed' ||
+      !event?.merged || event.base.ref !== 'main' ||
+      !event.labels.some(label => label.name === 'autorelease: pending')) {
+    throw new Error('Publish requires a merged release PR');
   }
-  const sha = run.head_sha;
-  const prs = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-    ...repo, commit_sha: sha, per_page: 100,
-  });
-  const candidates = prs.filter(pr => pr.merged_at && pr.merge_commit_sha === sha &&
-    pr.base.ref === 'main' && pr.labels.some(label => label.name === 'autorelease: pending'));
-  if (candidates.length === 0) {
-    core.info('No pending release PR at the verified commit');
-    return;
+  const issue_number = event.number;
+  const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: issue_number });
+  const pending = pr.labels.some(label => label.name === 'autorelease: pending');
+  const tagged = pr.labels.some(label => label.name === 'autorelease: tagged');
+  const sha = pr.merge_commit_sha;
+  if (!pr.merged_at || pr.base.ref !== 'main' ||
+      pr.base.repo.full_name !== `${repo.owner}/${repo.repo}` ||
+      typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha) || sha !== event.merge_commit_sha || (!pending && !tagged)) {
+    throw new Error('Select a merged release PR targeting this repository main branch');
   }
-  if (candidates.length !== 1) throw new Error('Ambiguous release PR');
+  // Read CI for the release merge commit, even if main has advanced since then.
+  // Do not filter to successful runs: a newer failed/in-progress run must block publication.
+  let verified = false;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const { data } = await github.rest.actions.listWorkflowRuns({ ...repo, workflow_id: 'ci.yml',
+      head_sha: sha, event: 'push', branch: 'main', per_page: 100 });
+    const run = data.workflow_runs[0];
+    if (run) {
+      if (run.head_sha !== sha || run.event !== 'push' || run.head_branch !== 'main' ||
+          run.head_repository?.full_name !== `${repo.owner}/${repo.repo}`) {
+        throw new Error('Expected successful main-branch push CI for the release merge commit');
+      }
+      if (run.status === 'completed') {
+        if (run.conclusion !== 'success') {
+          throw new Error('Release merge CI was not successful; fix or rerun CI, then rerun this release job');
+        }
+        core.info(`Publishing PR #${issue_number} at ${sha}, verified by CI run ${run.id}`);
+        verified = true;
+        break;
+      }
+    }
+    core.info('Waiting for native-fidelity push CI on the release merge commit');
+    if (attempt + 1 < attempts) await wait(20000);
+  }
+  if (!verified) throw new Error('Timed out waiting for successful release merge CI; rerun this release job once CI passes');
   const read = async path => {
     const { data } = await github.rest.repos.getContent({ ...repo, path, ref: sha });
     if (data.type !== 'file' || data.encoding !== 'base64') throw new Error(`Cannot read ${path}`);
@@ -44,16 +71,19 @@ module.exports = async ({ github, context, core }) => {
   if (ref) {
     if (ref.object.type !== 'commit' || ref.object.sha !== sha) throw new Error('Release tag conflicts with verified commit');
   } else {
+    if (!pending) throw new Error('Previously published release tag is missing');
     await github.rest.git.createRef({ ...repo, ref: `refs/tags/${tag}`, sha });
   }
   const existing = await getOrMissing(() => github.rest.repos.getReleaseByTag({ ...repo, tag }));
   if (existing) {
     if (existing.draft || existing.prerelease || existing.body !== body) throw new Error('Existing release differs from reviewed release notes');
   } else {
+    if (!pending) throw new Error('Previously published GitHub Release is missing');
     await github.rest.repos.createRelease({ ...repo, tag_name: tag, target_commitish: sha,
       name: tag, body, draft: false, prerelease: false });
   }
-  const issue_number = candidates[0].number;
-  await github.rest.issues.addLabels({ ...repo, issue_number, labels: ['autorelease: tagged'] });
-  await github.rest.issues.removeLabel({ ...repo, issue_number, name: 'autorelease: pending' });
+  if (pending) {
+    await github.rest.issues.addLabels({ ...repo, issue_number, labels: ['autorelease: tagged'] });
+    await github.rest.issues.removeLabel({ ...repo, issue_number, name: 'autorelease: pending' });
+  }
 };
