@@ -8,7 +8,7 @@ fn rust_download_and_short_cli_share_environment_resolution() {
     fs::create_dir_all(&project).unwrap();
     let project = fs::canonicalize(project).unwrap();
     let archive = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../assets/en_core_web_sm-3.8.0-py3-none-any.whl");
+        .join("../../assets/en_core_web_sm-3.8.0-py3-none-any.whl");
     let store = project.join("models");
     let options = DownloadOptions {
         path: Some(store.clone()),

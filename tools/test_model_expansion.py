@@ -44,7 +44,7 @@ class ModelExpansionTests(unittest.TestCase):
                 validate_configuration(text, mode, attr)
 
     def test_new_model_provenance_is_checked_against_official_wheel(self) -> None:
-        path = Path('installer/models/en_core_web_sm/source-lock.json')
+        path = Path('crates/spars-model/models/en_core_web_sm/source-lock.json')
         original = read_json(path)
         self.assertEqual(json.loads(model_source_lock(original, 'en_core_web_sm')), original)
         for field in ['version', 'release', 'tokenizer', 'attribute_ruler/patterns', 'LICENSE', 'inventory']:

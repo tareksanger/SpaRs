@@ -8,13 +8,13 @@ Set `SPARS_MODEL_DIR` in the environment used by both the downloader and applica
 
 ```sh
 export SPARS_MODEL_DIR="./target/models"
-cargo install --path installer --bin spars --locked
+cargo install --path crates/spars-model --bin spars --locked
 spars download en_core_web_lg
 ```
 
 The Node package supplies the same `spars download` command and a `downloadModel` API without requiring a separate CLI build; see [Node setup](NODE.md). The command accepts `--path DIR`, `--archive WHEEL`, and `--version VERSION`. A path override applies only to that operation. Neither downloader edits shell files, `.env`, or project JSON. Environment discovery and operating-system cache defaults are shared by Rust and Node. The root Rust library remains offline and has no networking dependency.
 
-Rust applications use `spars_model::download_model("en_core_web_lg", spars_model::DownloadOptions::default())` from the separate `spars-model` crate (available at `installer/` in this checkout). Set `DownloadOptions.path`, `.archive`, or `.version` for explicit overrides. Inference then uses `spars::Model::load("en_core_web_lg")`. Applications managing multiple roots can use `spars::ModelStore::new(path).load(name)` without changing environment variables.
+Rust applications use `spars_model::download_model("en_core_web_lg", spars_model::DownloadOptions::default())` from the separate `spars-model` crate (available at `crates/spars-model/` in this checkout). Set `DownloadOptions.path`, `.archive`, or `.version` for explicit overrides. Inference then uses `spars::Model::load("en_core_web_lg")`. Applications managing multiple roots can use `spars::ModelStore::new(path).load(name)` without changing environment variables.
 
 A completed download records the selected version in a small plain-text record under the model root's `.spars` directory. This is installation metadata, not project configuration. Loading reads that bounded record, validates the selected directory and model identity, and never picks an arbitrary version by scanning. Repeating a download verifies and selects that installation; older versioned directories remain intact. The legacy `install` command below still returns a directory directly and does not select it for name-based loading.
 
@@ -23,7 +23,7 @@ A completed download records the selected version in a small plain-text record u
 Run from the repository root:
 
 ```sh
-cargo build --locked --release --manifest-path installer/Cargo.toml
+cargo build --locked --release --manifest-path crates/spars-model/Cargo.toml
 model_dir=$(target/release/spars-model install --version 3.8.0 --root target/models)
 cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 ```
@@ -73,7 +73,7 @@ Recipe regeneration checks shared implementation sources against `reference/sour
 The regular acceptance script runs the installer tests, complete manifest and weight comparisons against the Python exporter, and local-package installation followed by the independent Rust consumer with an empty `PATH`. The native installation CI job separately downloads, converts, verifies, and uses the model without a Python setup step. Missing official assets fail model-dependent tests; they do not silently skip in acceptance.
 
 ```sh
-cargo test --release --offline --manifest-path installer/Cargo.toml -- --include-ignored
+cargo test --release --offline --manifest-path crates/spars-model/Cargo.toml -- --include-ignored
 .venv/bin/python tools/check_installer.py
 ```
 

@@ -16,7 +16,7 @@ name = "spars-model"
 path = "src/main.rs"
 
 [dependencies]
-spars = { package = "spars-nlp", path = "../crates/spars" }
+spars = { package = "spars-nlp", path = "../spars" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"

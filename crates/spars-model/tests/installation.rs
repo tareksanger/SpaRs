@@ -8,7 +8,7 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
+            .join("../../target")
             .join(format!("integration-{}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         Self(path)
@@ -27,13 +27,10 @@ fn distinct_models_install_side_by_side_and_match_official_exports() {
     use std::io::Read;
     let scratch = Scratch(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
+            .join("../../target")
             .join(format!("multi-model-{}", std::process::id())),
     );
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let digest = |path: PathBuf| {
         let mut file = fs::File::open(path).unwrap();
         let mut hash = Sha256::new();
@@ -120,10 +117,7 @@ fn distinct_models_install_side_by_side_and_match_official_exports() {
 fn official_conversion_and_installation_lifecycle() {
     let scratch = Scratch::new();
     let root = scratch.0.join("models");
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let archive = repo.join("assets/en_core_web_md-3.8.0-py3-none-any.whl");
     assert!(archive.is_file(), "official archive required");
     let identity = catalog().unwrap().remove(0);

@@ -56,7 +56,7 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     subprocess.run(['cargo', 'build', '--release', '--offline', '--lib'], cwd=root, check=True)
     subprocess.run(['cargo', 'build', '--release', '--offline', '--manifest-path',
-                    'installer/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
+                    'crates/spars-model/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
     store = root / 'target/docs-models'
     subprocess.run([
         'target/release/spars', 'download', 'en_core_web_sm', '--path', str(store),

@@ -65,7 +65,7 @@ jobs:
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
       - run: cargo fetch --locked
       - run: npm --prefix bindings/node run build
-      - run: cargo build --locked --release --manifest-path installer/Cargo.toml
+      - run: cargo build --locked --release --manifest-path crates/spars-model/Cargo.toml
       - run: cargo build --locked --release --manifest-path consumer/Cargo.toml
       - name: Download and install without interpreters
         run: |

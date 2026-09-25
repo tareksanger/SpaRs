@@ -20,7 +20,7 @@ The Rust examples below and the TypeScript examples in the [Node guide](NODE.md)
 
 ## Cargo workspace
 
-The virtual workspace at the repository root contains the library in `crates/spars/`, the installer in `installer/`, and the Node binding in `bindings/node/`. They share the root `Cargo.lock` and `target/` build directory. Run these commands from the repository root:
+The virtual workspace at the repository root contains the library in `crates/spars/`, the installer in `crates/spars-model/`, and the Node binding in `bindings/node/`. They share the root `Cargo.lock` and `target/` build directory. Run these commands from the repository root:
 
 ```sh
 cargo update

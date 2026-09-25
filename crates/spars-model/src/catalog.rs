@@ -32,7 +32,7 @@ pub(crate) struct Release {
 }
 pub(crate) fn releases() -> Result<Vec<Release>> {
     let entries: Vec<Release> =
-        serde_json::from_slice(include_bytes!("../../models/catalog.json"))?;
+        serde_json::from_slice(include_bytes!("../../../models/catalog.json"))?;
     for entry in &entries {
         let limits = entry.limits;
         if limits.archive == 0

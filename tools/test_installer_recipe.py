@@ -34,7 +34,7 @@ class InstallerRecipeTests(unittest.TestCase):
         self.assertEqual(decode_lemmas({'lemma_rules': {445: [['“', '"']]}}, positions), {
             'lemma_rules': {'noun': {}, 'verb': {}, 'adj': {}, 'adv': {}, 'punct': [['“', '"']]},
         })
-        recipe = json_object(read_json(Path('installer/resources/recipe.json')))
+        recipe = json_object(read_json(Path('crates/spars-model/resources/recipe.json')))
         self.assertEqual(recipe['lemma_pos'], positions)
 
     def test_lookup_digest_uses_sorted_compact_utf8_without_newline(self) -> None:
@@ -66,7 +66,7 @@ class InstallerRecipeTests(unittest.TestCase):
             decode_parameter({'params': [{'W': expected}]}, ThincSource('component/model', -1, 'W'))
 
     def test_committed_recipe_inventory_and_resource_hashes(self) -> None:
-        root = Path('installer/resources')
+        root = Path('crates/spars-model/resources')
         recipe = json_object(read_json(root / 'recipe.json'))
         self.assertEqual(json_object(recipe['identity'])['resource_revision'], 2)
         self.assertNotIn('Python.txt', json_object(recipe['resources']))
@@ -93,7 +93,7 @@ class InstallerRecipeTests(unittest.TestCase):
             output = Path(temporary) / 'nested' / 'resources'
             with contextlib.redirect_stdout(io.StringIO()):
                 generate(output)
-            committed = Path('installer/resources')
+            committed = Path('crates/spars-model/resources')
             self.assertEqual({p.name for p in output.iterdir()}, {p.name for p in committed.iterdir()})
             for path in output.iterdir():
                 self.assertEqual(path.read_bytes(), (committed / path.name).read_bytes(), path.name)
@@ -111,7 +111,7 @@ class InstallerRecipeTests(unittest.TestCase):
             with patch('provenance.record', return_value=observed), contextlib.redirect_stdout(io.StringIO()):
                 generate(output)
             for path in output.iterdir():
-                self.assertEqual(path.read_bytes(), (Path('installer/resources') / path.name).read_bytes(), path.name)
+                self.assertEqual(path.read_bytes(), (Path('crates/spars-model/resources') / path.name).read_bytes(), path.name)
 
     def test_regeneration_rejects_changed_upstream_source_before_writing(self) -> None:
         observed = provenance.record()

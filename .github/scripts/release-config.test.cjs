@@ -78,7 +78,7 @@ test('release PR synchronizes Rust, installer and Node manifests without changin
   const versionUpdate = pr.updates.find(update => update.path === 'version.txt');
   assert.ok(versionUpdate);
   assert.equal(versionUpdate.updater.updateContent(readFileSync('version.txt', 'utf8')), '0.2.0\n');
-  const targets = ['crates/spars/Cargo.toml', 'bindings/node/Cargo.toml', 'installer/Cargo.toml',
+  const targets = ['crates/spars/Cargo.toml', 'bindings/node/Cargo.toml', 'crates/spars-model/Cargo.toml',
     'bindings/node/package.json', 'bindings/node/package-lock.json'];
   for (const path of targets) {
     const update = pr.updates.find(update => update.path === path);

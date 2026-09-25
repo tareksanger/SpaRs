@@ -11,6 +11,7 @@ __pycache__/
 .env.*
 !.env.example
 
+# Legacy build caches from the former standalone projects.
 /installer/target/
 /bindings/node/target/
 /bindings/node/node_modules/

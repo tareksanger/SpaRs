@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/spars", "installer", "bindings/node"]
+members = ["crates/spars", "crates/spars-model", "bindings/node"]
 default-members = ["crates/spars"]
 exclude = ["consumer"]
 resolver = "2"
