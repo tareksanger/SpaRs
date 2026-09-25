@@ -11,7 +11,7 @@ Follow the [developer setup](DEVELOPMENT.md), then run:
 git status --short
 ```
 
-Verify the final commit in GitHub Actions: the Linux reference job and the separate native installation job must pass. Review the reference job's report artifacts and the native installation job's logs when investigating failures. A local pass or a pass from an earlier commit does not establish release verification.
+Verify the final commit in GitHub Actions: the Linux and macOS reference jobs, native installation job, and release-tooling job must pass. Review the reference job's report artifacts and the native installation job's logs when investigating failures. A local pass or a pass from an earlier commit does not establish release verification.
 
 Review the README, compatibility inventory, model versions, and minimum toolchain versions. Confirm that examples execute and the Cargo package dry run succeeds. Keep generated binaries, models, reports, local environment files, and credentials out of the source distribution.
 
@@ -41,3 +41,33 @@ The source includes the [project license](../LICENSE) and [third-party attributi
 Before distributing a compiled artifact, review the exact dependencies linked into it and include their required license texts. Audit the corresponding lockfile for published security advisories. Repeat that review for each Rust library, installer, Node addon, and target platform being distributed. A source-repository license or dependency lockfile alone does not fulfill every binary-distribution notice requirement.
 
 Before registry publication, confirm package-name ownership, package contents, platform support, and consumer installation from the packaged artifact. Node publication additionally needs a deliberate platform-binary packaging strategy and its own clean-consumer tests. Those checks are separate from building the addon in this repository.
+
+## GitHub release automation
+
+[Release Please](https://github.com/googleapis/release-please) prepares one release PR for the root `spars-nlp` crate. The PR updates `Cargo.toml`, the root lockfile, the root crate entries in the three dependent lockfiles, the release manifest, and `CHANGELOG.md`. The source-only installer and Node package retain their separate versions and non-publishable settings. Changes to those directories are still included in the repository release history.
+
+The [release workflow](../.github/workflows/release.yml) runs after successful `native-fidelity` push CI on `main`. It publishes a release only when that exact tested commit merged a PR labeled `autorelease: pending`. Version and release notes are read from that commit; the tag targets that commit even if `main` advances. Ordinary commits prepare or refresh the release PR without publishing a release. Merging a release PR authorizes its GitHub source release once the merged commit passes CI. Registry publication and compiled artifacts remain separate maintainer actions.
+
+The publisher refuses conflicting tags, missing notes, and malformed versions. Rerun the failed Release workflow after resolving its error; rerunning acceptance for the same commit also retries publication. On retry, an existing matching tag and release are reused. It marks a completed release PR `autorelease: tagged`. A failed publication leaves the pending label for retry. Do not reuse or move a published version tag.
+
+### Repository setup
+
+1. Create a GitHub App and install it only on this repository. Grant repository permissions **Contents: read and write**, **Pull requests: read and write**, and **Issues: read and write**. The last permission allows release lifecycle labels. No webhook subscription is required for this workflow.
+2. Add its App ID as the Actions repository variable `RELEASE_APP_ID`. Generate an App private key and store it as the Actions repository secret `RELEASE_APP_PRIVATE_KEY`. The workflow mints a short-lived installation token scoped to this repository. App-authored PRs trigger normal CI; the default workflow token suppresses those automatic workflow triggers.
+3. Enable squash merging and select **Pull request title** as the default squash commit title. Use squash merges for contributions so the validated title reaches the commit history. Disable other merge methods if enforcing this repository-wide is desired.
+4. Once the title workflow is on `main` and has run, add **Conventional PR title** to the required branch checks alongside the existing acceptance checks. The workflow checks titles but cannot make itself required. Keep release-tooling required as well. The title check reads event data only and never checks out PR code despite using `pull_request_target`.
+5. Keep action references pinned to full commit hashes. Dependabot maintains those pins. Do not grant the release App a branch-protection bypass; its release PR must pass the normal checks.
+
+Without the App variable and secret, the release job fails at token creation and creates no release. The title check and acceptance CI require no release credentials.
+
+### First release and versioning
+
+The empty release manifest lets the Rust strategy propose its initial `0.1.0` release. The bootstrap commit in the configuration excludes older, inconsistently named commits from automated notes. Merge the automation setup with a title such as `feat(ci): automate reviewed source releases` to trigger the initial release PR. Copy the initial overview in [the changelog](../CHANGELOG.md) into that PR's versioned `0.1.0` entry and remove the unversioned overview before merging. Review the entry against the current compatibility inventory. No historical release is implied by the overview.
+
+Before `1.0.0`, fixes increment the patch version and features increment the minor version; breaking changes also increment the minor version. A feature and a breaking change can therefore produce the same version increment, so migration notes remain necessary. After `1.0.0`, breaking changes increment the major version. Documentation and maintenance commits alone do not normally open a release PR. Review every proposed version; a deliberately chosen version can be requested using a `Release-As: 0.1.0` commit footer, replacing the example version as appropriate.
+
+Releases use `vX.Y.Z` tags and the corresponding changelog entry as their body. This publisher accepts three-part versions only; prerelease suffixes need a separate tested extension. GitHub supplies source archives. Model weights, prebuilt binaries, and registry uploads are not attached or published by this workflow.
+
+### Check release tooling locally
+
+With Node.js 24 available, first run `npm --prefix tools ci --ignore-scripts --no-audit --no-fund`, then `node --test .github/scripts/*.test.cjs` from the checkout. These tests execute the title-check script and exercise release success, rejected CI events, conflicting tags, absent notes, API failures, and retries using a simulated GitHub API. They also exercise initial version generation and dependent lockfile updates with the pinned Release Please library. Keep that development dependency aligned with the library bundled in the pinned action when updating it. The release-tooling CI job runs the same command. They do not create remote releases or prove that an App installation is configured correctly.
