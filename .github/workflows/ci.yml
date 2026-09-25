@@ -14,11 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            model-reference-args: --model-exports-only
-          - os: macos-latest
-            model-reference-args: ''
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -27,11 +23,19 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
-          components: rustfmt, clippy
+          components: ${{ runner.os == 'Linux' && 'rustfmt,clippy' || '' }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            . -> target
+            consumer -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - run: npm --prefix tools ci --ignore-scripts --no-audit --no-fund
+      - name: Install Linux verification tools
+        if: runner.os == 'Linux'
+        run: npm --prefix tools ci --ignore-scripts --no-audit --no-fund
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - run: uv venv --python 3.12.5 .venv
@@ -43,9 +47,27 @@ jobs:
       - name: Require the recorded model-reference architecture
         if: runner.os == 'macOS'
         run: test "$(uname -m)" = arm64
-      - name: Run the same acceptance checks as local development
-        run: .venv/bin/python tools/verify.py ${{ matrix.model-reference-args }} --report target/reports/verification-ci.json
+      - name: Run Linux acceptance
+        if: runner.os == 'Linux'
+        run: .venv/bin/python tools/verify.py --model-exports-only --report target/reports/verification-ci.json
+      - name: Regenerate canonical model references
+        if: runner.os == 'macOS'
+        run: .venv/bin/python tools/check_models.py
+      - name: Build and smoke test macOS native consumers
+        if: runner.os == 'macOS'
+        run: |
+          npm --prefix bindings/node run build
+          cargo build --release --locked --offline --manifest-path crates/spars-model/Cargo.toml
+          cargo build --release --locked --offline --manifest-path consumer/Cargo.toml
+          node_bin=$(command -v node)
+          for model in en_core_web_sm en_core_web_md en_core_web_lg; do
+            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --archive "assets/$model-3.8.0-py3-none-any.whl" --root target/macos-smoke-models)
+            env -i PATH= target/release/spars-model verify "$model_path"
+            env -i PATH= consumer/target/release/native-consumer-check "$model_path"
+            env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"
+          done
       - name: Record performance separately from fidelity
+        if: runner.os == 'Linux'
         run: .venv/bin/python tools/benchmark.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -62,6 +84,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            . -> target
+            consumer -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
