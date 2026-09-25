@@ -9,8 +9,6 @@ Install Rust 1.88 or newer for the Node binding, `uv`, `curl`, and Node.js 24 wi
 ```sh
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
-cargo fetch --locked --manifest-path installer/Cargo.toml
-cargo fetch --locked --manifest-path bindings/node/Cargo.toml
 npm --prefix bindings/node run build
 ```
 
@@ -19,6 +17,20 @@ The Rust examples below and the TypeScript examples in the [Node guide](NODE.md)
 ```sh
 .venv/bin/python tools/check_docs.py
 ```
+
+## Cargo workspace
+
+The virtual workspace at the repository root contains the library in `crates/spars/`, the installer in `installer/`, and the Node binding in `bindings/node/`. They share the root `Cargo.lock` and `target/` build directory. Run these commands from the repository root:
+
+```sh
+cargo update
+cargo check --locked --workspace
+cargo fmt --all --check
+```
+
+`cargo update` updates all workspace dependencies within the versions allowed by their manifests. Review and commit the root lockfile after updating. Use `cargo build --release -p spars-model` to build the installer; its binaries are in `target/release/`. Root `cargo build`, `cargo check`, `cargo test`, and `cargo run` commands select the library by default; use `-p` to select another member, or `--workspace` with commands that support it.
+
+The `consumer/` project deliberately remains outside the workspace to check SpaRs as an external dependency. Update its separate lockfile with `cargo update --manifest-path consumer/Cargo.toml`. Full acceptance checks both projects, builds the Node addon, and runs its JavaScript tests.
 
 ## Read tokens and named entities
 

@@ -25,7 +25,7 @@ class ModelVerificationTests(unittest.TestCase):
                 self.assertEqual(linux, [*canonical, '--exports-only'])
             else:
                 self.assertEqual(canonical, linux)
-        self.assertIn(['cargo', 'test', '--release', '--offline', '--', '--include-ignored'], exports)
+        self.assertIn(['cargo', 'test', '--release', '--locked', '--offline', '--', '--include-ignored'], exports)
         self.assertIn(['.venv/bin/python', 'tools/check_reference.py'], exports)
         self.assertIn(['.venv/bin/python', 'tools/check_quality.py'], exports)
 

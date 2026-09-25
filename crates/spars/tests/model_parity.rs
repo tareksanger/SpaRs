@@ -35,11 +35,12 @@ struct VectorCase {
 #[test]
 #[ignore = "requires official sm export; mandatory acceptance test"]
 fn contextual_token_and_span_vectors_match_independent_reference() {
-    let fixture: VectorFixture =
-        serde_json::from_slice(&fs::read("fixtures/model-capabilities-v1.expected.json").unwrap())
-            .unwrap();
+    let fixture: VectorFixture = serde_json::from_slice(
+        &fs::read("../../fixtures/model-capabilities-v1.expected.json").unwrap(),
+    )
+    .unwrap();
     assert_eq!(fixture.vector_model, "en_core_web_sm 3.8.0");
-    let model = Model::load("assets/en_core_web_sm-3.8.0").unwrap();
+    let model = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
     assert_eq!(fixture.vector_cases.len(), 4);
     for case in fixture.vector_cases {
         let doc = model.process(&case.text).unwrap();
@@ -89,9 +90,9 @@ fn close(actual: &[f32], expected: &[f32], context: &str) {
 #[ignore = "requires official sm/lg exports; mandatory acceptance test"]
 fn official_small_and_large_pipeline_parity() {
     for size in ["sm", "lg"] {
-        let model = Model::load(format!("assets/en_core_web_{size}-3.8.0")).unwrap();
+        let model = Model::load(format!("../../assets/en_core_web_{size}-3.8.0")).unwrap();
         let fixture: Fixture = serde_json::from_slice(
-            &fs::read(format!("fixtures/model-{size}-v1.expected.json")).unwrap(),
+            &fs::read(format!("../../fixtures/model-{size}-v1.expected.json")).unwrap(),
         )
         .unwrap();
         assert_eq!(fixture.model, format!("en_core_web_{size} 3.8.0"));
@@ -134,7 +135,7 @@ fn official_small_and_large_pipeline_parity() {
 #[test]
 #[ignore = "requires official sm export; mandatory acceptance test"]
 fn contextual_vectors_preserve_empty_and_unavailable_states() {
-    let model = Model::load("assets/en_core_web_sm-3.8.0").unwrap();
+    let model = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
     assert!(model.vector("hello").is_none());
     let raw = model.tokenize("hello world").unwrap();
     assert!(model.document_vector(&raw).is_empty());

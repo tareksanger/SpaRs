@@ -6,7 +6,7 @@ from model_catalog import catalog
 
 
 def main() -> None:
-    binary = str(Path('installer/target/release/spars-model'))
+    binary = str(Path('target/release/spars-model'))
     Path('target').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='native-install-', dir='target') as root:
         directories: list[str] = []

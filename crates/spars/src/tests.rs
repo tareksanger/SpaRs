@@ -21,7 +21,7 @@ fn compare_floats(actual: &Value, expected: &Value, abs: f64, rel: f64) -> f64 {
 #[test]
 fn hash_keys_match_thinc() {
     let cases: Value =
-        serde_json::from_str(include_str!("../fixtures/hash.expected.json")).unwrap();
+        serde_json::from_str(include_str!("../../../fixtures/hash.expected.json")).unwrap();
     for c in cases.as_array().unwrap() {
         assert_eq!(
             serde_json::json!(hash::keys(
@@ -35,10 +35,11 @@ fn hash_keys_match_thinc() {
 #[test]
 #[ignore = "requires official export; mandatory CI stage"]
 fn official_stage_parity() {
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
-    let cases: Value =
-        serde_json::from_str(&std::fs::read_to_string("fixtures/stages.expected.json").unwrap())
-            .unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let cases: Value = serde_json::from_str(
+        &std::fs::read_to_string("../../fixtures/stages.expected.json").unwrap(),
+    )
+    .unwrap();
     let mut max_activation = 0f64;
     let mut max_score = 0f64;
     let mut actions = 0;
@@ -85,16 +86,17 @@ fn official_stage_parity() {
             }
         }
     }
-    std::fs::create_dir_all("target/reports").unwrap();
-    std::fs::write("target/reports/stages.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"actions":actions,"max_activation_absolute_error":max_activation,"max_score_absolute_error":max_score})).unwrap()).unwrap();
+    std::fs::create_dir_all("../../target/reports").unwrap();
+    std::fs::write("../../target/reports/stages.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"actions":actions,"max_activation_absolute_error":max_activation,"max_score_absolute_error":max_score})).unwrap()).unwrap();
 }
 #[test]
 #[ignore = "requires official export; mandatory CI stage"]
 fn tokenizer_and_features() {
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
-    let cases: Value =
-        serde_json::from_str(&std::fs::read_to_string("fixtures/tokenizer.expected.json").unwrap())
-            .unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let cases: Value = serde_json::from_str(
+        &std::fs::read_to_string("../../fixtures/tokenizer.expected.json").unwrap(),
+    )
+    .unwrap();
     let mut failures = vec![];
     let mut count = 0;
     for c in cases.as_array().unwrap() {
@@ -109,8 +111,8 @@ fn tokenizer_and_features() {
             failures.push(serde_json::json!({"text":c["text"],"actual":actual,"expected":c["tokens"],"features":features,"expected_features":c["features"]}));
         }
     }
-    std::fs::create_dir_all("target/reports").unwrap();
-    std::fs::write("target/reports/tokenizer-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"tokens":count,"differences":failures})).unwrap()).unwrap();
+    std::fs::create_dir_all("../../target/reports").unwrap();
+    std::fs::write("../../target/reports/tokenizer-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"tokens":count,"differences":failures})).unwrap()).unwrap();
     assert!(
         failures.is_empty(),
         "{} tokenizer/feature mismatches",
@@ -120,10 +122,11 @@ fn tokenizer_and_features() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn lexical_and_vectors() {
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
-    let cases: Value =
-        serde_json::from_str(&std::fs::read_to_string("fixtures/lexical.expected.json").unwrap())
-            .unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let cases: Value = serde_json::from_str(
+        &std::fs::read_to_string("../../fixtures/lexical.expected.json").unwrap(),
+    )
+    .unwrap();
     let mut failures = vec![];
     for c in cases.as_array().unwrap() {
         let actual = serde_json::to_value(m.lexeme(c["text"].as_str().unwrap()).unwrap()).unwrap();
@@ -133,9 +136,9 @@ fn lexical_and_vectors() {
             );
         }
     }
-    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::create_dir_all("../../target/reports").unwrap();
     std::fs::write(
-        "target/reports/lexical-mismatches.json",
+        "../../target/reports/lexical-mismatches.json",
         serde_json::to_string_pretty(
             &serde_json::json!({"cases":cases.as_array().unwrap().len(),"differences":failures}),
         )
@@ -143,9 +146,10 @@ fn lexical_and_vectors() {
     )
     .unwrap();
     assert!(failures.is_empty(), "{} lexical mismatches", failures.len());
-    let vectors: Value =
-        serde_json::from_str(&std::fs::read_to_string("fixtures/vectors.expected.json").unwrap())
-            .unwrap();
+    let vectors: Value = serde_json::from_str(
+        &std::fs::read_to_string("../../fixtures/vectors.expected.json").unwrap(),
+    )
+    .unwrap();
     for v in vectors["words"].as_array().unwrap() {
         let a = m.vector(v["text"].as_str().unwrap());
         assert_eq!(a.is_some(), v["has_vector"].as_bool().unwrap());
@@ -174,10 +178,11 @@ fn document_snapshots_validate_offsets() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn regex_span_semantics() {
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
-    let cases: Value =
-        serde_json::from_str(&std::fs::read_to_string("fixtures/regex.expected.json").unwrap())
-            .unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let cases: Value = serde_json::from_str(
+        &std::fs::read_to_string("../../fixtures/regex.expected.json").unwrap(),
+    )
+    .unwrap();
     let mut failures = vec![];
     for c in cases.as_array().unwrap() {
         for kind in ["prefix", "suffix", "infix", "url"] {
@@ -190,8 +195,8 @@ fn regex_span_semantics() {
             }
         }
     }
-    std::fs::create_dir_all("target/reports").unwrap();
-    std::fs::write("target/reports/regex-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"comparisons":cases.as_array().unwrap().len()*4,"differences":failures})).unwrap()).unwrap();
+    std::fs::create_dir_all("../../target/reports").unwrap();
+    std::fs::write("../../target/reports/regex-mismatches.json",serde_json::to_string_pretty(&serde_json::json!({"cases":cases.as_array().unwrap().len(),"comparisons":cases.as_array().unwrap().len()*4,"differences":failures})).unwrap()).unwrap();
     assert!(
         failures.is_empty(),
         "{} regex span mismatches",

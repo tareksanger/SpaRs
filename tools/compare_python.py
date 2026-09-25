@@ -187,7 +187,7 @@ def main() -> None:
         rounds=options.rounds, warmup_passes=options.warmup, profiles=profiles,
         revision=command('git', 'rev-parse', 'HEAD'),
         working_tree_dirty=bool(command('git', 'status', '--porcelain')),
-        source_sha256={str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in [Path('fixtures/evaluation-v1.json'), Path('tools/compare_python.py'), Path('examples/measure.rs'), Path('examples/measure/stats.rs'), Path('Cargo.lock'), *sorted(Path('src').rglob('*.rs'))]},
+        source_sha256={str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in [Path('fixtures/evaluation-v1.json'), Path('tools/compare_python.py'), Path('crates/spars/examples/measure.rs'), Path('crates/spars/examples/measure/stats.rs'), Path('Cargo.lock'), *sorted(Path('crates/spars/src').rglob('*.rs'))]},
         command=reproduction_command(options),
         limits='One sequential native then Python run per profile; no batching or parallelism. Warm caches; OS caches not cleared. Inference excludes model load, imports, corpus reading, document destruction, and JSON output. Python materializes sentences, noun chunks and entities to match native work. Peak RSS includes interpreter and model loading. Load excludes Python import time. Synthetic corpus and single run do not establish general speed. Values below 1 mean Rust is slower.',
     )

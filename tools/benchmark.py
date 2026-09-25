@@ -119,7 +119,7 @@ def main() -> None:
               'weights_sha256':manifest.weights_sha256,'corpus_sha256':hashlib.sha256(corpus.read_bytes()).hexdigest(),
               'revision':command('git','rev-parse','HEAD'),'working_tree_dirty':bool(command('git','status','--porcelain')),
               'profiles':profiles,
-              'source_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [*sorted(Path('src').glob('*.rs')), Path('examples/measure.rs'), Path('examples/measure/stats.rs'), Path('tools/benchmark.py'), Path('Cargo.lock')]},
+              'source_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [*sorted(Path('crates/spars/src').glob('*.rs')), Path('crates/spars/examples/measure.rs'), Path('crates/spars/examples/measure/stats.rs'), Path('tools/benchmark.py'), Path('Cargo.lock')]},
               'limits':'Each profile uses a fresh process. Peak RSS includes loading, model storage and processing; it is not inference-only memory. OS file caches are not cleared. Timings exclude corpus reading and JSON output. Synthetic inputs are not representative of every application.'}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report,indent=2)+'\n')

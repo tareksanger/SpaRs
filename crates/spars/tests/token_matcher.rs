@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use spars::{DependencyMatch, DependencyMatcher, DependencyPattern, Doc, Span, Token};
+use spars::{Doc, Span, Token, TokenMatch, TokenMatcher, TokenPattern};
 use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
@@ -16,12 +16,12 @@ struct Case {
     entities: Vec<Span>,
     noun_chunks: Vec<Span>,
     rules: Vec<Rule>,
-    expected: Vec<DependencyMatch>,
+    expected: Vec<TokenMatch>,
 }
 #[derive(Deserialize)]
 struct Rule {
     name: String,
-    patterns: Vec<DependencyPattern>,
+    patterns: Vec<TokenPattern>,
 }
 #[derive(Serialize)]
 struct Snapshot<'a> {
@@ -38,20 +38,53 @@ struct Storage<'a> {
 }
 
 #[test]
-fn official_dependency_pattern_order_and_annotations() {
-    check("fixtures/dependency-match-v1.expected.json", 6, Some(52));
+fn official_token_patterns_repetition_and_order() {
     check(
-        "fixtures/dependency-match-regressions-v1.expected.json",
-        2,
-        None,
+        "../../fixtures/token-match-v1.expected.json",
+        10,
+        38,
+        480,
+        704,
+    );
+    check(
+        "../../fixtures/token-match-exhaustive-v1.expected.json",
+        31,
+        98,
+        4805,
+        6261,
     );
 }
-fn check(path: &str, cases: usize, additions: Option<usize>) {
+#[test]
+fn official_long_branching_patterns() {
+    check(
+        "../../fixtures/token-match-branching-v1.expected.json",
+        31,
+        98,
+        248,
+        288,
+    );
+}
+fn check(path: &str, cases: usize, tokens: usize, rules: usize, matches: usize) {
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(fixture.versions["spacy"], "3.8.14");
     assert_eq!(fixture.versions["thinc"], "8.3.13");
     assert_eq!(fixture.cases.len(), cases);
-    let mut comparisons = 0;
+    assert_eq!(
+        fixture.cases.iter().map(|c| c.tokens.len()).sum::<usize>(),
+        tokens
+    );
+    assert_eq!(
+        fixture.cases.iter().map(|c| c.rules.len()).sum::<usize>(),
+        rules
+    );
+    assert_eq!(
+        fixture
+            .cases
+            .iter()
+            .map(|c| c.expected.len())
+            .sum::<usize>(),
+        matches
+    );
     for case in fixture.cases {
         let doc = Doc::from_json(
             &serde_json::to_string(&Snapshot {
@@ -67,19 +100,12 @@ fn check(path: &str, cases: usize, additions: Option<usize>) {
             .unwrap(),
         )
         .unwrap();
-        let mut matcher = DependencyMatcher::new();
-        if let Some(additions) = additions {
-            assert_eq!(case.rules.len(), additions);
-        }
-        comparisons += case.rules.len();
+        let mut matcher = TokenMatcher::new();
         for rule in case.rules {
             matcher.add(rule.name, rule.patterns).unwrap();
         }
-        if additions.is_some() {
-            assert_eq!(matcher.len(), 51);
-        }
         let actual = matcher.find_matches(&doc).unwrap();
-        assert_eq!(actual, case.expected, "{}", case.id);
+        assert_eq!(actual, case.expected, "{}: {}", case.id, case.text);
         assert_eq!(
             matcher.find_matches(&doc).unwrap(),
             actual,
@@ -87,12 +113,8 @@ fn check(path: &str, cases: usize, additions: Option<usize>) {
             case.id
         );
         std::thread::scope(|scope| {
-            let first = scope.spawn(|| matcher.find_matches(&doc).unwrap());
-            assert_eq!(first.join().unwrap(), actual);
+            let concurrent = scope.spawn(|| matcher.find_matches(&doc).unwrap());
+            assert_eq!(concurrent.join().unwrap(), actual);
         });
-    }
-    assert!(comparisons > 0);
-    if additions.is_some() {
-        assert_eq!(comparisons, 312);
     }
 }

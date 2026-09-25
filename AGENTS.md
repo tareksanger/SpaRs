@@ -70,7 +70,7 @@ Keep unsafe numerical code inside a small checked wrapper. Validate dimensions, 
 
 Keep changes small and focused. Prefer pure computation, immutable loaded models, and per-call state. Preserve exact text, whitespace, and distinct byte offsets, code-point offsets, and token indices. Unsupported configurations and unavailable annotations must remain explicit rather than being omitted or fabricated.
 
-Keep source files focused, unit tests in separate `tests.rs` modules, integration tests in `tests/`, and runnable examples in `examples/`. Export tooling must stay outside normal consumer Cargo builds.
+Keep source files focused, unit tests in separate `tests.rs` modules, integration tests in each crate's `tests/` directory, and runnable examples in its `examples/` directory. The library lives in `crates/spars/`. Export tooling must stay outside normal consumer Cargo builds.
 
 Do not change frozen evaluation inputs or expected outputs to make an implementation pass. Add regressions separately and record which evaluation data influenced the implementation. Expected results must come from the pinned official reference or an independently justified invariant. Preserve declared numerical tolerances and exact discrete-output requirements; record unresolved mismatches.
 

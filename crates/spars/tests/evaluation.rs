@@ -22,10 +22,11 @@ fn unseen_postfix_comparison() {
 }
 
 fn check(split: &str) {
-    let fixture: Value =
-        serde_json::from_slice(&std::fs::read(format!("fixtures/{split}.expected.json")).unwrap())
-            .unwrap();
-    let model = Model::load("assets/en_core_web_md-3.8.0").unwrap();
+    let fixture: Value = serde_json::from_slice(
+        &std::fs::read(format!("../../fixtures/{split}.expected.json")).unwrap(),
+    )
+    .unwrap();
+    let model = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let cases = fixture["cases"].as_array().unwrap();
     assert!(!cases.is_empty(), "empty parity suite");
     assert_eq!(fixture["model"], "en_core_web_md 3.8.0");
@@ -33,7 +34,7 @@ fn check(split: &str) {
         fixture["versions"],
         json!({"spacy":"3.8.14", "thinc":"8.3.13"})
     );
-    let input = std::fs::read(format!("fixtures/{split}.json")).unwrap();
+    let input = std::fs::read(format!("../../fixtures/{split}.json")).unwrap();
     assert_eq!(
         fixture["input_sha256"],
         Sha256::digest(&input)
@@ -86,14 +87,14 @@ fn check(split: &str) {
             count.1 += 1;
         }
     }
-    std::fs::create_dir_all("target/reports").unwrap();
+    std::fs::create_dir_all("../../target/reports").unwrap();
     let report = json!({"model":fixture["model"], "versions":fixture["versions"],
         "input_sha256":fixture["input_sha256"], "cases":cases.len(), "tokens":tokens,
         "category_counts":categories.iter().map(|(name,(total,passed))| (name,json!({"total":total,"passed":passed}))).collect::<BTreeMap<_,_>>(),
         "max_vector_absolute_error":max_vector_error, "differences":differences,
         "command":"cargo test --release --test evaluation -- --include-ignored"});
     std::fs::write(
-        format!("target/reports/{split}.json"),
+        format!("../../target/reports/{split}.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
     )
     .unwrap();

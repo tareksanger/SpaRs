@@ -8,7 +8,7 @@ fn missing_model_is_an_error() {
 fn public_api_and_batch_isolation() {
     fn send_sync<T: Send + Sync>() {}
     send_sync::<Model>();
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let texts = ["😀 Café é.  ", "", "Alice met Bob in London."];
     let individual: Vec<_> = texts.iter().map(|s| m.process(s).unwrap()).collect();
     let batched: Vec<_> = m.pipe(texts).map(Result::unwrap).collect();
@@ -54,7 +54,7 @@ fn public_api_and_batch_isolation() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn malformed_models_are_errors() {
-    let root = std::path::Path::new("assets/en_core_web_md-3.8.0");
+    let root = std::path::Path::new("../../assets/en_core_web_md-3.8.0");
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("manifest.json")).unwrap()).unwrap();
     let tmp = std::env::temp_dir().join(format!("spacy-native-invalid-{}", std::process::id()));
@@ -98,7 +98,7 @@ fn malformed_models_are_errors() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn checked_views_and_similarity() {
-    let m = Model::load("assets/en_core_web_md-3.8.0").unwrap();
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let d = m.process("dog cat").unwrap();
     let dog = d.token(TokenIndex(0)).unwrap();
     let cat = d.token(TokenIndex(1)).unwrap();

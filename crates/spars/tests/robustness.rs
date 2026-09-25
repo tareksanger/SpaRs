@@ -4,7 +4,7 @@ use spars::{ByteOffset, Doc, Error, Model, TokenIndex};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const ASSETS: &str = "assets/en_core_web_md-3.8.0";
+const ASSETS: &str = "../../assets/en_core_web_md-3.8.0";
 
 struct TempModel(PathBuf);
 impl TempModel {

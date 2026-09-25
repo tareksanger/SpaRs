@@ -6,7 +6,7 @@ struct Export(PathBuf);
 impl Export {
     fn from_manifest(manifest: &Value) -> Self {
         let path = PathBuf::from(format!(
-            "target/model-loading-{}-{}",
+            "../../target/model-loading-{}-{}",
             std::process::id(),
             ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
@@ -17,7 +17,7 @@ impl Export {
         )
         .unwrap();
         fs::hard_link(
-            "assets/en_core_web_md-3.8.0/weights.safetensors",
+            "../../assets/en_core_web_md-3.8.0/weights.safetensors",
             path.join("weights.safetensors"),
         )
         .unwrap();
@@ -45,9 +45,10 @@ impl Drop for Export {
     }
 }
 fn manifest() -> Value {
-    let mut value: Value =
-        serde_json::from_slice(&fs::read("assets/en_core_web_md-3.8.0/manifest.json").unwrap())
-            .unwrap();
+    let mut value: Value = serde_json::from_slice(
+        &fs::read("../../assets/en_core_web_md-3.8.0/manifest.json").unwrap(),
+    )
+    .unwrap();
     value["format_version"] = json!(2);
     value["model"] = json!("independent_model_identity");
     value["model_version"] = json!("1.0.0");
@@ -65,7 +66,7 @@ fn manifest() -> Value {
 fn model_identity_is_independent_of_native_capabilities() {
     let directory = Export::from_manifest(&manifest());
     let model = Model::load(&directory.0).unwrap();
-    let baseline = Model::load("assets/en_core_web_md-3.8.0").unwrap();
+    let baseline = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     for text in [
         "",
         "Alice visited London.",
@@ -92,7 +93,7 @@ fn component_order_comes_from_configuration() {
     ]);
     let directory = Export::from_manifest(&config);
     let model = Model::load(&directory.0).unwrap();
-    let baseline = Model::load("assets/en_core_web_md-3.8.0").unwrap();
+    let baseline = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     assert_eq!(
         model.process("Alice visited London.").unwrap(),
         baseline.process("Alice visited London.").unwrap()
@@ -102,9 +103,10 @@ fn component_order_comes_from_configuration() {
         .unwrap();
     assert!(doc.entities().is_some());
     assert!(doc.tokens()[0].tag.is_none());
-    let reference: ReorderedFixture =
-        serde_json::from_slice(&fs::read("fixtures/model-capabilities-v1.expected.json").unwrap())
-            .unwrap();
+    let reference: ReorderedFixture = serde_json::from_slice(
+        &fs::read("../../fixtures/model-capabilities-v1.expected.json").unwrap(),
+    )
+    .unwrap();
     assert_eq!(reference.reordered_model, "en_core_web_md 3.8.0");
     assert_eq!(config["pipeline"], json!(reference.reordered_pipeline));
     assert_eq!(reference.reordered.len(), 3);

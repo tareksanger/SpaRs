@@ -24,7 +24,7 @@ Run from the repository root:
 
 ```sh
 cargo build --locked --release --manifest-path installer/Cargo.toml
-model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root target/models)
+model_dir=$(target/release/spars-model install --version 3.8.0 --root target/models)
 cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 ```
 
@@ -33,9 +33,9 @@ Installation prints the directory that you pass to `Model::load`. Diagnostic err
 To install an official package you already have, use `--archive`. After Rust dependencies have been fetched and the tool built, this path works without network access:
 
 ```sh
-model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root target/models --archive assets/en_core_web_md-3.8.0-py3-none-any.whl)
-installer/target/release/spars-model verify "$model_dir"
-installer/target/release/spars-model list --root target/models
+model_dir=$(target/release/spars-model install --version 3.8.0 --root target/models --archive assets/en_core_web_md-3.8.0-py3-none-any.whl)
+target/release/spars-model verify "$model_dir"
+target/release/spars-model list --root target/models
 ```
 
 Keep the chosen directory in your application's configuration. Existing documentation examples use the Python reference export at `assets/en_core_web_md-3.8.0`; replace that path with the installed directory in your application. Both have the same model data. Use a dedicated installation root: `list` checks every non-hidden entry and returns an error for damaged or unsupported installations.
@@ -45,7 +45,7 @@ Keep the chosen directory in your application's configuration. Existing document
 `catalog` lists releases supported by the installed tool:
 
 ```sh
-installer/target/release/spars-model catalog
+target/release/spars-model catalog
 ```
 
 The catalog contains `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0. The installation directory includes the model version, native format version, conversion-recipe revision, language-resource revision, and archive checksum. Installing an already-present identity verifies and reuses it. Failed conversion leaves prior installations intact. An abandoned staging directory is recovered on the next attempt; concurrent installers cannot write through the same root lock.

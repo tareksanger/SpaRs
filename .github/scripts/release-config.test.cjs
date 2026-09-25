@@ -16,12 +16,12 @@ function strategy() {
   return buildStrategy({ releaseType: config['release-type'], github, targetBranch: 'main', path: '.',
     packageName: config['package-name'], includeComponentInTag: config['include-component-in-tag'],
     bumpMinorPreMajor: config['bump-minor-pre-major'],
-    bumpPatchForMinorPreMajor: config['bump-patch-for-minor-pre-major'], extraFiles: config['extra-files'] });
+    bumpPatchForMinorPreMajor: config['bump-patch-for-minor-pre-major'], extraFiles: config['extra-files'], versionFile: config['version-file'], initialVersion: config['initial-version'] });
 }
 const commits = message => parseConventionalCommits([{ sha: 'a'.repeat(40), message, files: ['Cargo.toml'] }]);
 
-test('pinned Rust strategy proposes 0.1.0 with versioned notes on first release', async () => {
-  assert.equal(config['release-type'], 'rust');
+test('pinned workspace strategy proposes 0.1.0 with versioned notes on first release', async () => {
+  assert.equal(config['release-type'], 'simple');
   const pr = await (await strategy()).buildReleasePullRequest(commits('feat(ci): automate reviewed source releases'));
   assert.ok(pr);
   assert.equal(pr.version.toString(), '0.1.0');
@@ -35,7 +35,7 @@ test('upstream updater changes only project versions in every dependent lockfile
   const updates = (await s.extraFileUpdates(Version.parse('0.42.0'), new Map(), 'YYYY-MM-DD'))
     .filter(update => update.path.endsWith('Cargo.lock'));
   assert.deepEqual(updates.map(update => update.path).sort(),
-    ['consumer/Cargo.lock', 'installer/Cargo.lock', 'bindings/node/Cargo.lock'].sort());
+    ['Cargo.lock', 'consumer/Cargo.lock']);
   for (const update of updates) {
     const input = readFileSync(update.path, 'utf8');
     const before = toml.parse(input);
@@ -65,7 +65,20 @@ test('release PR synchronizes Rust, installer and Node manifests without changin
   const pr = await (await strategy()).buildReleasePullRequest(commits('feat: new behavior'), latest);
   assert.ok(pr);
   assert.equal(pr.version.toString(), '0.2.0');
-  const targets = ['Cargo.toml', 'bindings/node/Cargo.toml', 'installer/Cargo.toml',
+  const lockUpdates = pr.updates.filter(update => update.path === 'Cargo.lock');
+  assert.equal(lockUpdates.length, 1);
+  const lockInput = readFileSync('Cargo.lock', 'utf8');
+  const expectedLock = toml.parse(lockInput);
+  const local = expectedLock.package.filter(pkg => ['spars-nlp', 'spars-model', 'spars-node'].includes(pkg.name));
+  assert.equal(local.length, 3);
+  for (const pkg of local) pkg.version = '0.2.0';
+  assert.deepEqual(toml.parse(lockUpdates[0].updater.updateContent(lockInput)), expectedLock);
+  const rootManifest = pr.updates.find(update => update.path === 'Cargo.toml');
+  assert.equal(rootManifest, undefined, 'The virtual workspace has no package version');
+  const versionUpdate = pr.updates.find(update => update.path === 'version.txt');
+  assert.ok(versionUpdate);
+  assert.equal(versionUpdate.updater.updateContent(readFileSync('version.txt', 'utf8')), '0.2.0\n');
+  const targets = ['crates/spars/Cargo.toml', 'bindings/node/Cargo.toml', 'installer/Cargo.toml',
     'bindings/node/package.json', 'bindings/node/package-lock.json'];
   for (const path of targets) {
     const update = pr.updates.find(update => update.path === path);

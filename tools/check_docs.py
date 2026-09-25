@@ -59,7 +59,7 @@ def main() -> None:
                     'installer/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
     store = root / 'target/docs-models'
     subprocess.run([
-        'installer/target/release/spars', 'download', 'en_core_web_sm', '--path', str(store),
+        'target/release/spars', 'download', 'en_core_web_sm', '--path', str(store),
         '--archive', 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
     ], cwd=root, check=True, capture_output=True, text=True)
     os.environ['SPARS_MODEL_DIR'] = str(store)

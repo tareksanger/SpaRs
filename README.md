@@ -53,7 +53,7 @@ Clone the [SpaRs repository](https://github.com/tareksanger/SpaRs) and run these
 
 ```sh
 cargo build --locked --release --manifest-path installer/Cargo.toml
-model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root target/models)
+model_dir=$(target/release/spars-model install --version 3.8.0 --root target/models)
 cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 ```
 
@@ -88,20 +88,18 @@ Run development and verification commands from a repository checkout; tests, fix
 ```sh
 cargo fetch --locked
 cargo fetch --locked --manifest-path consumer/Cargo.toml
-cargo fetch --locked --manifest-path installer/Cargo.toml
-cargo fetch --locked --manifest-path bindings/node/Cargo.toml
 ```
 
 Frozen fixtures are checked in. Do not regenerate expected outputs during fixes. To audit their provenance, generators under `tools/` run the pinned official reference. `fixtures/README.md` identifies the development, holdout and regression sets, numerical tolerances and source licenses.
 
 ```sh
-cargo fmt --check
+cargo fmt --all --check
 cargo fmt --manifest-path consumer/Cargo.toml --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 cargo test --release -- --include-ignored
 cargo build --release --offline --manifest-path consumer/Cargo.toml
 env -i PATH= consumer/target/release/native-consumer-check assets/en_core_web_md-3.8.0
-cargo package --allow-dirty --offline
+cargo package -p spars-nlp --allow-dirty --offline
 ```
 
 For all gates plus a byte-identical re-export check, run `.venv/bin/python tools/verify.py`. The [CI workflow](https://github.com/tareksanger/SpaRs/blob/main/.github/workflows/ci.yml) runs the model-dependent tests using the official exported assets.

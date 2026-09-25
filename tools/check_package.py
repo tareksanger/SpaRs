@@ -24,15 +24,15 @@ def validate_inventory(files: set[str], sources: set[str]) -> None:
 
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
-    manifest = json_object(validate_json(tomllib.loads((root / 'Cargo.toml').read_text())))
+    manifest = json_object(validate_json(tomllib.loads((root / 'crates/spars/Cargo.toml').read_text())))
     package = json_object(manifest['package'])
     name, version = json_string(package['name']), json_string(package['version'])
     prefix = f'{name}-{version}'
-    subprocess.run(['cargo', 'package', '--allow-dirty', '--offline', '--target-dir', 'target'], cwd=root, check=True)
+    subprocess.run(['cargo', 'package', '-p', 'spars-nlp', '--allow-dirty', '--offline', '--target-dir', 'target'], cwd=root, check=True)
     archive = root / 'target/package' / f'{prefix}.crate'
     with tarfile.open(archive, 'r:gz') as contents:
         files = {str(PurePosixPath(member.name).relative_to(prefix)) for member in contents if member.isfile()}
-    sources = {path.relative_to(root).as_posix() for path in (root / 'src').rglob('*.rs') if path.name != 'tests.rs'}
+    sources = {path.relative_to(root / 'crates/spars').as_posix() for path in (root / 'crates/spars/src').rglob('*.rs') if path.name != 'tests.rs'}
     validate_inventory(files, sources)
     packaged = root / 'target/package' / prefix
     build = root / 'target/package-consumer-build'

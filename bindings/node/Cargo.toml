@@ -7,19 +7,14 @@ license = "MIT"
 description = "Node-API bindings for the native SpaRs NLP library"
 publish = false
 
-[workspace]
-
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 spars-model = { path = "../../installer" }
-spars = { package = "spars-nlp", path = "../.." }
+spars = { package = "spars-nlp", path = "../../crates/spars" }
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 
 [build-dependencies]
 napi-build = "2"
-
-[profile.release]
-debug = 1

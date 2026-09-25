@@ -37,8 +37,6 @@ jobs:
       - run: .venv/bin/python tools/export.py --all
       - run: cargo fetch --locked
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
-      - run: cargo fetch --locked --manifest-path installer/Cargo.toml
-      - run: cargo fetch --locked --manifest-path bindings/node/Cargo.toml
       - name: Require the recorded model-reference architecture
         if: runner.os == 'macOS'
         run: test "$(uname -m)" = arm64
@@ -65,7 +63,7 @@ jobs:
         with:
           node-version: 24
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
-      - run: cargo fetch --locked --manifest-path bindings/node/Cargo.toml
+      - run: cargo fetch --locked
       - run: npm --prefix bindings/node run build
       - run: cargo build --locked --release --manifest-path installer/Cargo.toml
       - run: cargo build --locked --release --manifest-path consumer/Cargo.toml
@@ -73,8 +71,8 @@ jobs:
         run: |
           node_bin=$(command -v node)
           for model in en_core_web_sm en_core_web_md en_core_web_lg; do
-            model_path=$(env -i PATH= installer/target/release/spars-model install --model "$model" --version 3.8.0 --root target/models)
-            env -i PATH= installer/target/release/spars-model verify "$model_path"
+            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --root target/models)
+            env -i PATH= target/release/spars-model verify "$model_path"
             env -i PATH= consumer/target/release/native-consumer-check "$model_path"
             env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"
           done

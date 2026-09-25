@@ -4,5 +4,5 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 [dependencies]
-spars = { package = "spars-nlp", path = ".." }
+spars = { package = "spars-nlp", path = "../crates/spars" }
 [workspace]

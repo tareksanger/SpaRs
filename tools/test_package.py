@@ -31,7 +31,7 @@ class PackageTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            shutil.copyfile(project / 'Cargo.toml', root / 'Cargo.toml')
+            shutil.copyfile(project / 'crates/spars/Cargo.toml', root / 'Cargo.toml')
             shutil.copyfile(project / 'Cargo.lock', root / 'Cargo.lock')
             for relative in required | excluded:
                 path = root / relative
