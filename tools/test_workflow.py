@@ -20,6 +20,11 @@ def check_action_pins(text: str) -> None:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_ci_runs_for_pull_requests_and_only_main_pushes(self) -> None:
+        workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/ci.yml').read_text()
+        triggers = workflow.split('\non:', 1)[1].split('\npermissions:', 1)[0]
+        self.assertEqual(triggers, '\n  push:\n    branches: [main]\n  pull_request:')
+
     def test_remote_actions_use_full_commit_hashes(self) -> None:
         root = Path(__file__).resolve().parent.parent
         workflows = sorted((root / '.github/workflows').glob('*.y*ml'))
