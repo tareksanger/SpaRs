@@ -5,8 +5,10 @@ import re
 import subprocess
 from pathlib import Path
 from typing import TypedDict
+
+from node_docs import examples as node_examples
+from node_docs import run_example
 from report_paths import portable_text
-from node_docs import examples as node_examples, run_example
 
 
 class DocumentationResult(TypedDict):
