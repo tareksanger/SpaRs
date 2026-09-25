@@ -59,6 +59,12 @@ cargo run --release --example analyze -- "$model_dir" 'Alice visited New York.'
 
 Pass the printed installation directory to `Model::load`. Use `--model en_core_web_sm`, `--model en_core_web_md` (the default), or `--model en_core_web_lg`; installation does not select a new version for your application automatically. See [model installation](https://github.com/tareksanger/SpaRs/blob/main/docs/MODEL_INSTALLATION.md) for local archives, verification, and version handling. The Python setup below is for development and reference testing.
 
+## Load installed models by name
+
+Set `SPARS_MODEL_DIR` once in the environment used by your application and CLI. Downloads are explicit; loading is offline. Rust's `Model::load("en_core_web_lg")` and Node's `loadModel("en_core_web_lg")` resolve the selected installation from that directory. Without the variable, both use the operating system's user cache. Explicit paths override the environment for one call and do not write project configuration.
+
+The [Node package](docs/NODE.md) includes `spars download en_core_web_lg` and `downloadModel(...)`; from a built source checkout, run `node bindings/node/bin/spars.mjs download en_core_web_lg`. Rust users can install the CLI with `cargo install --path installer --bin spars --locked` and call the shared `spars_model::download_model` API from the separate installer crate. See [installation](docs/MODEL_INSTALLATION.md) for the API and directory rules. Package publication and prebuilt binaries are separate from these source workflows.
+
 ## Acquire and export explicitly
 
 Run these development commands from the cloned repository's root. Requirements for full verification: Rust 1.88+, Python 3.12.5, `uv`, `curl`, and Node.js 24 with npm. The standalone Rust library requires Rust 1.85 and needs neither Python nor Node.js. Python is used for reference tooling; Node.js is used for the optional binding and development checks.

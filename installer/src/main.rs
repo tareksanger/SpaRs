@@ -1,3 +1,4 @@
+mod cli;
 use spars_model::{catalog, install, list, verify, ModelName, Version};
 use std::{ffi::OsString, path::PathBuf};
 fn main() {
@@ -9,6 +10,16 @@ fn main() {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args_os().skip(1);
     let command=args.next().ok_or("usage: spars-model catalog | install --version VERSION --root DIR [--archive WHEEL] | list --root DIR | verify PATH")?;
+    if command == "--help" || command == "-h" || command == "help" {
+        if args.next().is_some() {
+            return Err("help takes no arguments".into());
+        }
+        println!("spars download MODEL [--path DIR] [--version VERSION] [--archive WHEEL]\nDirectory: SPARS_MODEL_DIR or the user cache.\nLegacy: spars-model catalog | install --version VERSION --root DIR | list --root DIR | verify PATH");
+        return Ok(());
+    }
+    if command == "download" {
+        return cli::project_command(&command, args);
+    }
     if command == "catalog" {
         if args.next().is_some() {
             return Err("catalog takes no arguments".into());

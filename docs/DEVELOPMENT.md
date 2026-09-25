@@ -153,3 +153,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 This does not establish support for other languages, transformer models, or custom components. Capability declarations and configuration are validated before inference; additional implementations and reference suites are required for those families.
+
+## Resolve an installed model by name
+
+Set `SPARS_MODEL_DIR` and explicitly download the model first, as described in [installation](MODEL_INSTALLATION.md). The guide checker prepares the small model in its own store before executing this example. A missing installation returns an error with a download hint; loading never starts a download. Use `./directory` or an absolute path to load an export directly instead of resolving a bare name.
+
+```rust
+use spars::Model;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("en_core_web_sm")?;
+    let doc = model.process("Alice visits London.")?;
+    assert!(doc.entities().is_some());
+    assert_eq!(model.document_vector(&doc).len(), 96);
+    Ok(())
+}
+```

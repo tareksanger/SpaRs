@@ -13,7 +13,15 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["tests/**/*.mts", "scripts/**/*.mts", "index.d.ts", "units.d.ts"]
+  "include": [
+    "tests/**/*.mts",
+    "scripts/**/*.mts",
+    "index.d.ts",
+    "units.d.ts",
+    "bin/**/*.mjs"
+  ]
 }

@@ -1,6 +1,8 @@
 //! Native Node-API boundary for SpaRs.
 mod convert;
 mod errors;
+mod models;
+pub use models::{download_model, DownloadOptions, LoadOptions};
 mod output;
 mod tasks;
 
@@ -79,6 +81,8 @@ impl Model {
 
 /// Load and validate an installed model on Node's worker pool. No network access.
 #[napi(strict)]
-pub fn load_model(path: Utf16String) -> AsyncTask<LoadTask> {
-    AsyncTask::new(LoadTask { path })
+pub fn load_model(path: Utf16String, options: Option<models::LoadOptions>) -> AsyncTask<LoadTask> {
+    AsyncTask::new(LoadTask {
+        source: models::LoadSource::prepare(&path, options),
+    })
 }

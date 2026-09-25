@@ -2,6 +2,22 @@
 
 The separate `spars-model` tool downloads and converts the official `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0 packages entirely natively. It requires a Rust toolchain to build from this checkout. Installation does not require Python, Node, WASM, `curl`, or a model service. Applications still depend only on the `spars-nlp` Cargo package, imported as `spars`; its builds and inference do not download anything.
 
+## Environment and simple downloads
+
+Set `SPARS_MODEL_DIR` in the environment used by both the downloader and application:
+
+```sh
+export SPARS_MODEL_DIR="./target/models"
+cargo install --path installer --bin spars --locked
+spars download en_core_web_lg
+```
+
+The Node package supplies the same `spars download` command and a `downloadModel` API without requiring a separate CLI build; see [Node setup](NODE.md). The command accepts `--path DIR`, `--archive WHEEL`, and `--version VERSION`. A path override applies only to that operation. Neither downloader edits shell files, `.env`, or project JSON. Environment discovery and operating-system cache defaults are shared by Rust and Node. The root Rust library remains offline and has no networking dependency.
+
+Rust applications use `spars_model::download_model("en_core_web_lg", spars_model::DownloadOptions::default())` from the separate `spars-model` crate (available at `installer/` in this checkout). Set `DownloadOptions.path`, `.archive`, or `.version` for explicit overrides. Inference then uses `spars::Model::load("en_core_web_lg")`. Applications managing multiple roots can use `spars::ModelStore::new(path).load(name)` without changing environment variables.
+
+A completed download records the selected version in a small plain-text record under the model root's `.spars` directory. This is installation metadata, not project configuration. Loading reads that bounded record, validates the selected directory and model identity, and never picks an arbitrary version by scanning. Repeating a download verifies and selects that installation; older versioned directories remain intact. The legacy `install` command below still returns a directory directly and does not select it for name-based loading.
+
 ## Download and install
 
 Run from the repository root:
@@ -34,7 +50,7 @@ installer/target/release/spars-model catalog
 
 The catalog contains `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0. The installation directory includes the model version, native format version, conversion-recipe revision, language-resource revision, and archive checksum. Installing an already-present identity verifies and reuses it. Failed conversion leaves prior installations intact. An abandoned staging directory is recovered on the next attempt; concurrent installers cannot write through the same root lock.
 
-There is no implicit “latest” version and no active-model switch. A future supported release will install alongside the old one; applications will switch by explicitly selecting its directory and can roll back by selecting the retained old directory. Future catalogs must retain supported older recipes to verify those installations. Other model families, automatic update discovery, and model-removal commands are not implemented. New architectures still require native implementation and their own reference tests.
+There is no implicit “latest” version. Legacy `install` leaves name-based selections unchanged; explicit `download` selects that installation for subsequent name-based loads. Already loaded models and older directories remain unchanged. A future supported release will install alongside the old one; applications will switch by explicitly selecting its directory and can roll back by selecting the retained old directory. Future catalogs must retain supported older recipes to verify those installations. Other model families, automatic update discovery, and model-removal commands are not implemented. New architectures still require native implementation and their own reference tests.
 
 ## What is converted and checked
 

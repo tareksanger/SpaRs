@@ -37,6 +37,8 @@ mod attributes;
 mod chunks;
 mod lemmatizer;
 mod model;
+mod model_store;
+pub use model_store::ModelStore;
 mod ner;
 mod neural;
 mod parser;
