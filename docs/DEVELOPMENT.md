@@ -28,9 +28,11 @@ cargo check --locked --workspace
 cargo fmt --all --check
 ```
 
-`cargo update` updates all workspace dependencies within the versions allowed by their manifests. Review and commit the root lockfile after updating. Use `cargo build --release -p spars-model` to build the installer; its binaries are in `target/release/`. Root `cargo build`, `cargo check`, `cargo test`, and `cargo run` commands select the library by default; use `-p` to select another member, or `--workspace` with commands that support it.
+`cargo update` updates all workspace dependencies within the versions allowed by their manifests. Review and commit the root lockfile after updating. Use `cargo build --release -p spars-model` to build the installer; its binaries are in `target/release/`. The root manifest sets `default-members = ["crates/spars"]`, whose package name is `spars-nlp`. Root `cargo build`, `cargo check`, `cargo test`, `cargo run`, and `cargo publish` commands select that package by default; use `-p` to select another member, or `--workspace` with commands that support it.
 
 The `consumer/` project deliberately remains outside the workspace to check SpaRs as an external dependency. Update its separate lockfile with `cargo update --manifest-path consumer/Cargo.toml`. Full acceptance checks both projects, builds the Node addon, and runs its JavaScript tests.
+
+The maintainer command `cargo release` prepares the release PR using GitHub CLI; `cargo release --dry-run` previews it. It is implemented in `tools/release/` and shares the workspace lockfile. See [release preparation](RELEASING.md#start-a-release-when-ready) for prerequisites and the distinction from package publication.
 
 ## Read tokens and named entities
 

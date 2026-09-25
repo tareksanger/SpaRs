@@ -52,6 +52,8 @@ def verification_commands(model_exports_only: bool) -> list[list[str]]:
         ['cargo', 'fmt', '--all', '--check'],
         ['cargo', 'fmt', '--manifest-path', 'consumer/Cargo.toml', '--check'],
         ['cargo', 'clippy', '--locked', '--offline', '--workspace', '--all-targets', '--', '-D', 'warnings'],
+        ['cargo', 'test', '--locked', '--offline', '-p', 'spars-release-command'],
+        ['cargo', 'release', '--dry-run'],
         ['npm', '--prefix', 'bindings/node', 'run', 'build'],
         ['npm', '--prefix', 'bindings/node', 'run', 'typecheck'],
         ['npm', '--prefix', 'bindings/node', 'test'],

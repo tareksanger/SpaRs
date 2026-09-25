@@ -10,7 +10,7 @@ from json_types import json_array, json_object, json_string, validate_json
 class WorkspaceTests(unittest.TestCase):
     def test_members_share_the_root_and_consumer_stays_independent(self) -> None:
         root = Path(__file__).resolve().parent.parent
-        for manifest in ('Cargo.toml', 'crates/spars/Cargo.toml', 'crates/spars-model/Cargo.toml', 'bindings/node/Cargo.toml', 'consumer/Cargo.toml'):
+        for manifest in ('Cargo.toml', 'crates/spars/Cargo.toml', 'crates/spars-model/Cargo.toml', 'bindings/node/Cargo.toml', 'tools/release/Cargo.toml', 'consumer/Cargo.toml'):
             with self.subTest(manifest=manifest):
                 result = subprocess.check_output([
                     'cargo', 'metadata', '--offline', '--locked', '--no-deps', '--format-version', '1',
@@ -27,7 +27,7 @@ class WorkspaceTests(unittest.TestCase):
                     for item in json_array(data['packages'])
                     if json_string((package := json_object(item))['id']) in members
                 }
-                self.assertEqual(names, {'native-consumer-check'} if consumer else {'spars-nlp', 'spars-model', 'spars-node'})
+                self.assertEqual(names, {'native-consumer-check'} if consumer else {'spars-nlp', 'spars-model', 'spars-node', 'spars-release-command'})
                 defaults = {json_string(item) for item in json_array(data['workspace_default_members'])}
                 default_names = {
                     json_string(package['name'])
@@ -37,6 +37,7 @@ class WorkspaceTests(unittest.TestCase):
                 expected_default = 'native-consumer-check' if consumer else {
                     'crates/spars-model/Cargo.toml': 'spars-model',
                     'bindings/node/Cargo.toml': 'spars-node',
+                    'tools/release/Cargo.toml': 'spars-release-command',
                 }.get(manifest, 'spars-nlp')
                 self.assertEqual(default_names, {expected_default})
 

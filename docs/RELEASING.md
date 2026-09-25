@@ -22,6 +22,8 @@ cargo package --list
 cargo publish --dry-run
 ```
 
+The root workspace sets `default-members = ["crates/spars"]`, so these commands and `cargo publish` select the `spars-nlp` package. `cargo publish -p spars-nlp` makes the same selection explicitly. The installer, Node binding, and maintainer tool have `publish = false`. Publish a new version from the reviewed release tag; a version already on crates.io cannot be uploaded again.
+
 The Cargo archive contains production Rust source, package metadata, the README, and the project, spaCy, and Thinc notices. Tests, fixtures, examples, contributor guides, model assets, model-specific notices, and development tools stay in the repository. Run the test suite from a repository checkout; test modules are not distributed in the crate. Models and the native installer retain their own required notices.
 
 If Cargo lists unexpected files, correct the package's include rules before publishing. Explicit include rules override Git's ignore rules; a filename pattern without a directory can match files in nested folders. The [packaging regression test](../tools/test_package.py) checks those boundaries, and [package verification](../tools/check_package.py) builds a separate Rust application against the unpacked archive and runs model inference with an empty runtime PATH. Both checks run during acceptance. Avoid bypassing unexpected-file errors with `--allow-dirty`.
@@ -47,8 +49,13 @@ Before registry publication, confirm package-name ownership, package contents, p
 Install GitHub CLI and authenticate with `gh auth login`, then run this command from a checkout of the repository to prepare a release:
 
 ```sh
-gh workflow run release.yml --ref main
+cargo release --dry-run
+cargo release
 ```
+
+The preview prints `gh workflow run release.yml --ref main` without contacting GitHub. `cargo release` invokes that command in this checkout's repository, using the GitHub CLI repository selection. Cargo compiles the dependency-free maintainer tool on first use. The repository-local [Cargo alias](../.cargo/config.toml) works from the repository root or a directory within its shared workspace; it requires no additional Cargo plugin. GitHub CLI must be installed and authenticated with repository write access. Unsupported arguments and GitHub CLI failures return a nonzero exit status.
+
+`cargo release` requests release preparation; it does not push local commits, merge the release PR, or upload a Cargo package. Use `cargo publish` separately for registry publication after the release checks.
 
 The workflow uses Release Please to calculate the next version from commits since the previous release and open or refresh a version/changelog PR. It uses the remote `main` branch, so merge changes intended for this release before running the command. Normal pushes and PRs do not prepare releases. If more changes land while the release PR is open, run the same command again to refresh it.
 
@@ -82,4 +89,4 @@ Releases use `vX.Y.Z` tags and the corresponding changelog entry as their body. 
 
 ### Check release tooling locally
 
-With Node.js 24 available, first run `npm --prefix tools ci --ignore-scripts --no-audit --no-fund`, then `node --test .github/scripts/*.test.cjs` from the checkout. These tests execute the title-check script and exercise release success, explicit preparation, release-PR merge triggers, rejected CI results, wait timeouts, conflicting tags, absent notes, API failures, and retries using a simulated GitHub API. They also exercise initial version generation and dependent lockfile updates with the pinned Release Please library. Keep that development dependency aligned with the library bundled in the pinned action when updating it. The release-tooling CI job runs the same command. They do not create remote releases or prove that an App installation is configured correctly.
+With Node.js 24 available, first run `npm --prefix tools ci --ignore-scripts --no-audit --no-fund`, then `node --test .github/scripts/*.test.cjs` from the checkout. These tests execute the title-check script and exercise release success, explicit preparation, release-PR merge triggers, rejected CI results, wait timeouts, conflicting tags, absent notes, API failures, and retries using a simulated GitHub API. They also exercise initial version generation and dependent lockfile updates with the pinned Release Please library. Keep that development dependency aligned with the library bundled in the pinned action when updating it. The release-tooling CI job runs the same command. They do not create remote releases or prove that an App installation is configured correctly. Run `cargo test --locked --offline -p spars-release-command` for the local command's dispatch, preview, argument, and failure tests, and `cargo release --dry-run` to check the Cargo alias. These checks also run in the acceptance script without dispatching a workflow.

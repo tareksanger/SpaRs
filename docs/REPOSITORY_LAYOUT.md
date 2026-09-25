@@ -12,6 +12,8 @@ Choose a project's location by its responsibility. Extend an existing project wh
 | Development, export, reference, or verification tooling | `tools/` | Keeps maintainer tooling separate from production inference and ordinary library builds. |
 | Downstream application | Separate repository | Keeps application features and their dependencies outside the NLP library's scope. |
 
+Rust maintainer tools such as `tools/release/` are workspace members so they reuse the root lockfile and build directory. Keep them non-publishable and outside `default-members`; ordinary root commands continue to select the library.
+
 Keep each crate's production code in its `src/`, integration tests in its `tests/`, and runnable examples in its `examples/`. Keep unit tests in separate `tests.rs` modules as required by [AGENTS.md](../AGENTS.md). Shared frozen evaluation data belongs in `fixtures/`; model acquisition records belong in `models/`; pinned upstream provenance belongs in `reference/`. Keep crate-specific embedded resources with the crate that consumes them, with their licenses and provenance intact.
 
 ## Cargo ownership
