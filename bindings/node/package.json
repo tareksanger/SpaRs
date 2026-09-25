@@ -19,7 +19,7 @@
     "binaryName": "spars-node"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.10.4",
+    "@napi-rs/cli": "3.10.5",
     "@types/node": "24.13.6",
     "typescript": "5.9.3"
   },
