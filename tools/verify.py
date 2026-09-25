@@ -12,6 +12,7 @@ from report_paths import portable_text
 
 
 class Options(argparse.Namespace):
+    model_exports_only: bool = False
     report: Path = Path("target/reports/verification.json")
 
 
@@ -23,6 +24,7 @@ class CommandResult(TypedDict):
 
 
 class VerificationReport(TypedDict):
+    model_reference_regeneration: bool
     platform: str
     machine: str
     rustc: str
@@ -39,32 +41,13 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--report', type=Path, default=Path('target/reports/verification.json'))
-    options = Options()
-    parser.parse_args(namespace=options)
-    report_path = options.report
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    results: list[CommandResult] = []
-
-    def run(cmd: list[str]) -> None:
-        result = subprocess.run(cmd, text=True, capture_output=True)
-        results.append({'command':[portable_text(part, Path.cwd()) for part in cmd], 'exit_code':result.returncode,
-                        'stdout':portable_text(result.stdout, Path.cwd()), 'stderr':portable_text(result.stderr, Path.cwd())})
-        if result.returncode:
-            failure = report_path.with_name(report_path.stem+'-failure.json')
-            failure.write_text(json.dumps(results, indent=2)+'\n')
-            print(result.stdout, result.stderr)
-            raise SystemExit(f'Failed: {cmd}. See {failure}')
-        print('PASS', ' '.join(results[-1]['command']), flush=True)
-
-    commands = [
+def verification_commands(model_exports_only: bool) -> list[list[str]]:
+    return [
         ["tools/node_modules/.bin/pyright", "--project", "pyrightconfig.json"],
         [".venv/bin/python", "tools/check_typing_policy.py"],
         ['.venv/bin/python', 'tools/check_quality.py'],
         ['.venv/bin/python', 'tools/check_reference.py'],
-        ['.venv/bin/python', 'tools/check_models.py'],
+        ['.venv/bin/python', 'tools/check_models.py', *(['--exports-only'] if model_exports_only else [])],
         ['.venv/bin/python', '-m', 'unittest', 'discover', '-s', 'tools', '-p', 'test_*.py'],
         ['cargo', 'fmt', '--check'],
         ['cargo', 'fmt', '--manifest-path', 'consumer/Cargo.toml', '--check'],
@@ -86,6 +69,31 @@ def main() -> None:
         ['.venv/bin/python', 'tools/check_installer.py'],
         ['.venv/bin/python', 'tools/check_package.py'],
     ]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--report', type=Path, default=Path('target/reports/verification.json'))
+    parser.add_argument('--model-exports-only', action='store_true',
+                        help='Keep model export and native parity checks; regenerate sm/lg references separately on macOS ARM.')
+    options = Options()
+    parser.parse_args(namespace=options)
+    report_path = options.report
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    results: list[CommandResult] = []
+
+    def run(cmd: list[str]) -> None:
+        result = subprocess.run(cmd, text=True, capture_output=True)
+        results.append({'command':[portable_text(part, Path.cwd()) for part in cmd], 'exit_code':result.returncode,
+                        'stdout':portable_text(result.stdout, Path.cwd()), 'stderr':portable_text(result.stderr, Path.cwd())})
+        if result.returncode:
+            failure = report_path.with_name(report_path.stem+'-failure.json')
+            failure.write_text(json.dumps(results, indent=2)+'\n')
+            print(result.stdout, result.stderr)
+            raise SystemExit(f'Failed: {cmd}. See {failure}')
+        print('PASS', ' '.join(results[-1]['command']), flush=True)
+
+    commands = verification_commands(options.model_exports_only)
     for cmd in commands:
         run(cmd)
     Path('target').mkdir(exist_ok=True)
@@ -102,6 +110,7 @@ def main() -> None:
     report: VerificationReport = {'platform':platform.platform(),'machine':platform.machine(),
               'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),
               'python':platform.python_version(),'reference_versions':manifest.versions,
+              'model_reference_regeneration': not options.model_exports_only,
               'model':manifest.model+' '+manifest.model_version, 'commands':results,
               'reexport_sha256':digests,
               'fixture_sha256':{str(p):digest(p) for p in sorted(Path('fixtures').glob('*.json'))},
