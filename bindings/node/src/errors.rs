@@ -2,11 +2,13 @@ use napi::{Env, JsError};
 
 pub type Result<T> = std::result::Result<T, BindingError>;
 
+#[derive(Clone)]
 pub struct BindingError {
     code: Code,
     message: String,
 }
 
+#[derive(Clone)]
 enum Code {
     Io,
     InvalidModel,
@@ -66,4 +68,20 @@ pub fn number(value: usize) -> Result<u32> {
         code: Code::Bounds,
         message: "Document offset or token index exceeds the Node binding's u32 range".into(),
     })
+}
+
+impl From<spars_model::Error> for BindingError {
+    fn from(error: spars_model::Error) -> Self {
+        if let spars_model::Error::Model(error) = error {
+            return error.into();
+        }
+        let code = match &error {
+            spars_model::Error::Io(_) => Code::Io,
+            _ => Code::InvalidModel,
+        };
+        Self {
+            code,
+            message: error.to_string(),
+        }
+    }
 }

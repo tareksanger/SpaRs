@@ -11,14 +11,21 @@ function fixture() {
     'CHANGELOG.md': '# Changelog\n\n## 0.1.0 (2026-01-01)\n\n### Features\n\n- Native inference\n\n## 0.0.1\n\nOld notes\n',
   };
   const pr = { number: 42, merged_at: '2026-01-01', merge_commit_sha: sha,
-    base: { ref: 'main' }, labels: [{ name: 'autorelease: pending' }] };
-  const context = { repo: { owner: 'owner', repo: 'repo' }, payload: { workflow_run: {
-    conclusion: 'success', event: 'push', head_branch: 'main', head_sha: sha,
-    head_repository: { full_name: 'owner/repo' },
-  } } };
+    base: { ref: 'main', repo: { full_name: 'owner/repo' } }, labels: [{ name: 'autorelease: pending' }] };
+  const context = { repo: { owner: 'owner', repo: 'repo' }, eventName: 'pull_request',
+    payload: { action: 'closed', pull_request: { ...structuredClone(pr), merged: true } } };
+  const run = { id: 123, conclusion: 'success', status: 'completed', event: 'push',
+    head_branch: 'main', head_sha: sha, head_repository: { full_name: 'owner/repo' } };
   const missing = async () => { throw Object.assign(new Error('missing'), { status: 404 }); };
   const record = name => async args => { calls.push({ operation: name, ...args }); return { data: {} }; };
-  const github = { paginate: async () => [pr], rest: {
+  const github = { rest: {
+    pulls: { get: async args => { assert.equal(args.pull_number, 42); return { data: pr }; } },
+    actions: { listWorkflowRuns: async args => {
+      assert.equal(args.workflow_id, 'ci.yml'); assert.equal(args.head_sha, sha);
+      assert.equal(args.event, 'push'); assert.equal(args.branch, 'main');
+      assert.equal(args.status, undefined, 'Do not select an older successful run over a newer failure');
+      return { data: { workflow_runs: [run] } };
+    } },
     repos: { listPullRequestsAssociatedWithCommit() {},
       getContent: async ({ path, ref }) => {
         assert.equal(ref, sha, 'Release inputs must come from the tested commit');
@@ -27,7 +34,7 @@ function fixture() {
     git: { getRef: missing, createRef: record('tag') },
     issues: { addLabels: record('add'), removeLabel: record('remove') },
   } };
-  return { sha, calls, files, pr, context, github, core: { info() {} } };
+  return { sha, calls, files, pr, run, context, github, attempts: 2, wait: async () => {}, core: { info() {} } };
 }
 
 test('publishes the exact tested commit and only its reviewed notes', async () => {
@@ -51,16 +58,31 @@ test('rejects failed CI, PR runs, other branches, and forks before mutations', a
   for (const patch of [{ conclusion: 'failure' }, { event: 'pull_request' },
     { head_branch: 'other' }, { head_repository: { full_name: 'fork/repo' } }]) {
     const f = fixture();
-    Object.assign(f.context.payload.workflow_run, patch);
-    await assert.rejects(publish(f), /Expected successful/);
+    Object.assign(f.run, patch);
+    await assert.rejects(publish(f), /successful/);
     assert.deepEqual(f.calls, []);
   }
 });
 
-test('ordinary commits and different release merge SHAs do not release', async () => {
-  for (const change of [f => { f.pr.labels = []; }, f => { f.pr.merge_commit_sha = 'b'.repeat(40); },
-    f => { f.pr.merged_at = null; }, f => { f.pr.base.ref = 'other'; }]) {
-    const f = fixture(); change(f); await publish(f); assert.deepEqual(f.calls, []);
+test('only closing a merged prepared release PR authorizes publication', async () => {
+  for (const change of [f => { f.context.eventName = 'push'; },
+    f => { f.context.eventName = 'workflow_dispatch'; }, f => { f.context.payload.action = 'opened'; },
+    f => { f.context.payload.pull_request.merged = false; },
+    f => { f.context.payload.pull_request.labels = []; },
+    f => { f.context.payload.pull_request.base.ref = 'other'; }]) {
+    const f = fixture(); change(f);
+    await assert.rejects(publish(f)); assert.deepEqual(f.calls, []);
+  }
+});
+
+test('rejects ordinary or unmerged PRs and missing CI', async () => {
+  for (const change of [f => { f.pr.labels = []; }, f => { f.pr.merge_commit_sha = null; },
+    f => { f.pr.merged_at = null; }, f => { f.pr.base.ref = 'other'; },
+    f => { f.pr.base.repo.full_name = 'fork/repo'; },
+    f => { f.run.head_sha = 'b'.repeat(40); }, f => { f.run.status = 'in_progress'; },
+    f => { f.github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [] } }); }]) {
+    const f = fixture(); change(f);
+    await assert.rejects(publish(f)); assert.deepEqual(f.calls, []);
   }
 });
 
@@ -131,11 +153,7 @@ test('rejects each existing release mismatch independently', async () => {
   }
 });
 
-test('ambiguous PRs and invalid file responses fail before mutations', async () => {
-  const f = fixture();
-  f.github.paginate = async () => [f.pr, { ...f.pr, number: 43 }];
-  await assert.rejects(publish(f), /Ambiguous/);
-  assert.deepEqual(f.calls, []);
+test('invalid file responses fail before mutations', async () => {
   for (const data of [{ type: 'dir' }, { type: 'file', encoding: 'none' }]) {
     const g = fixture();
     g.github.rest.repos.getContent = async () => ({ data });
@@ -155,4 +173,60 @@ test('label failure after publishing can be retried without another release', as
   f.calls.length = 0;
   await publish(f);
   assert.deepEqual(f.calls.map(c => c.operation), ['add', 'remove']);
+});
+
+test('workflow prepares only on command and publishes only on release PR merge', () => {
+  const { parse } = require('../../tools/node_modules/yaml');
+  const workflow = parse(readFileSync('.github/workflows/release.yml', 'utf8'));
+  assert.deepEqual(Object.keys(workflow.on).sort(), ['pull_request', 'workflow_dispatch']);
+  assert.deepEqual(workflow.on.pull_request, { types: ['closed'], branches: ['main'] });
+  assert.match(workflow.jobs.prepare.if, /github.event_name == 'workflow_dispatch'/);
+  assert.match(workflow.jobs.prepare.if, /github.ref == 'refs\/heads\/main'/);
+  assert.match(workflow.jobs.publish.if, /github.event_name == 'pull_request'/);
+  assert.match(workflow.jobs.publish.if, /github.event.pull_request.merged == true/);
+  assert.match(workflow.jobs.publish.if, /contains\(github.event.pull_request.labels.\*.name, 'autorelease: pending'\)/);
+  const prepare = workflow.jobs.prepare.steps.find(step => step.uses?.startsWith('googleapis/release-please-action@'));
+  assert.equal(prepare.with['skip-github-release'], true);
+  assert.equal(workflow.concurrency, undefined, 'Unrelated closed PRs must not occupy the release queue');
+  for (const job of Object.values(workflow.jobs)) {
+    assert.deepEqual(job.concurrency, { group: 'release-main', queue: 'max', 'cancel-in-progress': false });
+  }
+  assert.deepEqual(workflow.jobs.publish.permissions, {
+    actions: 'read', contents: 'write', 'pull-requests': 'read', issues: 'write' });
+  assert.ok(!workflow.jobs.publish.steps.some(step => step.uses?.startsWith('googleapis/release-please-action@')));
+});
+
+test('newer failed CI blocks publication even if an older run succeeded', async () => {
+  const f = fixture();
+  f.github.rest.actions.listWorkflowRuns = async () => ({ data: {
+    workflow_runs: [{ ...f.run, conclusion: 'failure' }, f.run] } });
+  await assert.rejects(publish(f), /successful/);
+  assert.deepEqual(f.calls, []);
+});
+
+test('fully completed publication is repeatable without recreating a deleted release', async () => {
+  const f = fixture();
+  f.pr.labels = [{ name: 'autorelease: tagged' }];
+  await assert.rejects(publish(f), /tag is missing/);
+  assert.deepEqual(f.calls, []);
+  f.github.rest.git.getRef = async () => ({ data: { object: { type: 'commit', sha: f.sha } } });
+  await assert.rejects(publish(f), /GitHub Release is missing/);
+  assert.deepEqual(f.calls, []);
+  f.github.rest.repos.getReleaseByTag = async () => ({ data: {
+    draft: false, prerelease: false, body: '### Features\n\n- Native inference' } });
+  await publish(f);
+  assert.deepEqual(f.calls, []);
+});
+
+test('waits through missing and running CI, then publishes after success', async () => {
+  const f = fixture();
+  let reads = 0;
+  let waits = 0;
+  f.attempts = 3;
+  f.wait = async delay => { assert.equal(delay, 20000); waits++; assert.deepEqual(f.calls, []); };
+  f.github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs:
+    ++reads === 1 ? [] : [{ ...f.run, status: reads === 2 ? 'in_progress' : 'completed' }] } });
+  await publish(f);
+  assert.equal(waits, 2);
+  assert.equal(f.calls[1].operation, 'release');
 });

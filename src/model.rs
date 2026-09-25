@@ -19,6 +19,16 @@ pub struct Model {
 impl Model {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
+        if let Some(name) = path
+            .to_str()
+            .filter(|name| crate::model_store::validate_name(name).is_ok())
+        {
+            return crate::ModelStore::discover()?.load(name);
+        }
+        Self::load_path(path)
+    }
+    pub(crate) fn load_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
         let config: Manifest = serde_json::from_slice(&std::fs::read(path.join("manifest.json"))?)?;
         match config.format_version {
             1 if config.model == "en_core_web_md"

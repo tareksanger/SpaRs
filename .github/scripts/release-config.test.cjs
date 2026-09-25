@@ -30,9 +30,10 @@ test('pinned Rust strategy proposes 0.1.0 with versioned notes on first release'
   assert.match(changelog.updater.updateContent('# Changelog\n'), /^## 0\.1\.0 /m);
 });
 
-test('upstream updater changes only spars-nlp in every dependent lockfile', async () => {
+test('upstream updater changes only project versions in every dependent lockfile', async () => {
   const s = await strategy();
-  const updates = await s.extraFileUpdates(Version.parse('0.42.0'), new Map(), 'YYYY-MM-DD');
+  const updates = (await s.extraFileUpdates(Version.parse('0.42.0'), new Map(), 'YYYY-MM-DD'))
+    .filter(update => update.path.endsWith('Cargo.lock'));
   assert.deepEqual(updates.map(update => update.path).sort(),
     ['consumer/Cargo.lock', 'installer/Cargo.lock', 'bindings/node/Cargo.lock'].sort());
   for (const update of updates) {
@@ -40,9 +41,9 @@ test('upstream updater changes only spars-nlp in every dependent lockfile', asyn
     const before = toml.parse(input);
     const after = toml.parse(update.updater.updateContent(input));
     const expected = structuredClone(before);
-    const matches = expected.package.filter(pkg => pkg.name === 'spars-nlp');
-    assert.equal(matches.length, 1);
-    matches[0].version = '0.42.0';
+    const matches = expected.package.filter(pkg => ['spars-nlp', 'spars-node', 'spars-model'].includes(pkg.name));
+    assert.ok(matches.some(pkg => pkg.name === 'spars-nlp'));
+    for (const pkg of matches) pkg.version = '0.42.0';
     assert.deepEqual(after, expected, update.path);
   }
 });
@@ -55,5 +56,30 @@ test('configured pre-1.0 and stable version bumps follow documented policy', asy
     ['1.0.0', 'feat!: change output', '2.0.0'],
   ]) {
     assert.equal((await strategy()).versioningStrategy.bump(Version.parse(current), commits(message)).toString(), expected);
+  }
+});
+
+test('release PR synchronizes Rust, installer and Node manifests without changing publication policy', async () => {
+  const { TagName } = require('../../tools/node_modules/release-please/build/src/util/tag-name');
+  const latest = { tag: TagName.parse('v0.1.0'), sha: 'b'.repeat(40), notes: 'previous' };
+  const pr = await (await strategy()).buildReleasePullRequest(commits('feat: new behavior'), latest);
+  assert.ok(pr);
+  assert.equal(pr.version.toString(), '0.2.0');
+  const targets = ['Cargo.toml', 'bindings/node/Cargo.toml', 'installer/Cargo.toml',
+    'bindings/node/package.json', 'bindings/node/package-lock.json'];
+  for (const path of targets) {
+    const update = pr.updates.find(update => update.path === path);
+    assert.ok(update, path);
+    assert.equal(pr.updates.filter(item => item.path === path).length, 1, 'Extra updates must compose');
+    const input = readFileSync(path, 'utf8');
+    const parse = path.endsWith('.json') ? JSON.parse : toml.parse;
+    const before = parse(input);
+    const expected = structuredClone(before);
+    if (path.endsWith('.toml')) expected.package.version = '0.2.0';
+    else {
+      expected.version = '0.2.0';
+      if (expected.packages) expected.packages[''].version = '0.2.0';
+    }
+    assert.deepEqual(parse(update.updater.updateContent(input)), expected, path);
   }
 });

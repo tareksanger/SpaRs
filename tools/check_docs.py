@@ -1,5 +1,6 @@
 """Run the Rust examples written in the README and developer guides."""
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -54,6 +55,15 @@ def rustdoc_passed(returncode: int, stdout: str, count: int) -> bool:
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
     subprocess.run(['cargo', 'build', '--release', '--offline', '--lib'], cwd=root, check=True)
+    subprocess.run(['cargo', 'build', '--release', '--offline', '--manifest-path',
+                    'installer/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
+    store = root / 'target/docs-models'
+    subprocess.run([
+        'installer/target/release/spars', 'download', 'en_core_web_sm', '--path', str(store),
+        '--archive', 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
+    ], cwd=root, check=True, capture_output=True, text=True)
+    os.environ['SPARS_MODEL_DIR'] = str(store)
+    os.environ['SPARS_MODEL'] = str(root / 'assets/en_core_web_md-3.8.0')
     docs = [root/'README.md', *sorted((root/'docs').glob('*.md'))]
     results: list[DocumentationResult] = []
     for path in docs:

@@ -12,17 +12,42 @@
         {
           "type": "toml",
           "path": "consumer/Cargo.lock",
-          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp' || @.name.value == 'spars-node' || @.name.value == 'spars-model')].version"
         },
         {
           "type": "toml",
           "path": "installer/Cargo.lock",
-          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp' || @.name.value == 'spars-node' || @.name.value == 'spars-model')].version"
         },
         {
           "type": "toml",
           "path": "bindings/node/Cargo.lock",
-          "jsonpath": "$.package[?(@.name.value == 'spars-nlp')].version"
+          "jsonpath": "$.package[?(@.name.value == 'spars-nlp' || @.name.value == 'spars-node' || @.name.value == 'spars-model')].version"
+        },
+        {
+          "type": "toml",
+          "path": "bindings/node/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "installer/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "json",
+          "path": "bindings/node/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "bindings/node/package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "bindings/node/package-lock.json",
+          "jsonpath": "$.packages[''].version"
         }
       ]
     }

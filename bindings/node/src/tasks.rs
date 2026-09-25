@@ -4,7 +4,7 @@ use napi_derive::napi;
 use std::sync::Arc;
 
 pub struct LoadTask {
-    pub(crate) path: Utf16String,
+    pub(crate) source: errors::Result<crate::models::LoadSource>,
 }
 
 #[napi]
@@ -13,8 +13,11 @@ impl Task for LoadTask {
     type JsValue = Model;
 
     fn compute(&mut self) -> Result<Self::Output> {
-        Ok(errors::text(&self.path)
-            .and_then(|path| spars::Model::load(path).map(Arc::new).map_err(Into::into)))
+        Ok(self
+            .source
+            .as_ref()
+            .map_err(Clone::clone)
+            .and_then(|source| source.load().map(Arc::new)))
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {

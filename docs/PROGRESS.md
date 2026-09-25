@@ -22,13 +22,13 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `tests/model_loading.rs` and `tests/model_parity.rs` |
-| Executed Rust Markdown examples | 1 README example and 8 guide examples |
+| Executed Rust Markdown examples | 1 README example and 9 guide examples |
 | Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API and async lifecycle/error tests |
-| Executed TypeScript guide examples | 2 examples checked and run from Markdown |
+| Executed TypeScript guide examples | 3 examples checked and run from Markdown |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 9 Rust and 2 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 10 Rust and 3 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
@@ -61,7 +61,7 @@ Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_
 
 Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
-The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, and static word vectors. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, explicit model installation, and binary packaging for supported platforms. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
+The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, static word vectors, and explicit native model downloads. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, and binary packaging for supported platforms. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
 
 ## Model extensibility plan
 
@@ -128,3 +128,5 @@ Acceptance: lifecycle tests install two distinct identities, select each determi
 Add a plain-English installation guide with commands and a separate Rust consumer example that actually run. Extend CI to execute native local-package conversion and offline inference without silently skipping model tests. Keep Python reference/export jobs separate from the native installation acceptance job. Record checksums and fixtures in Git; generated mismatch and performance reports remain under ignored `target/reports/`.
 
 Acceptance: formatting, Clippy, typing, unit tests, malformed-input tests, reference comparisons, documentation examples, and package dry runs pass. Review installation security boundaries, source fidelity, test quality, and documentation independently. Measure download, conversion, disk usage, peak memory, and subsequent loading separately; check inference against the unchanged baseline if loader/runtime code changes. Public documentation must still distinguish this pinned installer from support for arbitrary spaCy packages.
+
+Name-based loading and explicit downloads share `SPARS_MODEL_DIR` and operating-system cache defaults across Rust, Node, and the `spars` CLI. `tests/model_store.rs`, `installer/tests/project.rs`, and `bindings/node/tests/models.test.mts` cover malformed selection records, path precedence, environment discovery, native installation, missing-model errors, and an installed npm package. Downloading is separate from loading, and path overrides do not persist project configuration.

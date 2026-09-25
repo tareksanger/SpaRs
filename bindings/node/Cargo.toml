@@ -13,6 +13,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
+spars-model = { path = "../../installer" }
 spars = { package = "spars-nlp", path = "../.." }
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"

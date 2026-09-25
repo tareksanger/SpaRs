@@ -10,22 +10,42 @@ Use Node.js 24 or newer, npm, and Rust 1.88 or newer. Run these commands from th
 npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
 cargo fetch --locked --manifest-path bindings/node/Cargo.toml
 npm --prefix bindings/node run build
-cargo build --locked --release --manifest-path installer/Cargo.toml
-model_dir=$(installer/target/release/spars-model install --version 3.8.0 --root target/models)
-export SPARS_MODEL="$model_dir"
+export SPARS_MODEL_DIR="./target/models"
+node bindings/node/bin/spars.mjs download en_core_web_lg
 ```
 
-Installation requires no Python. See [model installation](MODEL_INSTALLATION.md) for local archives and checksums. The binding loads an existing model directory and never downloads assets during inference. Build the addon locally for your operating system and CPU; prebuilt npm packages and Windows verification remain future work. Node dependencies are confined to `bindings/node/` and do not enter ordinary Rust consumer builds.
+Installation requires no Python. See [model installation](MODEL_INSTALLATION.md) for local archives and checksums. The Node package includes the `spars` CLI and an asynchronous `downloadModel` API backed by the native Rust installer. No separate installer executable is needed. `loadModel("en_core_web_lg")` resolves the installation under `SPARS_MODEL_DIR` and never downloads assets during loading or inference. Build the addon locally for your operating system and CPU; prebuilt npm packages and Windows verification remain future work. Node dependencies are confined to `bindings/node/` and do not enter ordinary Rust consumer builds.
+
+## Download and load by name
+
+Set `SPARS_MODEL_DIR` in your shell, service, or application environment before downloading or loading. The library does not read `.env` files automatically or write project configuration. Without this variable, the shared default is `Library/Caches/spars/models` under the user home on macOS, `spars/models` under `LOCALAPPDATA` on Windows, and `spars/models` under `XDG_CACHE_HOME` (or `.cache` under the user home) on other systems. Relative values use the process working directory; an absolute path avoids differences between launch directories.
+
+Once the Node package is installed locally, run `npx spars download en_core_web_lg`. From the source checkout, use `node bindings/node/bin/spars.mjs download en_core_web_lg`. Both accept `--path`, `--version`, and `--archive`. Omitting the version selects the catalog's single pinned release, never a remote latest release. `--path` affects that command only; set `SPARS_MODEL_DIR` or pass `{path: "models"}` to later `loadModel` calls to use the same custom directory.
+
+The following executable example uses the official wheel acquired by the reference setup to run offline. Omit `archive` to download from the pinned official URL. Guide verification configures a temporary model store before running this example.
+
+```typescript
+import assert from 'node:assert/strict';
+import { downloadModel, loadModel } from './index.js';
+
+await downloadModel('en_core_web_sm', {
+  archive: 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
+});
+const model = await loadModel('en_core_web_sm');
+assert.equal((await model.process('Alice visits London.')).tokens[0]?.text, 'Alice');
+```
+
+`downloadModel(name, {path?, version?, archive?})` resolves to the installed directory. Existing installations are verified and reused. `loadModel(name, {path?})` loads by name; an explicit directory such as `./models/export` remains supported. Bare names select installed models even if a same-named directory exists in the working directory. Missing models reject with a download hint. Async calls capture environment and relative paths when called, before work is queued. Downloads use Node's worker pool and share the Rust installer's checksum verification, archive limits, staging, and locking; cancellation and progress callbacks are not implemented.
 
 ## Process text
 
-Save this example as `bindings/node/analyze.mts`, then run `node bindings/node/analyze.mts` from the repository root. For reference development, the example also accepts the standard exported assets directory when `SPARS_MODEL` is unset. Verification executes this code directly from this guide.
+Save this example as `bindings/node/analyze.mts`, then run `node bindings/node/analyze.mts` from the repository root. `SPARS_MODEL` optionally selects another model name or an explicit export directory. Reference verification supplies the medium-model export through this variable. Verification executes this code directly from this guide.
 
 ```typescript
 import assert from 'node:assert/strict';
 import { loadModel } from './index.js';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'assets/en_core_web_md-3.8.0');
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 const doc = await model.process('Alice works in London.');
 assert.equal(doc.tokens[0]?.text, 'Alice');
 assert.ok(doc.entities);
@@ -51,7 +71,7 @@ This example can also be saved beside `index.js` and run from the repository roo
 import assert from 'node:assert/strict';
 import { loadModel } from './index.js';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'assets/en_core_web_md-3.8.0');
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 const docs = await model.processBatch(['😀 café', ''], 'Tokenizer');
 assert.equal(docs[0]?.tokens[0]?.utf16End, 2);
 assert.equal(docs[0]?.tokens[0]?.byteEnd, 4);
@@ -67,7 +87,7 @@ assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
 
 Each batch runs sequentially in one worker job and retains input order. A failure rejects the entire batch. Concurrent calls share the immutable model and own their processing state. Node's worker pool limits active jobs, but queued inputs and complete batch results still occupy memory. Keep batches and concurrent submissions bounded for your workload. Input copying and result creation take place on the JavaScript thread; large batches can still delay it. This API does not stream results or support cancellation.
 
-`vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, matchers, and model installation are not yet exposed through this binding; their Rust APIs remain available separately.
+`vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, and matchers are not yet exposed through this binding; their Rust APIs remain available separately.
 
 ## Errors and verification
 

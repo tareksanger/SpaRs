@@ -7,6 +7,14 @@ publish = false
 license = "MIT"
 description = "Explicit native model installation for SpaRs"
 
+[[bin]]
+name = "spars"
+path = "src/short_main.rs"
+
+[[bin]]
+name = "spars-model"
+path = "src/main.rs"
+
 [workspace]
 
 [dependencies]
