@@ -32,7 +32,7 @@ cargo fmt --all --check
 
 The `consumer/` project deliberately remains outside the workspace to check SpaRs as an external dependency. Update its separate lockfile with `cargo update --manifest-path consumer/Cargo.toml`. Full acceptance checks both projects, builds the Node addon, and runs its JavaScript tests.
 
-The maintainer command `cargo release` prepares the release PR using GitHub CLI; `cargo release --dry-run` previews it. It is implemented in `tools/release/` and shares the workspace lockfile. See [release preparation](RELEASING.md#start-a-release-when-ready) for prerequisites and the distinction from package publication.
+The maintainer command `cargo release` prepares the release PR using GitHub CLI; `cargo release --dry-run` previews it. It is implemented in `tools/release/` and shares the workspace lockfile. See [release preparation](RELEASING.md) for prerequisites and the steps to create a release and publish to crates.io.
 
 ## Read tokens and named entities
 
