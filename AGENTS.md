@@ -1,5 +1,9 @@
 # Contributing agent guidance
 
+## Repository layout
+
+Before creating or moving a project, read and follow [repository layout rules](docs/REPOSITORY_LAYOUT.md). Keep the root Cargo manifest a virtual workspace, place Rust libraries and command-line tools under `crates/`, and place language bindings under `bindings/`. The layout rules define the independent-consumer exception and the checks required when paths change.
+
 ## Project scope
 
 SpaRs (Cargo package `spars-nlp`, Rust import `spars`) is a standalone native Rust NLP library. The current supported models are the official `en_core_web_sm`, `en_core_web_md`, and `en_core_web_lg` 3.8.0 exports, using spaCy 3.8.14 and Thinc 8.3.13 as the reference. Keep broader compatibility status in `docs/COMPATIBILITY.md`; one English pipeline does not establish full spaCy parity.
