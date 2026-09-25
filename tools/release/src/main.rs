@@ -4,7 +4,7 @@ use std::{
     process::{Command, ExitCode},
 };
 
-const HELP: &str = "Usage: cargo release [--dry-run]\n\nPrepare or refresh the release PR from remote main using GitHub CLI.\nRequires gh authenticated with repository write access.\n--dry-run prints the command without contacting GitHub.\nPackage publication remains a separate cargo publish command.";
+const HELP: &str = "Usage: cargo release [--dry-run]\n\nPrepare or refresh the release PR from the remote default branch using GitHub CLI.\nRequires gh authenticated with repository write access.\n--dry-run prints the command without contacting GitHub.\nPackage publication remains a separate cargo publish command.";
 
 fn run(
     args: &[String],
@@ -13,8 +13,8 @@ fn run(
     match args {
         [] => {}
         [option] if option == "--dry-run" => {
-            println!("gh workflow run release.yml --ref main");
-            println!("Uses remote main for this checkout's GitHub repository; local changes are not pushed.");
+            println!("gh workflow run release.yml");
+            println!("Uses the remote default branch for this checkout's GitHub repository; local changes are not pushed.");
             return Ok(());
         }
         [option] if option == "--help" || option == "-h" => {
@@ -27,8 +27,10 @@ fn run(
     let mut command = Command::new("gh");
     command
         .current_dir(root)
-        .args(["workflow", "run", "release.yml", "--ref", "main"]);
-    println!("Preparing the release PR from remote main; local changes are not pushed.");
+        .args(["workflow", "run", "release.yml"]);
+    println!(
+        "Preparing the release PR from the remote default branch; local changes are not pushed."
+    );
     match invoke(&mut command) {
         Ok(true) => Ok(()),
         Ok(false) => {

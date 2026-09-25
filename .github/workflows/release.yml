@@ -3,16 +3,15 @@ on:
   workflow_dispatch:
   pull_request:
     types: [closed]
-    branches: [main]
 permissions:
   contents: read
 jobs:
   prepare:
     concurrency:
-      group: release-main
+      group: release-default-branch
       queue: max
       cancel-in-progress: false
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     steps:
       - name: Create repository-scoped release token
@@ -28,18 +27,19 @@ jobs:
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           token: ${{ steps.app.outputs.token }}
-          target-branch: main
+          target-branch: ${{ github.event.repository.default_branch }}
           skip-github-release: true
 
   publish:
     concurrency:
-      group: release-main
+      group: release-default-branch
       queue: max
       cancel-in-progress: false
     timeout-minutes: 45
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
       contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
     runs-on: ubuntu-latest
     permissions:

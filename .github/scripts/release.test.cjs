@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const publish = require('./release.cjs');
 
-function fixture() {
+function fixture(defaultBranch = 'main') {
   const sha = 'a'.repeat(40);
   const calls = [];
   const files = {
@@ -11,18 +11,18 @@ function fixture() {
     'CHANGELOG.md': '# Changelog\n\n## 0.1.0 (2026-01-01)\n\n### Features\n\n- Native inference\n\n## 0.0.1\n\nOld notes\n',
   };
   const pr = { number: 42, merged_at: '2026-01-01', merge_commit_sha: sha,
-    base: { ref: 'main', repo: { full_name: 'owner/repo' } }, labels: [{ name: 'autorelease: pending' }] };
+    base: { ref: defaultBranch, repo: { full_name: 'owner/repo' } }, labels: [{ name: 'autorelease: pending' }] };
   const context = { repo: { owner: 'owner', repo: 'repo' }, eventName: 'pull_request',
-    payload: { action: 'closed', pull_request: { ...structuredClone(pr), merged: true } } };
+    payload: { repository: { default_branch: defaultBranch }, action: 'closed', pull_request: { ...structuredClone(pr), merged: true } } };
   const run = { id: 123, conclusion: 'success', status: 'completed', event: 'push',
-    head_branch: 'main', head_sha: sha, head_repository: { full_name: 'owner/repo' } };
+    head_branch: defaultBranch, head_sha: sha, head_repository: { full_name: 'owner/repo' } };
   const missing = async () => { throw Object.assign(new Error('missing'), { status: 404 }); };
   const record = name => async args => { calls.push({ operation: name, ...args }); return { data: {} }; };
   const github = { rest: {
     pulls: { get: async args => { assert.equal(args.pull_number, 42); return { data: pr }; } },
     actions: { listWorkflowRuns: async args => {
       assert.equal(args.workflow_id, 'ci.yml'); assert.equal(args.head_sha, sha);
-      assert.equal(args.event, 'push'); assert.equal(args.branch, 'main');
+      assert.equal(args.event, 'push'); assert.equal(args.branch, defaultBranch);
       assert.equal(args.status, undefined, 'Do not select an older successful run over a newer failure');
       return { data: { workflow_runs: [run] } };
     } },
@@ -179,17 +179,19 @@ test('workflow prepares only on command and publishes only on release PR merge',
   const { parse } = require('../../tools/node_modules/yaml');
   const workflow = parse(readFileSync('.github/workflows/release.yml', 'utf8'));
   assert.deepEqual(Object.keys(workflow.on).sort(), ['pull_request', 'workflow_dispatch']);
-  assert.deepEqual(workflow.on.pull_request, { types: ['closed'], branches: ['main'] });
+  assert.deepEqual(workflow.on.pull_request, { types: ['closed'] });
   assert.match(workflow.jobs.prepare.if, /github.event_name == 'workflow_dispatch'/);
-  assert.match(workflow.jobs.prepare.if, /github.ref == 'refs\/heads\/main'/);
+  assert.ok(workflow.jobs.prepare.if.includes("github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"));
+  assert.ok(workflow.jobs.publish.if.includes('github.event.pull_request.base.ref == github.event.repository.default_branch'));
   assert.match(workflow.jobs.publish.if, /github.event_name == 'pull_request'/);
   assert.match(workflow.jobs.publish.if, /github.event.pull_request.merged == true/);
   assert.match(workflow.jobs.publish.if, /contains\(github.event.pull_request.labels.\*.name, 'autorelease: pending'\)/);
   const prepare = workflow.jobs.prepare.steps.find(step => step.uses?.startsWith('googleapis/release-please-action@'));
   assert.equal(prepare.with['skip-github-release'], true);
+  assert.equal(prepare.with['target-branch'], '${{ github.event.repository.default_branch }}');
   assert.equal(workflow.concurrency, undefined, 'Unrelated closed PRs must not occupy the release queue');
   for (const job of Object.values(workflow.jobs)) {
-    assert.deepEqual(job.concurrency, { group: 'release-main', queue: 'max', 'cancel-in-progress': false });
+    assert.deepEqual(job.concurrency, { group: 'release-default-branch', queue: 'max', 'cancel-in-progress': false });
   }
   assert.deepEqual(workflow.jobs.publish.permissions, {
     actions: 'read', contents: 'write', 'pull-requests': 'read', issues: 'write' });
@@ -229,4 +231,31 @@ test('waits through missing and running CI, then publishes after success', async
   await publish(f);
   assert.equal(waits, 2);
   assert.equal(f.calls[1].operation, 'release');
+});
+
+
+test('publication follows a renamed default branch and rejects the former branch', async () => {
+  for (const branch of ['trunk', 'release/stable']) {
+    const f = fixture(branch);
+    await publish(f);
+    assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release', 'add', 'remove']);
+    for (const change of [
+      g => { g.context.payload.pull_request.base.ref = 'main'; },
+      g => { g.pr.base.ref = 'main'; },
+      g => { g.run.head_branch = 'main'; },
+    ]) {
+      const g = fixture(branch); change(g);
+      await assert.rejects(publish(g));
+      assert.deepEqual(g.calls, []);
+    }
+  }
+});
+
+test('missing or invalid default branch metadata fails before mutations', async () => {
+  for (const value of [undefined, null, '', 42]) {
+    const f = fixture();
+    f.context.payload.repository.default_branch = value;
+    await assert.rejects(publish(f), /default branch/);
+    assert.deepEqual(f.calls, []);
+  }
 });

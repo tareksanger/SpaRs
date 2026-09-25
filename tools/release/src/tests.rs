@@ -1,12 +1,12 @@
 use super::*;
 
 #[test]
-fn prepares_only_the_main_branch_workflow_from_the_repository_root() {
+fn prepares_only_the_default_branch_workflow_from_the_repository_root() {
     run(&[], |command| {
         assert_eq!(command.get_program(), "gh");
         assert_eq!(
             command.get_args().collect::<Vec<_>>(),
-            ["workflow", "run", "release.yml", "--ref", "main"]
+            ["workflow", "run", "release.yml"]
         );
         assert_eq!(
             command.get_current_dir().unwrap().canonicalize().unwrap(),

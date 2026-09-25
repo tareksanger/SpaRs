@@ -11,9 +11,10 @@ fn isolated_command() -> Command {
 fn preview_and_help_succeed_without_github_cli() {
     let preview = isolated_command().arg("--dry-run").output().unwrap();
     assert!(preview.status.success());
-    assert!(String::from_utf8(preview.stdout)
-        .unwrap()
-        .contains("gh workflow run release.yml --ref main"));
+    assert_eq!(
+        String::from_utf8(preview.stdout).unwrap().lines().next(),
+        Some("gh workflow run release.yml")
+    );
     assert!(isolated_command().arg("--help").status().unwrap().success());
 }
 

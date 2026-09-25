@@ -3,9 +3,13 @@ module.exports = async ({ github, context, core,
   wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
   attempts = 120 }) => {
   const repo = context.repo;
+  const defaultBranch = context.payload.repository?.default_branch;
+  if (typeof defaultBranch !== 'string' || defaultBranch.trim() === '') {
+    throw new Error('Expected repository default branch metadata');
+  }
   const event = context.payload.pull_request;
   if (context.eventName !== 'pull_request' || context.payload.action !== 'closed' ||
-      !event?.merged || event.base.ref !== 'main' ||
+      !event?.merged || event.base.ref !== defaultBranch ||
       !event.labels.some(label => label.name === 'autorelease: pending')) {
     throw new Error('Publish requires a merged release PR');
   }
@@ -14,22 +18,22 @@ module.exports = async ({ github, context, core,
   const pending = pr.labels.some(label => label.name === 'autorelease: pending');
   const tagged = pr.labels.some(label => label.name === 'autorelease: tagged');
   const sha = pr.merge_commit_sha;
-  if (!pr.merged_at || pr.base.ref !== 'main' ||
+  if (!pr.merged_at || pr.base.ref !== defaultBranch ||
       pr.base.repo.full_name !== `${repo.owner}/${repo.repo}` ||
       typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha) || sha !== event.merge_commit_sha || (!pending && !tagged)) {
-    throw new Error('Select a merged release PR targeting this repository main branch');
+    throw new Error('Select a merged release PR targeting this repository default branch');
   }
-  // Read CI for the release merge commit, even if main has advanced since then.
+  // Read CI for the release merge commit, even if the default branch has advanced since then.
   // Do not filter to successful runs: a newer failed/in-progress run must block publication.
   let verified = false;
   for (let attempt = 0; attempt < attempts; attempt++) {
     const { data } = await github.rest.actions.listWorkflowRuns({ ...repo, workflow_id: 'ci.yml',
-      head_sha: sha, event: 'push', branch: 'main', per_page: 100 });
+      head_sha: sha, event: 'push', branch: defaultBranch, per_page: 100 });
     const run = data.workflow_runs[0];
     if (run) {
-      if (run.head_sha !== sha || run.event !== 'push' || run.head_branch !== 'main' ||
+      if (run.head_sha !== sha || run.event !== 'push' || run.head_branch !== defaultBranch ||
           run.head_repository?.full_name !== `${repo.owner}/${repo.repo}`) {
-        throw new Error('Expected successful main-branch push CI for the release merge commit');
+        throw new Error('Expected successful default-branch push CI for the release merge commit');
       }
       if (run.status === 'completed') {
         if (run.conclusion !== 'success') {
