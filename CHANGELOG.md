@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/tareksanger/SpaRs/compare/v0.1.0...v0.2.0) (2026-09-25)
+
+
+### Features
+
+* add native model downloads and name-based loading ([#29](https://github.com/tareksanger/SpaRs/issues/29)) ([ed1b516](https://github.com/tareksanger/SpaRs/commit/ed1b516ce6997d5137b05b0068ca982f1d8223f2))
+
 ## 0.1.0 (2026-09-25)
 
 
