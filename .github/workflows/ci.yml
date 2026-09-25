@@ -7,10 +7,15 @@ concurrency:
   cancel-in-progress: true
 jobs:
   reference-and-rust:
+    name: reference-and-rust (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            model-reference-args: --model-exports-only
+          - os: macos-latest
+            model-reference-args: ''
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -34,8 +39,11 @@ jobs:
       - run: cargo fetch --locked --manifest-path consumer/Cargo.toml
       - run: cargo fetch --locked --manifest-path installer/Cargo.toml
       - run: cargo fetch --locked --manifest-path bindings/node/Cargo.toml
+      - name: Require the recorded model-reference architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = arm64
       - name: Run the same acceptance checks as local development
-        run: .venv/bin/python tools/verify.py --report target/reports/verification-ci.json
+        run: .venv/bin/python tools/verify.py ${{ matrix.model-reference-args }} --report target/reports/verification-ci.json
       - name: Record performance separately from fidelity
         run: .venv/bin/python tools/benchmark.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
