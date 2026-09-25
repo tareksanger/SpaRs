@@ -77,7 +77,7 @@ Use this command for malformed-input and state-isolation checks:
 cargo test --release --offline --test robustness -- --include-ignored
 ```
 
-Ordinary `cargo test` skips model-dependent tests. Acceptance and CI include them explicitly. CI uses the same verification script as local development, saves reports even on failure, and runs on Linux and macOS. Repository administrators should require both reference jobs (`reference-and-rust (ubuntu-latest)` and `reference-and-rust (macos-latest)`) and `native-installation` before merging; the workflow alone does not configure branch protection.
+Ordinary `cargo test` skips model-dependent tests. Acceptance and CI include them explicitly. CI uses the same verification script as local development, saves reports even on failure, and runs on Linux and macOS. Small/large/component-order reference regeneration runs on macOS ARM; Linux retains byte-identical exports and native parity using `--model-exports-only`, as described in [validation](VALIDATION.md#model-reference-regeneration-across-platforms). Repository administrators should require both reference jobs (`reference-and-rust (ubuntu-latest)` and `reference-and-rust (macos-latest)`) and `native-installation` before merging; the workflow alone does not configure branch protection.
 
 Generated reports belong in ignored `target/reports/`, not Git. Keep test code, frozen fixtures, expected outputs, checksums, and source/model provenance in Git. To inspect CI evidence, open the workflow run in GitHub Actions and download the `fidelity-reports` artifact for its operating system. Artifacts describe that run and may expire under the repository retention policy; rerun verification when fresh evidence is needed.
 
