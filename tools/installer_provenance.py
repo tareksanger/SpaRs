@@ -4,10 +4,13 @@ from json_types import JsonValue, json_object, json_string, read_json, string_ma
 from provenance import PackageRecord
 
 # Official CPython 3.12 wheels differ only in build-directory comments in this
-# generated file. Both complete file hashes were verified; see reference/README.md.
+# generated file. All three complete file hashes were verified; see reference/README.md.
 _LEVENSHTEIN_SOURCE = 'spacy/matcher/levenshtein.c'
 _MACOS_SHA256 = '3d0aaaea19850900ec4071700ee6fe69c7d8e59ee1a4f9c963189e78161a278d'
-_LINUX_SHA256 = 'e14722922674055c3d72e21fd8b727597c58ba7395f70be68eaa55aa15bd44a9'
+_LINUX_SHA256 = frozenset({
+    'e14722922674055c3d72e21fd8b727597c58ba7395f70be68eaa55aa15bd44a9',
+    '2700287c8e956c608d7013e96e0ff0dd7b1e8296778b7ce3693197d2d4318e00',
+})
 
 
 def source_records(value: JsonValue) -> dict[str, PackageRecord]:
@@ -17,7 +20,7 @@ def source_records(value: JsonValue) -> dict[str, PackageRecord]:
         if set(record) != {'version', 'release', 'files'}:
             raise ValueError('Source records require version, release and files')
         files = string_map(record['files'])
-        if name == 'spacy' and record['version'] == '3.8.14' and files.get(_LEVENSHTEIN_SOURCE) == _LINUX_SHA256:
+        if name == 'spacy' and record['version'] == '3.8.14' and files.get(_LEVENSHTEIN_SOURCE, '') in _LINUX_SHA256:
             files[_LEVENSHTEIN_SOURCE] = _MACOS_SHA256
         # These four files describe the local Python installation, not model assets.
         if name == 'en_core_web_md':
