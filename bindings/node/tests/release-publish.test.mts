@@ -54,7 +54,7 @@ test('real tarball manifests determine ordering, SHA512, and complete versioned 
     const ordered=releasePackages(join(root,'tarballs'));
     assert.deepEqual(ordered.map(pkg=>pkg.name),[...targets.map(target=>`@spars/node-${target.suffix}`),'@spars/node']);
     for(const pkg of ordered) assert.equal(pkg.integrity,'sha512-'+createHash('sha512').update(readFileSync(pkg.path)).digest('base64'));
-    tarball('platform-0.tgz','@spars/node-darwin-arm64','0.1.0');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
+    tarball('platform-0.tgz',`@spars/node-${targets[0].suffix}`,'0.1.0');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
     tarball('platform-0.tgz','@spars/node-darwin-arm64');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
     tarball('platform-0.tgz',false);assert.throws(()=>releasePackages(join(root,'tarballs')),/Invalid tarball/);
     rmSync(join(root,'tarballs/platform-0.tgz'));assert.throws(()=>releasePackages(join(root,'tarballs')),new RegExp(`exactly ${targets.length+1} release tarballs`));
