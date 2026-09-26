@@ -1,2 +1,3 @@
 [alias]
 release = ["run", "--quiet", "--locked", "--offline", "-p", "spars-release-command", "--"]
+publish-npm = ["run", "--quiet", "--locked", "--offline", "-p", "spars-release-command", "--", "npm"]

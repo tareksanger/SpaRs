@@ -1,15 +1,22 @@
+mod npm;
+
 use std::{
     io,
     path::Path,
     process::{Command, ExitCode},
 };
 
-const HELP: &str = "Usage: cargo release [--dry-run]\n\nPrepare or refresh the release PR from the remote default branch using GitHub CLI.\nRequires gh authenticated with repository write access.\n--dry-run prints the command without contacting GitHub.\nPackage publication remains a separate cargo publish command.";
+const HELP: &str = "Usage: cargo release [--dry-run]\n\nPrepare or refresh the release PR from the remote default branch using GitHub CLI.\nRequires gh authenticated with repository write access.\n--dry-run prints the command without contacting GitHub.\nUse cargo publish for crates.io or cargo publish-npm --help for npm.";
 
 fn run(
     args: &[String],
     invoke: impl FnOnce(&mut Command) -> io::Result<bool>,
 ) -> Result<(), String> {
+    if let Some((command, rest)) = args.split_first() {
+        if command == "npm" {
+            return npm::run(rest, invoke);
+        }
+    }
     match args {
         [] => {}
         [option] if option == "--dry-run" => {

@@ -54,6 +54,7 @@ def verification_commands(model_exports_only: bool) -> list[list[str]]:
         ['cargo', 'clippy', '--locked', '--offline', '--workspace', '--all-targets', '--', '-D', 'warnings'],
         ['cargo', 'test', '--locked', '--offline', '-p', 'spars-release-command'],
         ['cargo', 'release', '--dry-run'],
+        ['cargo', 'publish-npm', 'v0.3.0', '--dry-run'],
         ['npm', '--prefix', 'bindings/node', 'run', 'build'],
         ['npm', '--prefix', 'bindings/node', 'run', 'typecheck'],
         ['npm', '--prefix', 'bindings/node', 'test'],
