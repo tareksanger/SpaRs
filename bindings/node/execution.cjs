@@ -2,6 +2,7 @@
 'use strict';
 
 /** @typedef {import('./index.js').ExecutionOptions} ExecutionOptions */
+/** @typedef {import('./index.js').InputLimits} InputLimits */
 /** @typedef {{ start: () => void, next: Job | null }} Job */
 
 /** A bounded FIFO that submits only active jobs to the native worker pool. */
@@ -71,6 +72,25 @@ class Scheduler {
 function busy() { return Promise.reject(Object.assign(new Error('Inference queue is full'), { code: 'SPARS_BUSY' })); }
 
 const scheduler = new Scheduler();
+/** @type {InputLimits} */
+let inputLimits = { maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLength: 65_536 };
+
+/** @param {InputLimits} options */
+function configureInputLimits(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Expected input limits');
+  const { maxTextLength, maxBatchSize, maxBatchTextLength } = options;
+  if (![maxTextLength, maxBatchSize, maxBatchTextLength].every(value => Number.isSafeInteger(value) && value > 0)) {
+    throw new RangeError('Input limits must be positive safe integers');
+  }
+  if (scheduler.active || scheduler.queued) throw new Error('Configure input limits only while inference is idle');
+  inputLimits = { maxTextLength, maxBatchSize, maxBatchTextLength };
+}
+
+/** @param {string} message @returns {Promise<never>} */
+function tooLarge(message) {
+  return Promise.reject(Object.assign(new Error(message), { code: 'SPARS_INPUT_LIMIT' }));
+}
+
 /** @param {ExecutionOptions} options */
 function configureExecution(options) { scheduler.configure(options); }
 
@@ -95,24 +115,31 @@ function install(binding) {
     if (!(this instanceof binding.Model)) throw new TypeError('Expected a Model receiver');
     if (typeof text !== 'string') throw new TypeError('Expected a text string');
     validateStage(stage);
+    if (text.length > inputLimits.maxTextLength) return tooLarge('Text exceeds maxTextLength (UTF-16 units)');
     return scheduler.submit(() => process.call(this, text, stage));
   };
   prototype.processBatch = function(texts, stage) {
     if (!(this instanceof binding.Model)) throw new TypeError('Expected a Model receiver');
     if (!Array.isArray(texts)) throw new TypeError('Expected an array of text strings');
     validateStage(stage);
+    const limits = inputLimits;
+    const count = texts.length;
+    if (count > limits.maxBatchSize) return tooLarge('Batch exceeds maxBatchSize');
     if (scheduler.full()) return busy();
     // Capture strings at submission, including for jobs that wait in JavaScript.
-    const count = texts.length;
+    let remaining = limits.maxBatchTextLength;
     /** @type {string[]} */
     const snapshot = [];
     for (let i = 0; i < count; i++) {
       const text = texts[i];
       if (typeof text !== 'string') throw new TypeError('Expected a text string');
+      if (text.length > limits.maxTextLength) return tooLarge('Batch text exceeds maxTextLength (UTF-16 units)');
+      if (text.length > remaining) return tooLarge('Batch exceeds maxBatchTextLength (UTF-16 units)');
+      remaining -= text.length;
       snapshot.push(text);
     }
     return scheduler.submit(() => batch.call(this, snapshot, stage));
   };
 }
 
-module.exports = { Scheduler, configureExecution, install };
+module.exports = { Scheduler, configureExecution, configureInputLimits, install };
