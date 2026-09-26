@@ -1,5 +1,6 @@
 name: npm release
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
@@ -13,11 +14,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: npm-release
+  group: npm-release-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'manual' }}
   cancel-in-progress: false
 jobs:
   validate:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -47,6 +48,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: linux-x64-gnu
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-gnu
           - os: macos-14
             target: darwin-arm64
     runs-on: ${{ matrix.os }}
@@ -111,7 +114,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -137,7 +140,7 @@ jobs:
           node bindings/node/scripts/release-smoke.mts target/npm-tarballs "$model_dir"
 
   publish:
-    if: inputs.publish
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
     needs: [validate, smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 10

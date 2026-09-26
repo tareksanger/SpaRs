@@ -4,13 +4,16 @@
 
 ## Verified wheel variation
 
-spaCy 3.8.14's CPython 3.12 macOS and Linux wheels contain different build-directory comments in the generated `spacy/matcher/levenshtein.c` file. Comparing the complete files found no other changes. The Python, Cython, and other source files in the checked Linux spaCy, Thinc, and MurmurHash wheels matched the pinned capture.
+spaCy 3.8.14's CPython 3.12 macOS and Linux wheels contain different build-directory comments in the generated `spacy/matcher/levenshtein.c` file. Comparing the complete files found no other changes. The Python, Cython, and other source files in the checked Linux x64 spaCy, Thinc, and MurmurHash wheels matched the pinned capture.
 
-The Linux artifact is `spacy-3.8.14-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl`, obtained from [the official PyPI release](https://pypi.org/project/spacy/3.8.14/#files). Its complete archive SHA-256 is `6d45715a24446f23b98ec3f09409a1d4111983d1d64613250ee38c3270e21853`.
+The Linux x64 artifact is `spacy-3.8.14-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl`, obtained from [the official PyPI release](https://pypi.org/project/spacy/3.8.14/#files). Its complete archive SHA-256 is `6d45715a24446f23b98ec3f09409a1d4111983d1d64613250ee38c3270e21853`.
 
 | File variant | SHA-256 of `spacy/matcher/levenshtein.c` |
 |---|---|
 | Pinned macOS capture | `3d0aaaea19850900ec4071700ee6fe69c7d8e59ee1a4f9c963189e78161a278d` |
-| Verified Linux wheel | `e14722922674055c3d72e21fd8b727597c58ba7395f70be68eaa55aa15bd44a9` |
+| Verified Linux x64 wheel | `e14722922674055c3d72e21fd8b727597c58ba7395f70be68eaa55aa15bd44a9` |
+| Verified Linux ARM64 wheel | `2700287c8e956c608d7013e96e0ff0dd7b1e8296778b7ce3693197d2d4318e00` |
 
-`tools/installer_provenance.py` accepts this exact alternate hash for this file and version when regenerating the installer recipe. Unknown hashes, other source changes, changed versions, and changed licenses still fail. The exported provenance records the files observed on that machine; the immutable installer recipe retains its original capture. `tools/test_installer_provenance.py` tests both acceptance and rejection paths.
+The Linux ARM64 artifact is `spacy-3.8.14-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl` from the same official PyPI release. Its complete archive SHA-256 is `daeb64b048f12c059997281aed53eb8776d26416dd313cf17ad6f63124b2b564`. Comparing its complete generated file against the Linux x64 wheel found only a build-directory comment difference. All other spaCy files in the pinned source inventory matched the ARM64 wheel.
+
+`tools/installer_provenance.py` accepts these exact alternate hashes for this file and version when regenerating the installer recipe. Unknown hashes, other source changes, changed versions, and changed licenses still fail. The exported provenance records the files observed on that machine; the immutable installer recipe retains its original capture. `tools/test_installer_provenance.py` tests both acceptance and rejection paths.
