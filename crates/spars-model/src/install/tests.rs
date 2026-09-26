@@ -56,3 +56,18 @@ fn dangling_lock_does_not_create_external_file() {
     assert!(!external.exists());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn syncing_staged_files_preserves_bytes_and_does_not_create_missing_files() {
+    let root = std::env::temp_dir().join(format!("spars-sync-test-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let file = root.join("resource");
+    let bytes = b"immutable model bytes\0\xff";
+    fs::write(&file, bytes).unwrap();
+    sync_installation_file(&file).unwrap();
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+    let missing = root.join("missing");
+    assert!(sync_installation_file(&missing).is_err());
+    assert!(!missing.exists());
+    fs::remove_dir_all(root).unwrap();
+}

@@ -8,6 +8,7 @@ npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
 case "${1:-}" in
   build)
     cargo fetch --locked
+    cargo test --locked --release -p spars-model install::tests
     npm --prefix bindings/node run build
     npm --prefix bindings/node run typecheck
     node --test bindings/node/tests/release*.test.mts

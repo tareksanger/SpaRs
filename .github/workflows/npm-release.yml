@@ -87,6 +87,8 @@ jobs:
         if: ${{ !matrix.alpine }}
       - run: cargo fetch --locked
         if: ${{ !matrix.alpine }}
+      - run: cargo test --locked --release -p spars-model install::tests
+        if: ${{ !matrix.alpine }}
       - run: npm --prefix bindings/node run build
         if: ${{ !matrix.alpine }}
       - run: npm --prefix bindings/node run typecheck
