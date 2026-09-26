@@ -61,6 +61,12 @@ jobs:
             target: darwin-x64
           - os: windows-11-arm
             target: win32-arm64-msvc
+          - os: ubuntu-24.04
+            target: linux-x64-musl
+            alpine: true
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-musl
+            alpine: true
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -76,17 +82,33 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        if: ${{ !matrix.alpine }}
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
+        if: ${{ !matrix.alpine }}
       - run: cargo fetch --locked
+        if: ${{ !matrix.alpine }}
       - run: cargo test --locked --release -p spars-model install::tests
+        if: ${{ !matrix.alpine }}
       - run: npm --prefix bindings/node run build
+        if: ${{ !matrix.alpine }}
       - run: npm --prefix bindings/node run typecheck
+        if: ${{ !matrix.alpine }}
       - run: node --test bindings/node/tests/release*.test.mts
+        if: ${{ !matrix.alpine }}
       - name: Collect native binary and notices
+        if: ${{ !matrix.alpine }}
         env:
           RELEASE_SHA: ${{ needs.validate.outputs.sha }}
           RELEASE_TARGET: ${{ matrix.target }}
         run: node bindings/node/scripts/release.mts collect "$RELEASE_TARGET" "target/npm-input/$RELEASE_TARGET" "$RELEASE_SHA"
+      - name: Build and collect inside native Alpine
+        if: matrix.alpine
+        env:
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: |
+          docker build -t spars-release-alpine - < bindings/node/scripts/release-alpine.Dockerfile
+          docker run --rm -e RELEASE_SHA -e RELEASE_TARGET -v "$PWD:/work" -w /work spars-release-alpine sh bindings/node/scripts/release-alpine.sh build
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.target }}
@@ -127,7 +149,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, windows-2022, macos-15-intel, windows-11-arm]
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64-gnu
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-gnu
+          - os: macos-14
+            target: darwin-arm64
+          - os: windows-2022
+            target: win32-x64-msvc
+          - os: macos-15-intel
+            target: darwin-x64
+          - os: windows-11-arm
+            target: win32-arm64-msvc
+          - os: ubuntu-24.04
+            target: linux-x64-musl
+            alpine: true
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-musl
+            alpine: true
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -143,17 +183,27 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        if: ${{ !matrix.alpine }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: npm-tarballs
           path: target/npm-tarballs
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
+        if: ${{ !matrix.alpine }}
       - run: cargo build --locked --release -p spars-model
+        if: ${{ !matrix.alpine }}
       - name: Acquire model explicitly and test installed tarballs offline
+        if: ${{ !matrix.alpine }}
         shell: bash
         run: |
           model_dir=$(target/release/spars-model install --model en_core_web_sm --version 3.8.0 --root target/models)
           node bindings/node/scripts/release-smoke.mts target/npm-tarballs "$model_dir"
+
+      - name: Test installed tarballs inside native Alpine
+        if: matrix.alpine
+        run: |
+          docker build -t spars-release-alpine - < bindings/node/scripts/release-alpine.Dockerfile
+          docker run --rm -v "$PWD:/work" -w /work spars-release-alpine sh bindings/node/scripts/release-alpine.sh smoke
 
   publish:
     if: github.event_name == 'workflow_dispatch' && inputs.publish
