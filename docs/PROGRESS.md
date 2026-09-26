@@ -61,7 +61,7 @@ Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_
 
 Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
-The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, static word vectors, and explicit native model downloads. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, and binary packaging for supported platforms. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
+The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, static word vectors, and explicit native model downloads. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, and verification of additional platforms. The [npm workflow](RELEASING.md#publish-the-node-package) assembles Linux x64 glibc and macOS ARM64 packages with clean-install checks before optional publication; a completed workflow and registry checks are required release evidence. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
 
 ## Model extensibility plan
 

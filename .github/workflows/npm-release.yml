@@ -1,0 +1,163 @@
+name: npm release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable GitHub release tag (vX.Y.Z)
+        required: true
+        type: string
+      publish:
+        description: Publish verified tarballs to npm (requires trusted publishers)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        with:
+          script: |
+            const release = await require('./.github/scripts/npm-release.cjs')({github, context, tag:process.env.RELEASE_TAG});
+            core.setOutput('sha', release.sha);
+            core.setOutput('version', release.version);
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64-gnu
+          - os: macos-14
+            target: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
+      - run: cargo fetch --locked
+      - run: npm --prefix bindings/node run build
+      - run: npm --prefix bindings/node run typecheck
+      - run: node --test bindings/node/tests/release*.test.mts
+      - name: Collect native binary and notices
+        env:
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: node bindings/node/scripts/release.mts collect "$RELEASE_TARGET" "target/npm-input/$RELEASE_TARGET" "$RELEASE_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.target }}
+          path: target/npm-input/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  assemble:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: target/npm-input
+      - name: Assemble complete release and pack without lifecycle scripts
+        env:
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: node bindings/node/scripts/release.mts stage target/npm-input target/npm-release "$RELEASE_SHA" "$RELEASE_VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-tarballs
+          path: target/npm-release/tarballs/
+          if-no-files-found: error
+          retention-days: 14
+
+  smoke:
+    needs: [validate, assemble]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: npm-tarballs
+          path: target/npm-tarballs
+      - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
+      - run: cargo build --locked --release -p spars-model
+      - name: Acquire model explicitly and test installed tarballs offline
+        shell: bash
+        run: |
+          model_dir=$(target/release/spars-model install --model en_core_web_sm --version 3.8.0 --root target/models)
+          node bindings/node/scripts/release-smoke.mts target/npm-tarballs "$model_dir"
+
+  publish:
+    if: inputs.publish
+    needs: [validate, smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: npm-tarballs
+          path: tarballs
+      - name: Publish platform packages, then the main package
+        run: node bindings/node/scripts/release-publish.mts tarballs

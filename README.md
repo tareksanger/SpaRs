@@ -63,7 +63,7 @@ Pass the printed installation directory to `Model::load`. Use `--model en_core_w
 
 Set `SPARS_MODEL_DIR` once in the environment used by your application and CLI. Downloads are explicit; loading is offline. Rust's `Model::load("en_core_web_lg")` and Node's `loadModel("en_core_web_lg")` resolve the selected installation from that directory. Without the variable, both use the operating system's user cache. Explicit paths override the environment for one call and do not write project configuration.
 
-The [Node package](docs/NODE.md) includes `spars download en_core_web_lg` and `downloadModel(...)`; from a built source checkout, run `node bindings/node/bin/spars.mjs download en_core_web_lg`. Rust users can install the CLI with `cargo install --path crates/spars-model --bin spars --locked` and call the shared `spars_model::download_model` API from the separate installer crate. See [installation](docs/MODEL_INSTALLATION.md) for the API and directory rules. Package publication and prebuilt binaries are separate from these source workflows.
+The [Node package](docs/NODE.md) includes `spars download en_core_web_lg` and `downloadModel(...)`; from a built source checkout, run `node bindings/node/bin/spars.mjs download en_core_web_lg`. Rust users can install the CLI with `cargo install --path crates/spars-model --bin spars --locked` and call the shared `spars_model::download_model` API from the separate installer crate. See [installation](docs/MODEL_INSTALLATION.md) for the API and directory rules. Package publication and prebuilt binaries use the separate [npm release workflow](docs/RELEASING.md#publish-the-node-package).
 
 ## Acquire and export explicitly
 

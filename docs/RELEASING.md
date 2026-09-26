@@ -1,6 +1,6 @@
-# Release spars-nlp
+# Release SpaRs
 
-Run these commands from the repository root. `cargo release` prepares a GitHub release PR. After you merge it, GitHub creates the tag and release. You then run `cargo publish` to upload `spars-nlp` to crates.io.
+Run these commands from the repository root. `cargo release` prepares a GitHub release PR. After you merge it, GitHub creates the tag and release. You then run `cargo publish` to upload `spars-nlp` to crates.io. The [npm procedure](#publish-the-node-package) is a separate, manually started workflow.
 
 ## Prerequisites
 
@@ -114,4 +114,65 @@ Check **Actions → Release**. For a transient CI failure or timeout, rerun CI f
 3. Enable squash merging with the PR title as the default commit title. Require **Conventional PR title** and the acceptance CI checks, including `release-tooling`, in branch protection. Do not give the release App a bypass.
 4. Ensure the release workflow is merged into the default branch before running `cargo release`.
 
-Registry credentials stay local; the GitHub workflow does not need your crates.io token.
+The GitHub workflow does not need your crates.io token. npm uses the separate setup below.
+
+## Publish the Node package
+
+The `npm release` workflow builds Linux x64 (glibc, Ubuntu 24.04 build baseline) and macOS ARM64 binaries with Node.js 24. Windows, Linux musl, Linux ARM64, and Intel macOS prebuilds are not included. Older glibc versions than the build runner are not guaranteed. Every release tests the packed API, CLI, TypeScript declarations, and native inference on both build platforms before publication. Model downloads remain explicit and weights are not bundled.
+
+### One-time npm setup
+
+1. Obtain publishing access to the `@spars` npm scope. If you use another scope, change the Node package name, lockfile name, package README, and package-install tests before releasing. The platform names are derived from the main name.
+2. Create a GitHub environment named `npm`, restrict it to the repository default branch, and optionally require a reviewer before publication.
+3. Merge the packaging workflow and scripts before preparing a new release. Older tags without these files cannot use this workflow. Keep `cargo release` as the version authority; do not run `npm version` separately.
+4. For the first version, run the build-only procedure below. After both smoke jobs pass, download its `npm-tarballs` artifact and publish those exact tarballs locally with `npm login` and the commands below. This creates all three packages before configuring their trusted publishers.
+
+Replace `123456` with the successful build-only workflow run ID and `0.3.0` with its version. Use a new, empty download directory:
+
+```bash
+npm_run=123456
+npm_version=0.3.0
+gh run download "$npm_run" --name npm-tarballs --dir target/npm-bootstrap
+npm login
+npm publish "target/npm-bootstrap/spars-node-linux-x64-gnu-$npm_version.tgz" --access public --ignore-scripts
+npm publish "target/npm-bootstrap/spars-node-darwin-arm64-$npm_version.tgz" --access public --ignore-scripts
+npm publish "target/npm-bootstrap/spars-node-$npm_version.tgz" --access public --ignore-scripts
+```
+
+Configure trusted publishing in npm settings for **each** of `@spars/node`, `@spars/node-linux-x64-gnu`, and `@spars/node-darwin-arm64`: select GitHub Actions, owner `tareksanger`, repository `SpaRs`, workflow `npm-release.yml`, and environment `npm`. Enable direct `npm publish` permission. Substitute the actual owner/repository if this is a fork. No `NPM_TOKEN` secret is required. The workflow uses Node.js 24 with npm 11.5.1 or newer; see [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). Local bootstrap publication does not provide GitHub Actions provenance.
+
+### Build and inspect a release
+
+Prepare and merge the release PR as above, then wait for its GitHub release. Select the repository default branch for the workflow and supply the released tag:
+
+```bash
+default_branch=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+gh workflow run npm-release.yml --ref "$default_branch" -f tag=v0.3.0 -f publish=false
+gh run list --workflow npm-release.yml
+```
+
+The workflow resolves the tag to a commit and requires successful default-branch push CI for that exact commit. It rejects draft releases, prereleases, and mismatched Node versions. In Actions, inspect both smoke jobs and download `npm-tarballs`. Three tarballs contain the main package and its two native dependencies, including license notices. Nothing is uploaded to npm in build-only mode. Artifacts expire after 14 days; retain the original tarballs if publication or recovery will happen later.
+
+### Publish later versions
+
+After all three trusted publishers are configured, prepare and merge a new release PR, wait for its GitHub release, then request publication explicitly. For example, if the new release is `v0.3.1`:
+
+```bash
+gh workflow run npm-release.yml --ref "$default_branch" -f tag=v0.3.1 -f publish=true
+```
+
+This run rebuilds and retests the release before publishing its own tested tarballs. It publishes both platform packages before the main package. All three packages use the release version. The source manifest remains private to prevent accidentally publishing a locally built, single-platform checkout; the packager creates public manifests in ignored `target/` output. There are no publication lifecycle hooks.
+
+If a publish job stops after uploading one package, keep that run's exact tarballs. Rerun only the failed publish job so it reuses that run's tested artifact. The publisher skips existing versions only when npm reports the exact SHA-512 integrity of the retained tarball, and stops before uploading anything if an existing version has different bytes. Do not restart all jobs to rebuild a partially published version. Inspect `npm view PACKAGE@VERSION dist.integrity`, compare it with the retained tarball's SHA-512 integrity, then publish only the missing platform packages and finally the main package using the bootstrap commands with your retained files. Do not upload different bytes under an existing version.
+
+After publication, check the registry and install from npm on each supported platform:
+
+```bash
+npm view @spars/node@0.3.1 optionalDependencies
+npm view @spars/node-linux-x64-gnu@0.3.1 version
+npm view @spars/node-darwin-arm64@0.3.1 version
+npm install @spars/node@0.3.1
+npx spars download en_core_web_sm
+```
+
+The workflow verifies local tarball installation before publishing; these registry checks remain a separate post-publication step. Prebuilt package availability is established by a successful registry publication, not by the existence of this workflow.
