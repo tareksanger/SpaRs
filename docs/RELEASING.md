@@ -118,7 +118,7 @@ The GitHub workflow does not need your crates.io token. npm uses the separate se
 
 ## Publish the Node package
 
-The `npm release` workflow builds Linux x64 and ARM64 (glibc, Ubuntu 24.04 build baseline), macOS x64/ARM64, and Windows x64 binaries with Node.js 24. Windows ARM64 and Linux musl prebuilds are not included. Older glibc versions than the build runner are not guaranteed. Every release tests the packed API, CLI, TypeScript declarations, and native inference on all configured build platforms before publication. Model downloads remain explicit and weights are not bundled. Pull requests run the same build, assembly, and installation checks against their merge commit without requiring a release tag. Publication runs only through an explicit manual dispatch.
+The `npm release` workflow builds Linux x64 and ARM64 (glibc, Ubuntu 24.04 build baseline), macOS x64/ARM64, and Windows x64/ARM64 binaries with Node.js 24. Linux musl prebuilds are not included. Older glibc versions than the build runner are not guaranteed. Every release tests the packed API, CLI, TypeScript declarations, and native inference on all configured build platforms before publication. Model downloads remain explicit and weights are not bundled. Pull requests run the same build, assembly, and installation checks against their merge commit without requiring a release tag. Publication runs only through an explicit manual dispatch.
 
 ### One-time npm setup
 
@@ -136,7 +136,7 @@ npm login
 cargo publish-npm --artifacts target/npm-bootstrap
 ```
 
-Configure trusted publishing in npm settings for **each** of `@spars/node`, `@spars/node-linux-x64-gnu`, `@spars/node-linux-arm64-gnu`, `@spars/node-darwin-arm64`, `@spars/node-darwin-x64`, and `@spars/node-win32-x64-msvc`: select GitHub Actions, owner `tareksanger`, repository `SpaRs`, workflow `npm-release.yml`, and environment `npm`. Enable direct `npm publish` permission. Substitute the actual owner/repository if this is a fork. No `NPM_TOKEN` secret is required. The workflow uses Node.js 24 with npm 11.5.1 or newer; see [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). Local bootstrap publication does not provide GitHub Actions provenance. Prepare a new release version when adding a platform because the main package manifest changes. Bootstrap the complete package set from that version’s successful manual build-only run, then configure the new platform’s trusted publisher. The local publisher verifies and skips already published identical tarballs.
+Configure trusted publishing in npm settings for **each** of `@spars/node`, `@spars/node-linux-x64-gnu`, `@spars/node-linux-arm64-gnu`, `@spars/node-darwin-arm64`, `@spars/node-darwin-x64`, `@spars/node-win32-x64-msvc`, and `@spars/node-win32-arm64-msvc`: select GitHub Actions, owner `tareksanger`, repository `SpaRs`, workflow `npm-release.yml`, and environment `npm`. Enable direct `npm publish` permission. Substitute the actual owner/repository if this is a fork. No `NPM_TOKEN` secret is required. The workflow uses Node.js 24 with npm 11.5.1 or newer; see [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). Local bootstrap publication does not provide GitHub Actions provenance. Prepare a new release version when adding a platform because the main package manifest changes. Bootstrap the complete package set from that version’s successful manual build-only run, then configure the new platform’s trusted publisher. The local publisher verifies and skips already published identical tarballs.
 
 ### Build and inspect a release
 
@@ -172,6 +172,7 @@ npm view @spars/node-linux-arm64-gnu@0.3.1 version
 npm view @spars/node-darwin-arm64@0.3.1 version
 npm view @spars/node-darwin-x64@0.3.1 version
 npm view @spars/node-win32-x64-msvc@0.3.1 version
+npm view @spars/node-win32-arm64-msvc@0.3.1 version
 npm install @spars/node@0.3.1
 npx spars download en_core_web_sm
 ```

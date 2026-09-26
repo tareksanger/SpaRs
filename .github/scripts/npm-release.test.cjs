@@ -145,3 +145,14 @@ test('Intel macOS has native build and installed-package coverage',async()=>{
   assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='macos-15-intel' && row.target==='darwin-x64'));
   assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('macos-15-intel'));
 });
+
+test('Windows ARM64 uses native build and installed-package coverage',async()=>{
+  const {readFileSync}=require('node:fs');
+  const {parse}=require('../../tools/node_modules/yaml');
+  const {targets}=await import('../../bindings/node/scripts/release.mts');
+  const workflow=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+  assert.deepEqual(targets.find(target=>target.suffix==='win32-arm64-msvc'),
+    {suffix:'win32-arm64-msvc',triple:'aarch64-pc-windows-msvc',os:'win32',cpu:'arm64',libc:undefined});
+  assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='windows-11-arm' && row.target==='win32-arm64-msvc'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('windows-11-arm'));
+});

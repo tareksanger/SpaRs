@@ -32,7 +32,7 @@ test('stage creates a missing output directory with exact platform dependencies 
     const main: unknown = JSON.parse(readFileSync(join(out, 'main/package.json'), 'utf8'));
     assert.ok(typeof main === 'object' && main !== null && 'optionalDependencies' in main);
     assert.deepEqual(main.optionalDependencies, {
-      '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-linux-arm64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0', '@spars/node-win32-x64-msvc':'0.2.0', '@spars/node-darwin-x64':'0.2.0',
+      '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-linux-arm64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0', '@spars/node-win32-x64-msvc':'0.2.0', '@spars/node-darwin-x64':'0.2.0', '@spars/node-win32-arm64-msvc':'0.2.0',
     });
     assert.ok(!existsSync(join(out, 'main/spars-node.darwin-arm64.node')));
     assert.equal(readFileSync(join(out, 'main/execution.cjs'), 'utf8'), 'module.exports = {};');
