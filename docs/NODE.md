@@ -43,9 +43,10 @@ Save this example as `bindings/node/analyze.mts`, then run `node bindings/node/a
 
 ```typescript
 import assert from 'node:assert/strict';
-import { configureExecution, loadModel } from './index.js';
+import { configureExecution, configureInputLimits, loadModel } from './index.js';
 
 configureExecution({ maxActive: 2, maxQueued: 32 });
+configureInputLimits({ maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLength: 65_536 });
 const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 const doc = await model.process('Alice works in London.');
 assert.equal(doc.tokens[0]?.text, 'Alice');
@@ -90,11 +91,15 @@ Each batch runs sequentially in one worker job and retains input order. A failur
 
 `configureExecution({maxActive, maxQueued})` sets both limits while inference is idle. `maxActive` must be a positive safe integer; `maxQueued` must be a nonnegative safe integer, and zero disables waiting. Invalid settings or changes while jobs are pending throw synchronously. Limits are shared by models loaded through this package instance within one JavaScript isolate (the separate JavaScript environment of the main thread or a Node worker), not across Node worker threads or processes. They cover inference only: load models and download assets during startup. The libuv pool is still shared with other Node operations; these limits do not reserve worker threads or guarantee latency. Calls rejected with `SPARS_BUSY` need application-level backpressure, such as rejecting an HTTP request or retrying later with a bounded policy. Import the package entry point; directly importing a native `.node` file bypasses admission control.
 
+`configureInputLimits({maxTextLength, maxBatchSize, maxBatchTextLength})` sets all three inference input limits while idle. Defaults allow 32,768 UTF-16 units per text, 128 documents per batch, and 65,536 UTF-16 units in total per batch. Length uses JavaScript's `string.length`, so an emoji such as `😀` counts as two units. Limits must be positive safe integers; invalid settings or changes while inference is pending throw synchronously. Empty text and empty batches remain supported. Configuration is copied and shares the same package-instance and JavaScript-isolate scope as admission limits.
+
+`process` and `processBatch` reject oversized input with `SPARS_INPUT_LIMIT` before copying it into Rust or submitting inference. Batch count is checked before accessing elements; text and aggregate length are checked while capturing the batch, and the first violation rejects the entire call. Size rejection does not consume an inference slot. A full queue can return `SPARS_BUSY` before inspecting batch elements. These are configurable resource limits, not a latency guarantee or an upstream spaCy restriction. They do not limit model loading, downloads, `vector` lookups, other isolates, or memory already allocated by the caller. Large allowed results still require synchronous JavaScript object creation. Split work into bounded batches and await completion; increasing limits increases the potential CPU, memory, and event-loop cost.
+
 `vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, and matchers are not yet exposed through this binding; their Rust APIs remain available separately.
 
 ## Errors and verification
 
-Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, and `SPARS_BUSY`. Invalid JavaScript argument types or unknown stages throw immediately; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
+Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, and `SPARS_INPUT_LIMIT`. Invalid JavaScript argument types or unknown stages throw immediately; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
 
 After the [reference setup](DEVELOPMENT.md#set-up-the-project), run:
 
