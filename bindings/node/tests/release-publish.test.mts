@@ -46,7 +46,7 @@ test('real tarball manifests determine ordering, SHA512, and complete versioned 
     mkdirSync(join(root,'source/package'),{recursive:true});mkdirSync(join(root,'tarballs'));
     function tarball(file:string,name:unknown,version:unknown='0.2.0'):void {
       writeFileSync(join(root,'source/package/package.json'),JSON.stringify({name,version}));
-      execFileSync('tar',['-czf',join(root,'tarballs',file),'-C',join(root,'source'),'package']);
+      execFileSync('tar',['-czf','../tarballs/'+file,'package'],{cwd:join(root,'source')});
     }
     // Deliberately put main first by filename; publish order must follow package identity.
     tarball('a.tgz','@spars/node');
