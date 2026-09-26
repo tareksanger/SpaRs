@@ -179,3 +179,8 @@ test('musl build and smoke execute inside native Alpine on both CPU architecture
   assert.match(script,/release\.mts collect/);
   assert.match(script,/release-smoke\.mts target\/npm-tarballs/);
 });
+
+test('native Alpine uses its system compiler for both musl targets',()=>{
+  const dockerfile=require('node:fs').readFileSync('bindings/node/scripts/release-alpine.Dockerfile','utf8');
+  for(const arch of ['X86_64','AARCH64']) assert.ok(dockerfile.includes(`CARGO_TARGET_${arch}_UNKNOWN_LINUX_MUSL_LINKER=cc`));
+});
