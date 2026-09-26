@@ -74,6 +74,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
       - run: cargo fetch --locked
+      - run: cargo test --locked --release -p spars-model install::tests
       - run: npm --prefix bindings/node run build
       - run: npm --prefix bindings/node run typecheck
       - run: node --test bindings/node/tests/release*.test.mts
