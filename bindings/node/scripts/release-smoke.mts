@@ -5,15 +5,14 @@ import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'n
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { targets } from './release.mts';
+import { targets, hostTarget } from './release.mts';
 import {releasePackages} from './release-publish.mts';
 import {createServer} from 'node:http';
 import {promisify} from 'node:util';
 const execute = promisify(execFile);
 
 export async function smoke(tarballs: string, model: string): Promise<void> {
-  const target = targets.find(item => item.os === process.platform && item.cpu === process.arch);
-  assert.ok(target,'Unsupported smoke-test platform');
+  const target = hostTarget();
   const packages = readdirSync(tarballs).filter(file => file.endsWith('.tgz'));
   const native = packages.filter(file => file.includes(`-${target.suffix}-`));
   const main = packages.filter(file => !targets.some(item => file.includes(`-${item.suffix}-`)));

@@ -11,7 +11,22 @@ export const targets = [
   {suffix:'win32-x64-msvc', triple:'x86_64-pc-windows-msvc', os:'win32', cpu:'x64', libc:undefined},
   {suffix:'darwin-x64', triple:'x86_64-apple-darwin', os:'darwin', cpu:'x64', libc:undefined},
   {suffix:'win32-arm64-msvc', triple:'aarch64-pc-windows-msvc', os:'win32', cpu:'arm64', libc:undefined},
+  {suffix:'linux-x64-musl', triple:'x86_64-unknown-linux-musl', os:'linux', cpu:'x64', libc:'musl'},
+  {suffix:'linux-arm64-musl', triple:'aarch64-unknown-linux-musl', os:'linux', cpu:'arm64', libc:'musl'},
 ] as const;
+export function selectTarget(platform: string, cpu: string, libc?: string): typeof targets[number] {
+  const target = targets.find(item => item.os === platform && item.cpu === cpu && item.libc === libc);
+  if (!target) throw new Error('Unsupported package host');
+  return target;
+}
+
+export function hostTarget(): typeof targets[number] {
+  const libc = process.platform === 'linux'
+    ? (typeof object(object(process.report.getReport()).header).glibcVersionRuntime === 'string' ? 'glibc' : 'musl')
+    : undefined;
+  return selectTarget(process.platform,process.arch,libc);
+}
+
 const commonFiles = ['index.js','index.d.ts','units.d.ts','execution.cjs','spars.mjs','README.md','LICENSE','THIRD_PARTY_NOTICES.md'] as const;
 const repository = {type:'git',url:'git+https://github.com/tareksanger/SpaRs.git',directory:'bindings/node'};
 interface ReleaseIdentity { name: string; version: string; sha: string; target: string }
@@ -116,7 +131,7 @@ export function licenseTexts(value: unknown, root: string): string {
 export function collect(root: string, suffix: string, output: string, sha: string): void {
   const target = targets.find(item => item.suffix === suffix);
   if (!target) throw new Error('Unsupported package target');
-  if (process.platform !== target.os || process.arch !== target.cpu) throw new Error('Build on the matching native runner');
+  if (hostTarget().suffix !== target.suffix) throw new Error('Build on the matching native runner');
   const binding = join(root,'bindings/node');
   const manifest = json(join(binding,'package.json'));
   const notices = dependencyLicenses(root,target.triple);

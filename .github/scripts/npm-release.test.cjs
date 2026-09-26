@@ -58,7 +58,7 @@ test('workflow gates publishing on all platform smoke jobs and uses immutable ch
   assert.deepEqual(workflow.jobs.publish.needs,['validate','smoke']);
   assert.deepEqual(workflow.jobs.smoke.needs,['validate','assemble']);
   assert.deepEqual(workflow.jobs.assemble.needs,['validate','build']);
-  assert.deepEqual(workflow.jobs.smoke.strategy.matrix.os,workflow.jobs.build.strategy.matrix.include.map(row=>row.os));
+  assert.deepEqual(workflow.jobs.smoke.strategy.matrix.include.map(row=>row.os),workflow.jobs.build.strategy.matrix.include.map(row=>row.os));
   for (const job of ['build','assemble','smoke','publish']) {
     const checkout=workflow.jobs[job].steps.find(step=>step.uses?.startsWith('actions/checkout@'));
     assert.equal(checkout.with.ref,'${{ needs.validate.outputs.sha }}');
@@ -95,7 +95,7 @@ test('Linux ARM64 is built, tested, and packaged on a native runner', async()=>{
     {suffix:'linux-arm64-gnu',triple:'aarch64-unknown-linux-gnu',os:'linux',cpu:'arm64',libc:'glibc'});
   assert.deepEqual(new Set(manifest.napi.targets),new Set(targets.map(target=>target.triple)));
   assert.ok(release.jobs.build.strategy.matrix.include.some(row=>row.os==='ubuntu-24.04-arm' && row.target==='linux-arm64-gnu'));
-  assert.ok(release.jobs.smoke.strategy.matrix.os.includes('ubuntu-24.04-arm'));
+  assert.ok(release.jobs.smoke.strategy.matrix.include.map(row=>row.os).includes('ubuntu-24.04-arm'));
   assert.ok(ci.jobs['reference-and-rust'].strategy.matrix.os.includes('ubuntu-24.04-arm'));
   const acceptance=ci.jobs['reference-and-rust'].steps.find(step=>step.name==='Run Linux acceptance');
   assert.equal(acceptance.if,"runner.os == 'Linux'");
@@ -126,7 +126,7 @@ test('Windows x64 has native build and installed-package coverage with portable 
   assert.deepEqual(targets.find(target=>target.suffix==='win32-x64-msvc'),
     {suffix:'win32-x64-msvc',triple:'x86_64-pc-windows-msvc',os:'win32',cpu:'x64',libc:undefined});
   assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='windows-2022' && row.target==='win32-x64-msvc'));
-  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('windows-2022'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.include.map(row=>row.os).includes('windows-2022'));
   assert.equal(workflow.defaults.run.shell,'bash');
   for(const name of ['build','smoke']) {
     const steps=workflow.jobs[name].steps;
@@ -143,7 +143,7 @@ test('Intel macOS has native build and installed-package coverage',async()=>{
   assert.deepEqual(targets.find(target=>target.suffix==='darwin-x64'),
     {suffix:'darwin-x64',triple:'x86_64-apple-darwin',os:'darwin',cpu:'x64',libc:undefined});
   assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='macos-15-intel' && row.target==='darwin-x64'));
-  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('macos-15-intel'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.include.map(row=>row.os).includes('macos-15-intel'));
 });
 
 test('Windows ARM64 uses native build and installed-package coverage',async()=>{
@@ -154,5 +154,28 @@ test('Windows ARM64 uses native build and installed-package coverage',async()=>{
   assert.deepEqual(targets.find(target=>target.suffix==='win32-arm64-msvc'),
     {suffix:'win32-arm64-msvc',triple:'aarch64-pc-windows-msvc',os:'win32',cpu:'arm64',libc:undefined});
   assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='windows-11-arm' && row.target==='win32-arm64-msvc'));
-  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('windows-11-arm'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.include.map(row=>row.os).includes('windows-11-arm'));
+});
+
+test('musl build and smoke execute inside native Alpine on both CPU architectures',()=>{
+  const {readFileSync}=require('node:fs');
+  const {parse}=require('../../tools/node_modules/yaml');
+  const workflow=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+  for(const [os,target] of [['ubuntu-24.04','linux-x64-musl'],['ubuntu-24.04-arm','linux-arm64-musl']]) {
+    for(const name of ['build','smoke']) {
+      const job=workflow.jobs[name];
+      assert.ok(job.strategy.matrix.include.some(row=>row.os===os && row.target===target && row.alpine===true));
+      const step=job.steps.find(step=>step.if==='matrix.alpine');
+      assert.match(step.run,/docker run --rm/);
+      assert.match(step.run,new RegExp('release-alpine.sh '+name));
+      assert.doesNotMatch(step.run,/--platform/,'Run natively, without emulation');
+      const cargo=job.steps.find(step=>step.run?.startsWith('cargo '));
+      assert.equal(cargo.if,'${{ !matrix.alpine }}');
+    }
+  }
+  const script=readFileSync('bindings/node/scripts/release-alpine.sh','utf8');
+  assert.match(script,/run typecheck/);
+  assert.match(script,/node --test bindings\/node\/tests\/release\*\.test\.mts/);
+  assert.match(script,/release\.mts collect/);
+  assert.match(script,/release-smoke\.mts target\/npm-tarballs/);
 });
