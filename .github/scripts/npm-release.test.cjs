@@ -117,3 +117,20 @@ test('pull request validation rejects invalid package versions and missing manif
   }
   await assert.rejects(validate({github:{rest:{repos:{getContent:async()=>({data:[]})}}},context:f.state.context}),/Missing Node manifest/);
 });
+
+test('Windows x64 has native build and installed-package coverage with portable checkout',async()=>{
+  const {readFileSync}=require('node:fs');
+  const {parse}=require('../../tools/node_modules/yaml');
+  const {targets}=await import('../../bindings/node/scripts/release.mts');
+  const workflow=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+  assert.deepEqual(targets.find(target=>target.suffix==='win32-x64-msvc'),
+    {suffix:'win32-x64-msvc',triple:'x86_64-pc-windows-msvc',os:'win32',cpu:'x64',libc:undefined});
+  assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='windows-2022' && row.target==='win32-x64-msvc'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('windows-2022'));
+  assert.equal(workflow.defaults.run.shell,'bash');
+  for(const name of ['build','smoke']) {
+    const steps=workflow.jobs[name].steps;
+    assert.equal(steps[0].run,'git config --global core.autocrlf false');
+    assert.equal(steps[0].if,"runner.os == 'Windows'");
+  }
+});
