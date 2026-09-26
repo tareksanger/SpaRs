@@ -4,9 +4,11 @@ use crate::{
 };
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+#[cfg(not(windows))]
+use std::fs::File;
 use std::{
     collections::BTreeMap,
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     path::{Path, PathBuf},
 };
 #[derive(Debug, Serialize)]
@@ -32,6 +34,16 @@ impl Drop for Stage {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+fn sync_installation_file(path: &Path) -> Result<()> {
+    // Windows FlushFileBuffers requires GENERIC_WRITE. Opening an existing
+    // staged file for writing does not create, truncate, or alter its bytes.
+    #[cfg(windows)]
+    let file = OpenOptions::new().write(true).open(path)?;
+    #[cfg(not(windows))]
+    let file = File::open(path)?;
+    file.sync_all()?;
+    Ok(())
 }
 fn regular(path: &Path) -> Result<()> {
     if !fs::symlink_metadata(path)?.file_type().is_file() {
@@ -147,7 +159,7 @@ pub fn install(
                 sha256: hash_file(&path)?,
             },
         );
-        File::open(path)?.sync_all()?;
+        sync_installation_file(&path)?;
     }
     let receipt = Receipt {
         identity: recipe.identity.clone(),
@@ -156,7 +168,7 @@ pub fn install(
     };
     let receipt_path = stage.0.join("installation.json");
     fs::write(&receipt_path, serde_json::to_vec_pretty(&receipt)?)?;
-    File::open(receipt_path)?.sync_all()?;
+    sync_installation_file(&receipt_path)?;
     #[cfg(unix)]
     File::open(&stage.0)?.sync_all()?;
     fs::rename(&stage.0, &destination)?;
