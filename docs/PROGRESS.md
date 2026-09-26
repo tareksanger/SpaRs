@@ -23,7 +23,7 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `crates/spars/tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `crates/spars/tests/model_loading.rs` and `crates/spars/tests/model_parity.rs` |
 | Executed Rust Markdown examples | 1 README example and 9 guide examples |
-| Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API and async lifecycle/error tests |
+| Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API, async lifecycle/error tests, and bounded inference admission in `bindings/node/tests/queue.test.mts` |
 | Executed TypeScript guide examples | 3 examples checked and run from Markdown |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
