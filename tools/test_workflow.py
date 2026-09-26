@@ -60,11 +60,22 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('npm --prefix bindings/node run build', smoke)
         self.assertIn('cargo build --release --locked --offline --manifest-path crates/spars-model/Cargo.toml', smoke)
         self.assertIn('cargo build --release --locked --offline --manifest-path consumer/Cargo.toml', smoke)
-        self.assertIn('--archive "assets/$model-3.8.0-py3-none-any.whl" --root target/macos-smoke-models', smoke)
+        self.assertIn('--archive "assets/$model-3.8.0-py3-none-any.whl" --root "$model_root"', smoke)
         self.assertIn('env -i PATH= target/release/spars-model verify "$model_path"', smoke)
         self.assertIn('env -i PATH= consumer/target/release/native-consumer-check', smoke)
         self.assertIn('bindings/node/scripts/smoke.mts "$model_path"', smoke)
         self.assertIn('if: always()', next(step for step in steps if 'actions/upload-artifact@' in step))
+
+    def test_installation_jobs_use_fresh_model_stores(self) -> None:
+        workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/ci.yml').read_text()
+        for name in ('reference-and-rust', 'native-installation'):
+            job = re.split(r'\n  [a-z][a-z-]*:', workflow.split('  ' + name + ':', 1)[1])[0]
+            with self.subTest(job=name):
+                install = next(step for step in job.split('      - ') if 'spars-model install' in step)
+                allocations = list(re.finditer(r'^          model_root=\$\(mktemp -d\)$', install, re.MULTILINE))
+                self.assertEqual(len(allocations), 1)
+                self.assertIn('--root "$model_root"', install)
+                self.assertLess(allocations[0].start(), install.index('spars-model install'))
 
     def test_rust_jobs_cache_both_workspaces_without_skipping_checks(self) -> None:
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/ci.yml').read_text()
