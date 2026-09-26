@@ -16,6 +16,9 @@ permissions:
 concurrency:
   group: npm-release-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'manual' }}
   cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
 jobs:
   validate:
     if: github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -52,9 +55,14 @@ jobs:
             target: linux-arm64-gnu
           - os: macos-14
             target: darwin-arm64
+          - os: windows-2022
+            target: win32-x64-msvc
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
+      - name: Preserve identical source bytes on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.validate.outputs.sha }}
@@ -66,6 +74,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - run: npm --prefix bindings/node ci --ignore-scripts --no-audit --no-fund
       - run: cargo fetch --locked
+      - run: cargo test --locked --release -p spars-model install::tests
       - run: npm --prefix bindings/node run build
       - run: npm --prefix bindings/node run typecheck
       - run: node --test bindings/node/tests/release*.test.mts
@@ -114,10 +123,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
+      - name: Preserve identical source bytes on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.validate.outputs.sha }}

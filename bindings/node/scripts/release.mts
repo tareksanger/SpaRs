@@ -8,6 +8,7 @@ export const targets = [
   {suffix:'linux-x64-gnu', triple:'x86_64-unknown-linux-gnu', os:'linux', cpu:'x64', libc:'glibc'},
   {suffix:'linux-arm64-gnu', triple:'aarch64-unknown-linux-gnu', os:'linux', cpu:'arm64', libc:'glibc'},
   {suffix:'darwin-arm64', triple:'aarch64-apple-darwin', os:'darwin', cpu:'arm64', libc:undefined},
+  {suffix:'win32-x64-msvc', triple:'x86_64-pc-windows-msvc', os:'win32', cpu:'x64', libc:undefined},
 ] as const;
 const commonFiles = ['index.js','index.d.ts','units.d.ts','execution.cjs','spars.mjs','README.md','LICENSE','THIRD_PARTY_NOTICES.md'] as const;
 const repository = {type:'git',url:'git+https://github.com/tareksanger/SpaRs.git',directory:'bindings/node'};

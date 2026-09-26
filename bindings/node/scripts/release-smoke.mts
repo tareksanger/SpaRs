@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { targets } from './release.mts';
 import {releasePackages} from './release-publish.mts';
@@ -42,7 +42,10 @@ export async function smoke(tarballs: string, model: string): Promise<void> {
     assert.ok(address && typeof address === 'object');
     registryUrl = `http://127.0.0.1:${address.port}`;
     writeFileSync(join(project,'package.json'),JSON.stringify({name:'release-consumer',private:true}));
-    await execute('npm',['install','--registry',registryUrl,'--ignore-scripts','--no-audit','--no-fund','--cache',join(project,'cache'),resolve(tarballs,main[0]!)],{cwd:project});
+    const npm = process.platform === 'win32'
+      ? {command:process.execPath,args:[join(dirname(process.execPath),'node_modules/npm/bin/npm-cli.js')]}
+      : {command:'npm',args:[]};
+    await execute(npm.command,[...npm.args,'install','--registry',registryUrl,'--ignore-scripts','--no-audit','--no-fund','--cache',join(project,'cache'),resolve(tarballs,main[0]!)],{cwd:project});
     assert.deepEqual([...fetched],[target.suffix],'npm must fetch only the host optional dependency');
     const manifest: unknown = JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
     assert.ok(typeof manifest === 'object' && manifest !== null && 'name' in manifest && typeof manifest.name === 'string');

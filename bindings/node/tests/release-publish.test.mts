@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {targets} from '../scripts/release.mts';
 import {publishPackages, type ReleasePackage, type Registry} from '../scripts/release-publish.mts';
 const packages: ReleasePackage[] = ['linux','macos','main'].map(name=>({name,version:'0.2.0',path:name+'.tgz',integrity:'sha512-'+name}));
 test('partial publication retries identical bytes and publishes main last',async()=>{
@@ -45,16 +46,17 @@ test('real tarball manifests determine ordering, SHA512, and complete versioned 
     mkdirSync(join(root,'source/package'),{recursive:true});mkdirSync(join(root,'tarballs'));
     function tarball(file:string,name:unknown,version:unknown='0.2.0'):void {
       writeFileSync(join(root,'source/package/package.json'),JSON.stringify({name,version}));
-      execFileSync('tar',['-czf',join(root,'tarballs',file),'-C',join(root,'source'),'package']);
+      execFileSync('tar',['-czf','../tarballs/'+file,'package'],{cwd:join(root,'source')});
     }
     // Deliberately put main first by filename; publish order must follow package identity.
-    tarball('a.tgz','@spars/node');tarball('b.tgz','@spars/node-darwin-arm64');tarball('c.tgz','@spars/node-linux-x64-gnu');tarball('d.tgz','@spars/node-linux-arm64-gnu');
+    tarball('a.tgz','@spars/node');
+    for(const [index,target] of targets.entries()) tarball(`platform-${index}.tgz`,`@spars/node-${target.suffix}`);
     const ordered=releasePackages(join(root,'tarballs'));
-    assert.deepEqual(ordered.map(pkg=>pkg.name),['@spars/node-linux-x64-gnu','@spars/node-linux-arm64-gnu','@spars/node-darwin-arm64','@spars/node']);
+    assert.deepEqual(ordered.map(pkg=>pkg.name),[...targets.map(target=>`@spars/node-${target.suffix}`),'@spars/node']);
     for(const pkg of ordered) assert.equal(pkg.integrity,'sha512-'+createHash('sha512').update(readFileSync(pkg.path)).digest('base64'));
-    tarball('b.tgz','@spars/node-darwin-arm64','0.1.0');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
-    tarball('b.tgz','@spars/node-linux-x64-gnu');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
-    tarball('b.tgz',false);assert.throws(()=>releasePackages(join(root,'tarballs')),/Invalid tarball/);
-    rmSync(join(root,'tarballs/b.tgz'));assert.throws(()=>releasePackages(join(root,'tarballs')),/exactly 4 release tarballs/);
+    tarball('platform-0.tgz',`@spars/node-${targets[0].suffix}`,'0.1.0');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
+    tarball('platform-0.tgz','@spars/node-darwin-arm64');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
+    tarball('platform-0.tgz',false);assert.throws(()=>releasePackages(join(root,'tarballs')),/Invalid tarball/);
+    rmSync(join(root,'tarballs/platform-0.tgz'));assert.throws(()=>releasePackages(join(root,'tarballs')),new RegExp(`exactly ${targets.length+1} release tarballs`));
   } finally {rmSync(root,{recursive:true,force:true});}
 });
