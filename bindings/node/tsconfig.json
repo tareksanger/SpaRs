@@ -22,6 +22,7 @@
     "scripts/**/*.mts",
     "index.d.ts",
     "units.d.ts",
-    "bin/**/*.mjs"
+    "bin/**/*.mjs",
+    "execution.cjs"
   ]
 }

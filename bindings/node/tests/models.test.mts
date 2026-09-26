@@ -83,7 +83,7 @@ test('the npm CLI works from an installed package without TypeScript stripping',
     const bin = join(project,'node_modules/@spars/node/bin/spars.mjs');
     const result = spawnSync(process.execPath, [bin,'download','en_core_web_sm','--archive',archive], {cwd:project, env:{...process.env,SPARS_MODEL_DIR:join(project,'models')},encoding:'utf8'});
     assert.equal(result.status, 0, result.stderr);
-    const loaded = spawnSync(process.execPath,['--input-type=module','-e',"import {loadModel} from '@spars/node'; const m=await loadModel('en_core_web_sm'); if (!(await m.process('Hello.')).tokens.length) process.exit(1);"],{cwd:project,env:{...process.env,SPARS_MODEL_DIR:join(project,'models')},encoding:'utf8'});
+    const loaded = spawnSync(process.execPath,['--input-type=module','-e',"import {loadModel,configureExecution} from '@spars/node'; configureExecution({maxActive:1,maxQueued:0}); const m=await loadModel('en_core_web_sm'); const pending=m.process('Hello.'); await m.process('overflow').then(()=>{throw new Error('Expected admission rejection');},error=>{if(error.code!=='SPARS_BUSY') throw error;}); if (!(await pending).tokens.length) process.exit(1);"],{cwd:project,env:{...process.env,SPARS_MODEL_DIR:join(project,'models')},encoding:'utf8'});
     assert.equal(loaded.status,0,loaded.stderr);
   } finally { rmSync(project,{recursive:true,force:true}); }
 });

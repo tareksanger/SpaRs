@@ -43,8 +43,9 @@ Save this example as `bindings/node/analyze.mts`, then run `node bindings/node/a
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { configureExecution, loadModel } from './index.js';
 
+configureExecution({ maxActive: 2, maxQueued: 32 });
 const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 const doc = await model.process('Alice works in London.');
 assert.equal(doc.tokens[0]?.text, 'Alice');
@@ -85,13 +86,15 @@ assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
 
 `process(text, stage?)` and `processBatch(texts, stage?)` return promises. The default runs the full pipeline. A stage selects an ordered prefix: `Tokenizer`, `Tagger`, `Parser`, `AttributeRuler`, `Lemmatizer`, or `Ner`. Later annotations remain `null`; computed empty lists remain `[]`. The early-stage unavailable-value contract follows SpaRs and does not reproduce every default value in a partially processed Python Doc.
 
-Each batch runs sequentially in one worker job and retains input order. A failure rejects the entire batch. Concurrent calls share the immutable model and own their processing state. Node's worker pool limits active jobs, but queued inputs and complete batch results still occupy memory. Keep batches and concurrent submissions bounded for your workload. Input copying and result creation take place on the JavaScript thread; large batches can still delay it. This API does not stream results or support cancellation.
+Each batch runs sequentially in one worker job and retains input order. A failure rejects the entire batch. Concurrent calls share the immutable model and own their processing state. The package submits at most two inference jobs to Node's worker pool and holds up to 32 more in a first-in, first-out queue in JavaScript by default. Excess `process` and `processBatch` calls reject with `SPARS_BUSY` without submitting native work. Queued batches capture their input strings at submission. A batch occupies one slot until its complete result has been created; success and failure both release the slot. Queued inputs and complete batch results still occupy memory. Keep batches bounded for your workload. Input copying and result creation take place on the JavaScript thread; large batches can still delay it. This API does not stream results or support cancellation.
+
+`configureExecution({maxActive, maxQueued})` sets both limits while inference is idle. `maxActive` must be a positive safe integer; `maxQueued` must be a nonnegative safe integer, and zero disables waiting. Invalid settings or changes while jobs are pending throw synchronously. Limits are shared by models loaded through this package instance within one JavaScript isolate (the separate JavaScript environment of the main thread or a Node worker), not across Node worker threads or processes. They cover inference only: load models and download assets during startup. The libuv pool is still shared with other Node operations; these limits do not reserve worker threads or guarantee latency. Calls rejected with `SPARS_BUSY` need application-level backpressure, such as rejecting an HTTP request or retrying later with a bounded policy. Import the package entry point; directly importing a native `.node` file bypasses admission control.
 
 `vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, and matchers are not yet exposed through this binding; their Rust APIs remain available separately.
 
 ## Errors and verification
 
-Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, and `SPARS_INFERENCE`. Invalid JavaScript argument types or unknown stages throw immediately through Node-API validation. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
+Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, and `SPARS_BUSY`. Invalid JavaScript argument types or unknown stages throw immediately; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
 
 After the [reference setup](DEVELOPMENT.md#set-up-the-project), run:
 
@@ -112,4 +115,4 @@ For repeatable local measurements, this command processes the short-document por
 UV_THREADPOOL_SIZE=1 node bindings/node/scripts/measure.mts assets/en_core_web_md-3.8.0 fixtures/evaluation-v1.json short single 3 1 96 Ner
 ```
 
-Use `long` for the two long documents, `batch` or `concurrent` instead of `single`, and `Tokenizer` instead of `Ner` to measure tokenization alone. The argument `96` limits each batch or group of concurrent calls to 96 documents; a smaller corpus produces a smaller group. Output separates model loading, awaited processing, peak process memory, submission time, and maximum timer gap. Awaited processing includes scheduling and result conversion; it is not a measurement of Rust inference alone. Repeat runs without competing workloads and record hardware, build mode, thread limits, and corpus identity as described in [performance measurements](PERFORMANCE.md).
+Use `long` for the two long documents, `batch` or `concurrent` instead of `single`, and `Tokenizer` instead of `Ner` to measure tokenization alone. The argument `96` limits each batch to 96 documents; a smaller corpus produces a smaller group. For `concurrent`, replace `96` with `8` to stay within the default admission limits. Output separates model loading, awaited processing, peak process memory, submission time, and maximum timer gap. Awaited processing includes scheduling and result conversion; it is not a measurement of Rust inference alone. Repeat runs without competing workloads and record hardware, build mode, thread limits, and corpus identity as described in [performance measurements](PERFORMANCE.md).
