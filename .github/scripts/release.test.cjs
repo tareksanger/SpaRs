@@ -194,7 +194,8 @@ test('workflow prepares only on command and publishes only on release PR merge',
     assert.deepEqual(job.concurrency, { group: 'release-default-branch', queue: 'max', 'cancel-in-progress': false });
   }
   assert.deepEqual(workflow.jobs.publish.permissions, {
-    actions: 'read', contents: 'write', 'pull-requests': 'read', issues: 'write' });
+    actions: 'read', contents: 'write', 'pull-requests': 'write', issues: 'write' },
+  'Publishing must be able to update the release PR labels');
   assert.ok(!workflow.jobs.publish.steps.some(step => step.uses?.startsWith('googleapis/release-please-action@')));
 });
 

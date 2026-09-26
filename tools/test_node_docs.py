@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from subprocess import CompletedProcess
-from check_docs import rust_examples
+from check_docs import rust_examples, run_checks, check_documents
 from node_docs import examples, run_example
 
 
@@ -41,3 +41,35 @@ class NodeDocumentationTests(unittest.TestCase):
         executed = run_example(root, 'throw new Error("intentional-guide-failure");')
         self.assertNotEqual(executed.returncode, 0)
         self.assertIn('intentional-guide-failure', executed.stderr)
+
+
+class DocumentationInstallationTests(unittest.TestCase):
+    def test_each_run_ignores_stale_cached_installations_and_cleans_up(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            seen: list[Path] = []
+
+            def check(received_root: Path, store: Path) -> None:
+                self.assertEqual(received_root, root)
+                self.assertTrue(store.is_dir())
+                self.assertEqual(list(store.iterdir()), [])
+                self.assertNotIn(store, seen)
+                seen.append(store)
+                (store / 'partial-installation').mkdir()
+
+            with patch('check_docs.check_documents', side_effect=check):
+                run_checks(root)  # A clean checkout has no target directory yet.
+                stale = root / 'target/docs-models/partial-installation'
+                stale.mkdir(parents=True)
+                run_checks(root)
+            self.assertTrue(stale.is_dir())
+            self.assertTrue(all(not store.exists() for store in seen))
+
+    def test_installer_failure_reports_diagnostic_before_examples(self) -> None:
+        replies = [CompletedProcess(['cargo'], 0, '', ''),
+                   CompletedProcess(['cargo'], 0, '', ''),
+                   CompletedProcess(['spars'], 1, '', 'I/O: missing installation receipt')]
+        with patch('check_docs.subprocess.run', side_effect=replies) as run:
+            with self.assertRaisesRegex(RuntimeError, 'missing installation receipt'):
+                check_documents(Path.cwd(), Path('target/unused-test-store'))
+            self.assertEqual(run.call_count, 3)

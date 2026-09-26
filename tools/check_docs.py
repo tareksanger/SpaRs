@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import TypedDict
 
@@ -52,16 +53,16 @@ def rustdoc_passed(returncode: int, stdout: str, count: int) -> bool:
     return returncode == 0 and passed is not None and int(passed[1]) == count
 
 
-def main() -> None:
-    root = Path(__file__).resolve().parent.parent
+def check_documents(root: Path, store: Path) -> None:
     subprocess.run(['cargo', 'build', '--release', '--offline', '--lib'], cwd=root, check=True)
     subprocess.run(['cargo', 'build', '--release', '--offline', '--manifest-path',
                     'crates/spars-model/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
-    store = root / 'target/docs-models'
-    subprocess.run([
+    installed = subprocess.run([
         'target/release/spars', 'download', 'en_core_web_sm', '--path', str(store),
         '--archive', 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
-    ], cwd=root, check=True, capture_output=True, text=True)
+    ], cwd=root, capture_output=True, text=True)
+    if installed.returncode:
+        raise RuntimeError(portable_text(installed.stderr, root))
     os.environ['SPARS_MODEL_DIR'] = str(store)
     os.environ['SPARS_MODEL'] = str(root / 'assets/en_core_web_md-3.8.0')
     docs = [root/'README.md', *sorted((root/'docs').glob('*.md'))]
@@ -94,6 +95,16 @@ def main() -> None:
     (root/'target/reports/documentation.json').write_text(json.dumps(results,indent=2)+'\n')
     if not all(r['passed'] for r in results):
         raise SystemExit('Documentation examples failed; see target/reports/documentation.json')
+
+
+def run_checks(root: Path) -> None:
+    (root / 'target').mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='docs-models-', dir=root / 'target') as temporary:
+        check_documents(root, Path(temporary))
+
+
+def main() -> None:
+    run_checks(Path(__file__).resolve().parent.parent)
 
 
 if __name__ == '__main__':

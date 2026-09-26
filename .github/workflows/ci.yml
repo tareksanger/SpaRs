@@ -60,8 +60,9 @@ jobs:
           cargo build --release --locked --offline --manifest-path crates/spars-model/Cargo.toml
           cargo build --release --locked --offline --manifest-path consumer/Cargo.toml
           node_bin=$(command -v node)
+          model_root=$(mktemp -d)
           for model in en_core_web_sm en_core_web_md en_core_web_lg; do
-            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --archive "assets/$model-3.8.0-py3-none-any.whl" --root target/macos-smoke-models)
+            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --archive "assets/$model-3.8.0-py3-none-any.whl" --root "$model_root")
             env -i PATH= target/release/spars-model verify "$model_path"
             env -i PATH= consumer/target/release/native-consumer-check "$model_path"
             env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"
@@ -101,8 +102,9 @@ jobs:
       - name: Download and install without interpreters
         run: |
           node_bin=$(command -v node)
+          model_root=$(mktemp -d)
           for model in en_core_web_sm en_core_web_md en_core_web_lg; do
-            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --root target/models)
+            model_path=$(env -i PATH= target/release/spars-model install --model "$model" --version 3.8.0 --root "$model_root")
             env -i PATH= target/release/spars-model verify "$model_path"
             env -i PATH= consumer/target/release/native-consumer-check "$model_path"
             env -i PATH= "$node_bin" bindings/node/scripts/smoke.mts "$model_path"

@@ -1,0 +1,16 @@
+{
+  "name": "spars-node-playground",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node src/main.mts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@spars/node": "file:../../../bindings/node" },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "5.9.3"
+  }
+}

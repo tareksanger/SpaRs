@@ -124,7 +124,7 @@ The `npm release` workflow builds Linux x64 (glibc, Ubuntu 24.04 build baseline)
 
 1. Obtain publishing access to the `@spars` npm scope. If you use another scope, change the Node package name, lockfile name, package README, and package-install tests before releasing. The platform names are derived from the main name.
 2. Create a GitHub environment named `npm`, restrict it to the repository default branch, and optionally require a reviewer before publication.
-3. Merge the packaging workflow and scripts before preparing a new release. Older tags without these files cannot use this workflow. Keep `cargo release` as the version authority; do not run `npm version` separately.
+3. Merge the packaging workflow and scripts into the default branch and wait for its CI to pass. The workflow builds its exact default-branch commit, which must be the tagged commit or a descendant of it and keep the same Node package version. This allows packaging an existing release whose tag predates the npm tooling without moving that tag. The npm package includes all source changes in the workflow commit, including changes made after the tag; its source commit can therefore differ from the tagged Rust release. Keep `cargo release` as the version authority; do not run `npm version` separately.
 4. For the first version, run the build-only procedure below. After both smoke jobs pass, download its `npm-tarballs` artifact and publish those exact tarballs locally with `npm login` and the commands below. This creates all three packages before configuring their trusted publishers.
 
 For local bootstrap publication, install Node.js 24 or newer with npm, and ensure `tar` is available on `PATH`. Replace `123456` with the successful build-only workflow run ID and use a new, empty download directory:
@@ -149,7 +149,7 @@ gh run list --workflow npm-release.yml
 
 `cargo publish-npm TAG` dispatches GitHub Actions using the remote default branch; it does not push local changes or wait for workflow completion. Add `--dry-run` to either the tag or `--artifacts` form to print the command without contacting GitHub or npm. The artifact directory is relative to the repository root, and must contain the three tarballs from a successful workflow, not locally assembled test fixtures.
 
-The workflow resolves the tag to a commit and requires successful default-branch push CI for that exact commit. It rejects draft releases, prereleases, and mismatched Node versions. In Actions, inspect both smoke jobs and download `npm-tarballs`. Three tarballs contain the main package and its two native dependencies, including license notices. Nothing is uploaded to npm in build-only mode. Artifacts expire after 14 days; retain the original tarballs if publication or recovery will happen later.
+The workflow checks that the tag still points to its recorded release commit, then builds the exact commit selected when the workflow was started. That commit must be the tagged commit or a descendant of it, retain its Node version, and have successful default-branch push CI. It rejects draft releases, prereleases, diverged history, and mismatched Node versions. Wait for CI to finish before starting the npm workflow. In Actions, inspect both smoke jobs and download `npm-tarballs`. Three tarballs contain the main package and its two native dependencies, including license notices. Nothing is uploaded to npm in build-only mode. Artifacts expire after 14 days; retain the original tarballs if publication or recovery will happen later.
 
 ### Publish later versions
 

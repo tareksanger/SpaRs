@@ -4,21 +4,22 @@ const validate = require('./npm-release.cjs');
 function fixture() {
   const sha = 'a'.repeat(40);
   const state = {
-    context:{eventName:'workflow_dispatch',ref:'refs/heads/trunk',repo:{owner:'owner',repo:'repo'},payload:{repository:{default_branch:'trunk'}}},
+    context:{sha,eventName:'workflow_dispatch',ref:'refs/heads/trunk',repo:{owner:'owner',repo:'repo'},payload:{repository:{default_branch:'trunk'}}},
     tag:'v0.2.0',
     release:{draft:false,prerelease:false,tag_name:'v0.2.0',target_commitish:sha},
     ref:{object:{type:'commit',sha}},
     run:{status:'completed',conclusion:'success',head_sha:sha,event:'push',head_branch:'trunk',head_repository:{full_name:'owner/repo'}},
     version:'0.2.0',
+    comparison:'identical',
   };
   const github = {rest:{
-    repos:{getReleaseByTag:async()=>({data:state.release}),getContent:async args => {
-      assert.equal(args.ref,sha);
+    repos:{compareCommits:async args=>{assert.equal(args.base,state.ref.object.sha);assert.equal(args.head,state.context.sha);return {data:{status:state.comparison}};},getReleaseByTag:async()=>({data:state.release}),getContent:async args => {
+      assert.equal(args.ref,state.context.sha);
       return {data:{type:'file',encoding:'base64',content:Buffer.from(JSON.stringify({version:state.version})).toString('base64')}};
     }},
     git:{getRef:async()=>({data:state.ref})},
     actions:{listWorkflowRuns:async args => {
-      assert.equal(args.head_sha,sha); assert.equal(args.branch,'trunk'); assert.equal(args.event,'push');
+      assert.equal(args.head_sha,state.context.sha); assert.equal(args.branch,'trunk'); assert.equal(args.event,'push');
       return {data:{workflow_runs:[state.run]}};
     }},
   }};
@@ -40,6 +41,9 @@ for (const [name,mutate] of [
   ['wrong CI commit',s=>{s.run.head_sha='b'.repeat(40);}],
   ['fork CI',s=>{s.run.head_repository.full_name='other/repo';}],
   ['PR CI',s=>{s.run.event='pull_request';}],
+  ['missing workflow commit',s=>{s.context.sha=undefined;}],
+  ['diverged source',s=>{s.comparison='diverged';}],
+  ['older source',s=>{s.comparison='behind';}],
   ['version mismatch',s=>{s.version='0.1.0';}],
 ]) test(`npm release rejects ${name}`,async()=>{const f=fixture();mutate(f.state);await assert.rejects(f.run());});
 
@@ -66,3 +70,16 @@ test('workflow gates publishing on both platform smoke jobs and uses immutable c
   }
 });
 
+
+test('old release tag uses the CI-verified workflow commit at the same version',async()=>{
+  const f=fixture();
+  f.state.context.sha='b'.repeat(40);
+  f.state.run.head_sha=f.state.context.sha;
+  f.state.comparison='ahead';
+  assert.deepEqual(await f.run(),{sha:'b'.repeat(40),version:'0.2.0'});
+});
+
+test('old tag CI cannot substitute for successful workflow-commit CI',async()=>{
+  const f=fixture();f.state.context.sha='b'.repeat(40);f.state.comparison='ahead';
+  await assert.rejects(f.run(),/Workflow commit needs successful/);
+});
