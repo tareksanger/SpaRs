@@ -34,7 +34,8 @@
     "index.d.ts",
     "units.d.ts",
     "*.node",
-    "bin/*.mjs"
+    "bin/*.mjs",
+    "execution.cjs"
   ],
   "repository": {
     "type": "git",

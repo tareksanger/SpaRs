@@ -8,7 +8,7 @@ export const targets = [
   {suffix:'linux-x64-gnu', triple:'x86_64-unknown-linux-gnu', os:'linux', cpu:'x64', libc:'glibc'},
   {suffix:'darwin-arm64', triple:'aarch64-apple-darwin', os:'darwin', cpu:'arm64', libc:undefined},
 ] as const;
-const commonFiles = ['index.js','index.d.ts','units.d.ts','spars.mjs','README.md','LICENSE','THIRD_PARTY_NOTICES.md'] as const;
+const commonFiles = ['index.js','index.d.ts','units.d.ts','execution.cjs','spars.mjs','README.md','LICENSE','THIRD_PARTY_NOTICES.md'] as const;
 const repository = {type:'git',url:'git+https://github.com/tareksanger/SpaRs.git',directory:'bindings/node'};
 interface ReleaseIdentity { name: string; version: string; sha: string; target: string }
 interface CargoPackage {
@@ -119,7 +119,7 @@ export function collect(root: string, suffix: string, output: string, sha: strin
   create(output);
   writeJson(join(output,'release.json'),{name:manifest.name,version:manifest.version,sha,target:suffix});
   identity(join(output,'release.json'));
-  for (const file of ['index.js','index.d.ts','units.d.ts',`spars-node.${suffix}.node`]) cpSync(join(binding,file),join(output,file));
+  for (const file of ['index.js','index.d.ts','units.d.ts','execution.cjs',`spars-node.${suffix}.node`]) cpSync(join(binding,file),join(output,file));
   cpSync(join(binding,'bin/spars.mjs'),join(output,'spars.mjs'));
   cpSync(join(binding,'README.md'),join(output,'README.md'));
   for (const file of ['LICENSE','THIRD_PARTY_NOTICES.md','licenses']) cpSync(join(root,file),join(output,file),{recursive:true});

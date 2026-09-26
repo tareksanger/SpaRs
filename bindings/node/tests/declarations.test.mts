@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { restrictConstructor } from '../scripts/declarations.mts';
+import { restrictConstructor, addExecutionLoader, addExecutionTypes } from '../scripts/declarations.mts';
 
 test('declaration correction preserves methods and rejects unexpected generator changes', () => {
   const source = 'export declare class Model {\n  process(text: string): Promise<Document>\n}';
@@ -10,4 +10,16 @@ test('declaration correction preserves methods and rejects unexpected generator 
   for (const bad of ['', source + source, 'export declare class Model { constructor() }']) {
     assert.throws(() => restrictConstructor(bad));
   }
+});
+
+test('execution wrapper is generated once and rejects changed loader contracts', () => {
+  const loader = 'module.exports.Model = nativeBinding.Model';
+  const wrapped = addExecutionLoader(loader);
+  assert.match(wrapped, /execution\.cjs/);
+  assert.match(wrapped, /module.exports.configureExecution/);
+  assert.equal(addExecutionLoader(wrapped), wrapped);
+  assert.throws(() => addExecutionLoader(''), /Expected native Model/);
+  const declaration = addExecutionTypes('');
+  assert.match(declaration, /configureExecution/);
+  assert.equal(addExecutionTypes(declaration), declaration);
 });
