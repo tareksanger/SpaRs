@@ -30,7 +30,7 @@ export function releasePackages(directory: string): ReleasePackage[] {
   if (files.length !== targets.length + 1) throw new Error(`Expected exactly ${targets.length + 1} release tarballs`);
   const packages = files.map(file => {
     const path = resolve(directory,file);
-    const value: unknown = JSON.parse(execFileSync('tar',['-xOf',path,'package/package.json'],{encoding:'utf8'}));
+    const value: unknown = JSON.parse(execFileSync('tar',['-xOf','./'+file,'package/package.json'],{cwd:resolve(directory),encoding:'utf8'}));
     if (typeof value !== 'object' || value === null || !('name' in value) || typeof value.name !== 'string' ||
         !/^@[a-z0-9-]+\/[a-z0-9-]+$/.test(value.name) || !('version' in value) || typeof value.version !== 'string' ||
         !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value.version)) throw new Error('Invalid tarball manifest');
