@@ -31,6 +31,26 @@ class InstallerProvenanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pinned_source_lock(data)
 
+    def test_verified_arm64_variant_is_narrow_and_preserves_pinned_bytes(self) -> None:
+        path = Path('reference/source-lock.json')
+        for change in ('none', 'version', 'other source', 'unknown hash'):
+            with self.subTest(change=change):
+                data = json_object(read_json(path))
+                record = json_object(data['spacy'])
+                files = json_object(record['files'])
+                files['spacy/matcher/levenshtein.c'] = '2700287c8e956c608d7013e96e0ff0dd7b1e8296778b7ce3693197d2d4318e00'
+                if change == 'version':
+                    record['version'] = '3.8.13'
+                elif change == 'other source':
+                    files['spacy/tokenizer.pyx'] = '0' * 64
+                elif change == 'unknown hash':
+                    files['spacy/matcher/levenshtein.c'] = 'f' * 64
+                if change == 'none':
+                    self.assertEqual(pinned_source_lock(data), path.read_bytes())
+                else:
+                    with self.assertRaises(ValueError):
+                        pinned_source_lock(data)
+
     def test_unchanged_capture_keeps_every_original_byte(self) -> None:
         path = Path('reference/source-lock.json')
         self.assertEqual(pinned_source_lock(read_json(path)), path.read_bytes())
