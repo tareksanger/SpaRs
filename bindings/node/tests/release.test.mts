@@ -12,7 +12,7 @@ function fixture(): string {
     mkdirSync(dir, {recursive:true});
     for (const [name, content] of Object.entries({
       'index.js': 'module.exports = {};', 'index.d.ts': 'export {};',
-      'units.d.ts': 'export {};', 'spars.mjs': '#!/usr/bin/env node\n',
+      'units.d.ts': 'export {};', 'execution.cjs': 'module.exports = {};', 'spars.mjs': '#!/usr/bin/env node\n',
       'README.md': 'Usage', 'LICENSE': 'MIT', 'THIRD_PARTY_NOTICES.md': 'Notices',
       'DEPENDENCY_LICENSES.txt': 'Dependency notices',
       [`spars-node.${target.suffix}.node`]: 'binary',
@@ -35,6 +35,7 @@ test('stage creates a missing output directory with exact platform dependencies 
       '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0',
     });
     assert.ok(!existsSync(join(out, 'main/spars-node.darwin-arm64.node')));
+    assert.equal(readFileSync(join(out, 'main/execution.cjs'), 'utf8'), 'module.exports = {};');
     for (const target of targets) {
       const manifest: unknown = JSON.parse(readFileSync(join(out, target.suffix, 'package.json'), 'utf8'));
       assert.ok(typeof manifest === 'object' && manifest !== null && 'os' in manifest && 'cpu' in manifest);
@@ -47,7 +48,7 @@ test('stage creates a missing output directory with exact platform dependencies 
   } finally { rmSync(root, {recursive:true,force:true}); }
 });
 
-for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wrong version', 'wrapper mismatch', 'missing notices']) {
+for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wrong version', 'wrapper mismatch', 'missing scheduler', 'scheduler mismatch', 'missing notices']) {
   test(`staging rejects ${problem} before creating output`, () => {
     const root = fixture();
     try {
@@ -56,6 +57,8 @@ for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wron
       if (problem === 'extra binary') writeFileSync(join(dir, 'unexpected.node'), 'binary');
       if (problem === 'wrong revision' || problem === 'wrong version') writeFileSync(join(dir, 'release.json'), JSON.stringify({name:'@spars/node',version:problem === 'wrong version' ? '0.1.0' : '0.2.0',sha:(problem === 'wrong revision' ? 'b' : 'a').repeat(40),target:'darwin-arm64'}));
       if (problem === 'wrapper mismatch') writeFileSync(join(dir, 'index.js'), 'different');
+      if (problem === 'missing scheduler') rmSync(join(dir, 'execution.cjs'));
+      if (problem === 'scheduler mismatch') writeFileSync(join(dir, 'execution.cjs'), 'different');
       if (problem === 'missing notices') rmSync(join(dir, 'DEPENDENCY_LICENSES.txt'));
       assert.throws(() => stageRelease(join(root,'inputs'),join(root,'output'),'a'.repeat(40),'0.2.0'));
       assert.ok(!existsSync(join(root,'output')));
