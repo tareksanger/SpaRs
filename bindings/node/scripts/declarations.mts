@@ -21,6 +21,14 @@ export interface ExecutionOptions {
 }
 /** Set both limits while idle. Defaults: 2 active jobs and 32 queued jobs. */
 export declare function configureExecution(options: ExecutionOptions): void
+/** Text lengths count UTF-16 units, matching JavaScript string.length. */
+export interface InputLimits {
+  maxTextLength: number
+  maxBatchSize: number
+  maxBatchTextLength: number
+}
+/** Set all input limits while idle. Defaults: 32768 units/text, 128 texts/batch, 65536 units/batch. */
+export declare function configureInputLimits(options: InputLimits): void
 `;
 
 export function addExecutionTypes(source: string): string {
@@ -31,7 +39,7 @@ export function addExecutionLoader(source: string): string {
   const marker = "require('./execution.cjs').install(module.exports);";
   if (source.includes(marker)) return source;
   if (!source.includes('module.exports.Model = nativeBinding.Model')) throw new Error('Expected native Model export');
-  return source + `\n${marker}\nmodule.exports.configureExecution = require('./execution.cjs').configureExecution;\n`;
+  return source + `\n${marker}\nmodule.exports.configureExecution = require('./execution.cjs').configureExecution;\nmodule.exports.configureInputLimits = require('./execution.cjs').configureInputLimits;\n`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -17,9 +17,11 @@ test('execution wrapper is generated once and rejects changed loader contracts',
   const wrapped = addExecutionLoader(loader);
   assert.match(wrapped, /execution\.cjs/);
   assert.match(wrapped, /module.exports.configureExecution/);
+  assert.match(wrapped, /module.exports.configureInputLimits/);
   assert.equal(addExecutionLoader(wrapped), wrapped);
   assert.throws(() => addExecutionLoader(''), /Expected native Model/);
   const declaration = addExecutionTypes('');
   assert.match(declaration, /configureExecution/);
+  assert.match(declaration, /configureInputLimits/);
   assert.equal(addExecutionTypes(declaration), declaration);
 });
