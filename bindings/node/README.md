@@ -1,6 +1,6 @@
 # SpaRs for Node.js
 
-Native Rust NLP using official spaCy pretrained weights. Node.js 24 or newer is required. Release packages target Linux x64 with glibc and macOS ARM64; other platforms require a source build and separate verification. See the [Node guide](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) for the typed API and limitations.
+Native Rust NLP using official spaCy pretrained weights. Node.js 24 or newer is required. Release packages target Linux x64/ARM64 with glibc and macOS ARM64; other platforms require a source build and separate verification. See the [Node guide](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) for the typed API and limitations.
 
 Model loading and NLP inference (`loadModel`, `process`, and `processBatch`) run asynchronously on background worker threads, keeping CPU-heavy inference off the event loop. Input copying and result creation still use the JavaScript thread.
 

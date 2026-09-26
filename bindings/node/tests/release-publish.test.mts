@@ -48,13 +48,13 @@ test('real tarball manifests determine ordering, SHA512, and complete versioned 
       execFileSync('tar',['-czf',join(root,'tarballs',file),'-C',join(root,'source'),'package']);
     }
     // Deliberately put main first by filename; publish order must follow package identity.
-    tarball('a.tgz','@spars/node');tarball('b.tgz','@spars/node-darwin-arm64');tarball('c.tgz','@spars/node-linux-x64-gnu');
+    tarball('a.tgz','@spars/node');tarball('b.tgz','@spars/node-darwin-arm64');tarball('c.tgz','@spars/node-linux-x64-gnu');tarball('d.tgz','@spars/node-linux-arm64-gnu');
     const ordered=releasePackages(join(root,'tarballs'));
-    assert.deepEqual(ordered.map(pkg=>pkg.name),['@spars/node-linux-x64-gnu','@spars/node-darwin-arm64','@spars/node']);
+    assert.deepEqual(ordered.map(pkg=>pkg.name),['@spars/node-linux-x64-gnu','@spars/node-linux-arm64-gnu','@spars/node-darwin-arm64','@spars/node']);
     for(const pkg of ordered) assert.equal(pkg.integrity,'sha512-'+createHash('sha512').update(readFileSync(pkg.path)).digest('base64'));
     tarball('b.tgz','@spars/node-darwin-arm64','0.1.0');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
     tarball('b.tgz','@spars/node-linux-x64-gnu');assert.throws(()=>releasePackages(join(root,'tarballs')),/mismatched/);
     tarball('b.tgz',false);assert.throws(()=>releasePackages(join(root,'tarballs')),/Invalid tarball/);
-    rmSync(join(root,'tarballs/b.tgz'));assert.throws(()=>releasePackages(join(root,'tarballs')),/exactly three/);
+    rmSync(join(root,'tarballs/b.tgz'));assert.throws(()=>releasePackages(join(root,'tarballs')),/exactly 4 release tarballs/);
   } finally {rmSync(root,{recursive:true,force:true});}
 });

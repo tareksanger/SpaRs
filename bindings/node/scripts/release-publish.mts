@@ -27,7 +27,7 @@ export async function publishPackages(packages: readonly ReleasePackage[], regis
 
 export function releasePackages(directory: string): ReleasePackage[] {
   const files = readdirSync(directory).filter(file => file.endsWith('.tgz'));
-  if (files.length !== targets.length + 1) throw new Error('Expected exactly three release tarballs');
+  if (files.length !== targets.length + 1) throw new Error(`Expected exactly ${targets.length + 1} release tarballs`);
   const packages = files.map(file => {
     const path = resolve(directory,file);
     const value: unknown = JSON.parse(execFileSync('tar',['-xOf',path,'package/package.json'],{encoding:'utf8'}));

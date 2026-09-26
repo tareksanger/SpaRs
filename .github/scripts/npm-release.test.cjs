@@ -47,13 +47,13 @@ for (const [name,mutate] of [
   ['version mismatch',s=>{s.version='0.1.0';}],
 ]) test(`npm release rejects ${name}`,async()=>{const f=fixture();mutate(f.state);await assert.rejects(f.run());});
 
-test('workflow gates publishing on both platform smoke jobs and uses immutable checkout/artifacts', () => {
+test('workflow gates publishing on all platform smoke jobs and uses immutable checkout/artifacts', () => {
   const {readFileSync} = require('node:fs');
   const {parse} = require('../../tools/node_modules/yaml');
   const workflow = parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
-  assert.deepEqual(Object.keys(workflow.on),['workflow_dispatch']);
+  assert.deepEqual(Object.keys(workflow.on).sort(),['pull_request','workflow_dispatch']);
   assert.equal(workflow.on.workflow_dispatch.inputs.publish.default,false);
-  assert.equal(workflow.jobs.publish.if,'inputs.publish');
+  assert.equal(workflow.jobs.publish.if,"github.event_name == 'workflow_dispatch' && inputs.publish");
   assert.equal(workflow.jobs.publish.environment,'npm');
   assert.deepEqual(workflow.jobs.publish.needs,['validate','smoke']);
   assert.deepEqual(workflow.jobs.smoke.needs,['validate','assemble']);
@@ -82,4 +82,38 @@ test('old release tag uses the CI-verified workflow commit at the same version',
 test('old tag CI cannot substitute for successful workflow-commit CI',async()=>{
   const f=fixture();f.state.context.sha='b'.repeat(40);f.state.comparison='ahead';
   await assert.rejects(f.run(),/Workflow commit needs successful/);
+});
+
+test('Linux ARM64 is built, tested, and packaged on a native runner', async()=>{
+  const {readFileSync} = require('node:fs');
+  const {parse} = require('../../tools/node_modules/yaml');
+  const {targets} = await import('../../bindings/node/scripts/release.mts');
+  const release=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+  const ci=parse(readFileSync('.github/workflows/ci.yml','utf8'));
+  const manifest=JSON.parse(readFileSync('bindings/node/package.json','utf8'));
+  assert.deepEqual(targets.find(target=>target.suffix==='linux-arm64-gnu'),
+    {suffix:'linux-arm64-gnu',triple:'aarch64-unknown-linux-gnu',os:'linux',cpu:'arm64',libc:'glibc'});
+  assert.deepEqual(new Set(manifest.napi.targets),new Set(targets.map(target=>target.triple)));
+  assert.ok(release.jobs.build.strategy.matrix.include.some(row=>row.os==='ubuntu-24.04-arm' && row.target==='linux-arm64-gnu'));
+  assert.ok(release.jobs.smoke.strategy.matrix.os.includes('ubuntu-24.04-arm'));
+  assert.ok(ci.jobs['reference-and-rust'].strategy.matrix.os.includes('ubuntu-24.04-arm'));
+  const acceptance=ci.jobs['reference-and-rust'].steps.find(step=>step.name==='Run Linux acceptance');
+  assert.equal(acceptance.if,"runner.os == 'Linux'");
+  assert.match(acceptance.run,/tools\/verify\.py --model-exports-only/);
+});
+
+test('pull requests build the exact merge commit without checking a release or permitting publication',async()=>{
+  const f=fixture();f.state.context.eventName='pull_request';f.state.context.ref='refs/pull/42/merge';
+  f.state.tag=undefined;f.state.release=null;f.state.run=null;
+  assert.deepEqual(await f.run(),{sha:'a'.repeat(40),version:'0.2.0'});
+  f.state.context.ref='refs/heads/trunk';await assert.rejects(f.run(),/merge ref/);
+});
+
+test('pull request validation rejects invalid package versions and missing manifests',async()=>{
+  const f=fixture();f.state.context.eventName='pull_request';f.state.context.ref='refs/pull/42/merge';
+  for(const version of ['bad','0.2.0-beta.1',2,null]) {
+    f.state.version=version;
+    await assert.rejects(f.run(),/Invalid Node package version/);
+  }
+  await assert.rejects(validate({github:{rest:{repos:{getContent:async()=>({data:[]})}}},context:f.state.context}),/Missing Node manifest/);
 });

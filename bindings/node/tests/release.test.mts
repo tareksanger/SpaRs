@@ -32,7 +32,7 @@ test('stage creates a missing output directory with exact platform dependencies 
     const main: unknown = JSON.parse(readFileSync(join(out, 'main/package.json'), 'utf8'));
     assert.ok(typeof main === 'object' && main !== null && 'optionalDependencies' in main);
     assert.deepEqual(main.optionalDependencies, {
-      '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0',
+      '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-linux-arm64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0',
     });
     assert.ok(!existsSync(join(out, 'main/spars-node.darwin-arm64.node')));
     for (const target of targets) {
@@ -88,3 +88,14 @@ test('Cargo notices include nested licenses and reject incomplete graphs, texts,
     assert.match(licenseTexts(metadata,root),/Pinned upstream notice/);
   } finally {rmSync(root,{recursive:true,force:true});}
 });
+
+for (const target of targets) {
+  test(`staging rejects missing ${target.suffix} artifact before creating output`, () => {
+    const root = fixture();
+    try {
+      rmSync(join(root, 'inputs', target.suffix), {recursive:true});
+      assert.throws(() => stageRelease(join(root,'inputs'),join(root,'output'),'a'.repeat(40),'0.2.0'));
+      assert.ok(!existsSync(join(root,'output')));
+    } finally { rmSync(root,{recursive:true,force:true}); }
+  });
+}

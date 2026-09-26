@@ -1,6 +1,6 @@
 use std::{io, path::Path, process::Command};
 
-const HELP: &str = "Usage: cargo publish-npm <vX.Y.Z> [--build-only] [--dry-run]\n       cargo publish-npm --artifacts <directory> [--dry-run]\n\nWith a tag: start the npm workflow from the remote default branch using gh.\nWith --artifacts: publish the three downloaded workflow tarballs using Node.js 24 and npm login.\n--build-only builds and tests without publishing.\n--dry-run prints the command without contacting GitHub or npm.\nSee docs/RELEASING.md for first-release setup.";
+const HELP: &str = "Usage: cargo publish-npm <vX.Y.Z> [--build-only] [--dry-run]\n       cargo publish-npm --artifacts <directory> [--dry-run]\n\nWith a tag: start the npm workflow from the remote default branch using gh.\nWith --artifacts: publish the complete set of downloaded workflow tarballs using Node.js 24 and npm login.\n--build-only builds and tests without publishing.\n--dry-run prints the command without contacting GitHub or npm.\nSee docs/RELEASING.md for first-release setup.";
 
 #[derive(Debug, PartialEq)]
 enum Destination<'a> {
