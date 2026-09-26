@@ -134,3 +134,14 @@ test('Windows x64 has native build and installed-package coverage with portable 
     assert.equal(steps[0].if,"runner.os == 'Windows'");
   }
 });
+
+test('Intel macOS has native build and installed-package coverage',async()=>{
+  const {readFileSync}=require('node:fs');
+  const {parse}=require('../../tools/node_modules/yaml');
+  const {targets}=await import('../../bindings/node/scripts/release.mts');
+  const workflow=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+  assert.deepEqual(targets.find(target=>target.suffix==='darwin-x64'),
+    {suffix:'darwin-x64',triple:'x86_64-apple-darwin',os:'darwin',cpu:'x64',libc:undefined});
+  assert.ok(workflow.jobs.build.strategy.matrix.include.some(row=>row.os==='macos-15-intel' && row.target==='darwin-x64'));
+  assert.ok(workflow.jobs.smoke.strategy.matrix.os.includes('macos-15-intel'));
+});
