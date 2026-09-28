@@ -12,11 +12,14 @@ test('loaded pipeline defaults and Python character counting match the pinned re
   await assert.rejects(model.process('😀😀a', 'Tokenizer'), { code: 'SPARS_TEXT_TOO_LONG' });
 });
 
-test('default processing accepts more than the former server caps', async () => {
+test('default processing accepts more than the former input caps', async () => {
   const model = await loadModel(modelPath);
   assert.equal((await model.process('word '.repeat(13_108), 'Tokenizer')).text.length, 65_540);
   assert.equal((await model.processBatch(Array(257).fill(''), 'Tokenizer')).length, 257);
-  assert.equal((await Promise.all(Array.from({length: 40}, () => model.process('', 'Tokenizer')))).length, 40);
+  const accepted = Array.from({ length: 34 }, () => model.process('', 'Tokenizer'));
+  const settled = Promise.allSettled(accepted);
+  await assert.rejects(model.process('', 'Tokenizer'), { code: 'SPARS_BUSY' });
+  assert.ok((await settled).every(result => result.status === 'fulfilled'));
 });
 
 

@@ -103,9 +103,9 @@ assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
 
 These buffers are not spaCy's component-level neural batching, and there is no `n_process` multiprocessing, `as_tuples`, per-component pipe configuration, or cancellation support. `pipe` accepts only `batchSize` and `stage` options; unknown options reject during iteration. Buffer failure timing need not match spaCy for every pipeline, especially tokenizer-only processing. Both input copying and result creation run on the JavaScript thread, so large documents or buffers can still delay the event loop. The default maximum length follows spaCy; it does not promise that all accepted text fits in memory or avoids native regex/inference limits.
 
-## Optional server resource limits
+## Server resource limits
 
-Additional queue and input limits are disabled by default. Applications relying on earlier default limits must now configure both policies explicitly at startup. Services can opt in during startup, before submitting inference. Choose values from measurements of their workload; these example values are application policy, not spaCy defaults:
+Inference admission retains the default of two active jobs and 32 queued jobs per package instance and JavaScript isolate. Additional input limits are disabled by default. Applications relying on the earlier text and batch caps must configure `configureInputLimits` explicitly at startup; existing queue protection needs no migration. Services can customize either policy while inference is idle. These are Node server policies, not spaCy processing defaults:
 
 ```typescript
 import assert from 'node:assert/strict';
@@ -117,12 +117,13 @@ configureInputLimits({ maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLen
 // Keep pipe buffers within the explicit maxBatchSize policy.
 model.batchSize = 128;
 assert.equal((await model.process('Hello.')).text, 'Hello.');
-// Demonstration only: omit these resets in a server that should retain its limits.
+// Demonstration only: restore default admission and remove additional input caps.
+// Omit these resets in a server that should retain its custom policies.
 configureExecution(null);
 configureInputLimits(null);
 ```
 
-Import `configureExecution` and `configureInputLimits` from the package entry point. `configureExecution({maxActive, maxQueued})` sets a maximum number of submitted inference jobs and a first-in, first-out waiting queue. `maxActive` must be a positive safe integer; `maxQueued` must be a nonnegative safe integer, and zero disables waiting. Excess calls reject with `SPARS_BUSY` without submitting native work. Calls rejected with `SPARS_BUSY` need application backpressure, such as rejecting an HTTP request or retrying later with a bounded policy. `configureExecution(null)` removes these additional admission limits while idle; it does not cancel work or change the native pool's thread count.
+Import `configureExecution` and `configureInputLimits` from the package entry point. `configureExecution({maxActive, maxQueued})` sets a maximum number of submitted inference jobs and a first-in, first-out waiting queue. `maxActive` must be a positive safe integer; `maxQueued` must be a nonnegative safe integer, and zero disables waiting. Excess calls reject with `SPARS_BUSY` without submitting native work. Calls rejected with `SPARS_BUSY` need application backpressure, such as rejecting an HTTP request or retrying later with a bounded policy. `configureExecution(null)` restores two active jobs and 32 queued jobs while idle; it does not cancel work or change the native pool's thread count.
 
 `configureInputLimits({maxTextLength, maxBatchSize, maxBatchTextLength})` sets all three additional input limits. All must be positive safe integers. Text lengths count JavaScript UTF-16 units (`string.length`), so `😀` counts as two units for these server policies. `maxBatchSize` limits the whole array passed to `processBatch` or one `pipe` buffer, before any internal chunking. Empty text and empty batches remain supported. `configureInputLimits(null)` removes these extra limits while idle; the per-model `maxLength` still applies.
 
@@ -155,4 +156,4 @@ For repeatable local measurements, this command processes the short-document por
 UV_THREADPOOL_SIZE=1 node bindings/node/scripts/measure.mts assets/en_core_web_md-3.8.0 fixtures/evaluation-v1.json short single 3 1 96 Ner
 ```
 
-Use `long` for the two long documents, `batch` or `concurrent` instead of `single`, and `Tokenizer` instead of `Ner` to measure tokenization alone. The argument `96` limits each batch to 96 documents; a smaller corpus produces a smaller group. For `concurrent`, replace `96` with `8` to measure groups of eight concurrent calls; enable explicit admission limits when measuring a server policy. Output separates model loading, awaited processing, peak process memory, submission time, and maximum timer gap. Awaited processing includes scheduling and result conversion; it is not a measurement of Rust inference alone. Repeat runs without competing workloads and record hardware, build mode, thread limits, and corpus identity as described in [performance measurements](PERFORMANCE.md).
+Use `long` for the two long documents, `batch` or `concurrent` instead of `single`, and `Tokenizer` instead of `Ner` to measure tokenization alone. The argument `96` limits each batch to 96 documents; a smaller corpus produces a smaller group. For `concurrent`, replace `96` with `8` to measure groups of eight concurrent calls; configure different admission limits when measuring another server policy. Output separates model loading, awaited processing, peak process memory, submission time, and maximum timer gap. Awaited processing includes scheduling and result conversion; it is not a measurement of Rust inference alone. Repeat runs without competing workloads and record hardware, build mode, thread limits, and corpus identity as described in [performance measurements](PERFORMANCE.md).

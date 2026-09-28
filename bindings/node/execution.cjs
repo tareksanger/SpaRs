@@ -5,6 +5,9 @@
 /** @typedef {import('./index.js').InputLimits} InputLimits */
 /** @typedef {{ start: () => void, next: Job | null }} Job */
 
+const DEFAULT_MAX_ACTIVE = 2;
+const DEFAULT_MAX_QUEUED = 32;
+
 /** A bounded FIFO that submits only active jobs to the native worker pool. */
 class Scheduler {
   /** @type {number} */
@@ -15,8 +18,8 @@ class Scheduler {
   head = null;
   /** @type {Job | null} */
   tail = null;
-  maxActive = Infinity;
-  maxQueued = Infinity;
+  maxActive = DEFAULT_MAX_ACTIVE;
+  maxQueued = DEFAULT_MAX_QUEUED;
 
   assertIdle() {
     if (this.active || this.queued) throw new Error('Configure processing only while inference is idle');
@@ -26,8 +29,8 @@ class Scheduler {
   configure(options) {
     if (options === null) {
       this.assertIdle();
-      this.maxActive = Infinity;
-      this.maxQueued = Infinity;
+      this.maxActive = DEFAULT_MAX_ACTIVE;
+      this.maxQueued = DEFAULT_MAX_QUEUED;
       return;
     }
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Expected execution options');

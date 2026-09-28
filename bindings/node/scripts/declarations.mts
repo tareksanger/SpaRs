@@ -19,7 +19,7 @@ export interface ExecutionOptions {
   maxActive: number
   maxQueued: number
 }
-/** Enable server admission limits while idle. Disabled by default; null resets them. */
+/** Configure admission while idle. Defaults to 2 active and 32 queued; null restores these defaults. */
 export declare function configureExecution(options: ExecutionOptions | null): void
 /** Text lengths count UTF-16 units, matching JavaScript string.length. */
 export interface InputLimits {

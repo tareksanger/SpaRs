@@ -70,8 +70,8 @@ test('invalid configuration leaves defaults unchanged', () => {
     {maxActive: Number.MAX_SAFE_INTEGER + 1,maxQueued: 0}]) {
     const scheduler = new Scheduler();
     assert.throws(() => Reflect.apply(scheduler.configure, scheduler, [options]));
-    assert.equal(scheduler.maxActive, Infinity);
-    assert.equal(scheduler.maxQueued, Infinity);
+    assert.equal(scheduler.maxActive, 2);
+    assert.equal(scheduler.maxQueued, 32);
   }
 });
 
@@ -125,7 +125,7 @@ test('wrappers defer native invocation and reject saturation without reading bat
 });
 
 
-test('reset disables admission caps for subsequent concurrent submissions', async () => {
+test('reset restores default admission caps for subsequent submissions', async () => {
   const model = await loadModel(modelPath);
   configureExecution({ maxActive: 1, maxQueued: 0 });
   const first = model.process('a', 'Tokenizer');
@@ -133,8 +133,11 @@ test('reset disables admission caps for subsequent concurrent submissions', asyn
     await assert.rejects(model.process('b', 'Tokenizer'), { code: 'SPARS_BUSY' });
     await first;
     configureExecution(null);
-    const docs = await Promise.all(['a', 'b', 'c'].map(text => model.process(text, 'Tokenizer')));
-    assert.deepEqual(docs.map(doc => doc.text), ['a', 'b', 'c']);
+    const accepted = Array.from({ length: 34 }, () => model.process('a', 'Tokenizer'));
+    const settled = Promise.allSettled(accepted);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    assert.ok((await settled).every(result => result.status === 'fulfilled'));
+    assert.equal((await model.process('recovered', 'Tokenizer')).text, 'recovered');
   } finally { await first; configureExecution(null); }
 });
 
@@ -188,4 +191,27 @@ test('native chunks run sequentially under one admission slot and stop on failur
     assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
     assert.equal((await model.process('recovered')).text, 'recovered');
   } finally { configureExecution(null); }
+});
+
+
+test('fresh scheduler admits two jobs and queues exactly 32 without configuration', async () => {
+  const scheduler = new Scheduler();
+  const gate = deferred();
+  const started: number[] = [];
+  const accepted = Array.from({ length: 34 }, (_, index) => scheduler.submit(() => {
+    started.push(index);
+    return gate.promise;
+  }));
+  const settled = Promise.allSettled(accepted);
+  try {
+    assert.deepEqual(started, [0, 1]);
+    assert.equal(scheduler.active, 2);
+    assert.equal(scheduler.queued, 32);
+    await assert.rejects(scheduler.submit(async () => 35), { code: 'SPARS_BUSY' });
+  } finally { gate.resolve(0); await settled; }
+  assert.deepEqual(started, Array.from({ length: 34 }, (_, index) => index));
+  scheduler.configure({ maxActive: 4, maxQueued: 0 });
+  scheduler.configure(null);
+  assert.equal(scheduler.maxActive, 2);
+  assert.equal(scheduler.maxQueued, 32);
 });
