@@ -189,6 +189,23 @@ assert.ok(restored.toObject().tokens.length > 0);
 
 `toSnapshot()` preserves native annotations and contextual vectors when available. `NativeDocument.fromSnapshot(json)` validates the complete snapshot, including text boundaries, annotation indices, and tensor shapes. This versioned native format is separate from spaCy JSON and DocBin. Native documents remain usable after their originating model is released. Snapshot import/export and plain-object conversion run synchronously on the JavaScript thread and allocate memory proportional to the document, including any contextual tensor; inference admission limits do not bound these operations.
 
+## Lexical attributes
+
+`model.lexeme(text)` returns an owned record of the existing native lexical attributes, including normalization, shape, prefix/suffix, lexical flags, and static-vector availability. It runs synchronously and does not change the vocabulary.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const lexeme = model.lexeme('London');
+assert.equal(lexeme.isAlpha, true);
+assert.equal(lexeme.suffix, 'don');
+assert.equal(typeof lexeme.orth, 'bigint');
+```
+
+`orth` is a JavaScript `bigint` so the unsigned 64-bit string identity stays exact. Convert it explicitly to a decimal string when serializing a lexical record to JSON; JavaScript's default JSON serializer rejects bigints.
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.

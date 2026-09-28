@@ -2,6 +2,7 @@
 mod convert;
 mod document;
 mod errors;
+mod lexical;
 mod models;
 pub use models::{download_model, DownloadOptions, LoadOptions};
 mod output;
