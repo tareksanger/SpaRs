@@ -22,7 +22,8 @@ function fixture(): {root:string; directory:string; stored:Map<string,Buffer>; c
   mkdirSync(directory);mkdirSync(join(root,'source/package'),{recursive:true});
   for(const suffix of ['',...targets.map(target=>'-'+target.suffix)]) {
     writeFileSync(join(root,'source/package/package.json'),JSON.stringify({name:'@spars/node'+suffix,version:'0.2.0'}));
-    execFileSync('tar',['-czf',join(directory,'spars-node'+suffix+'.tgz'),'package'],{cwd:join(root,'source')});
+    // GNU tar interprets a Windows drive-letter colon as a remote archive host.
+    execFileSync('tar',['-czf','../tarballs/spars-node'+suffix+'.tgz','package'],{cwd:join(root,'source')});
   }
   seal(directory,'v0.2.0','a'.repeat(40));
   const stored=new Map<string,Buffer>();const calls:string[][]=[];
