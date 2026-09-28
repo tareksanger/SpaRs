@@ -206,6 +206,29 @@ assert.equal(typeof lexeme.orth, 'bigint');
 
 `orth` is a JavaScript `bigint` so the unsigned 64-bit string identity stays exact. Convert it explicitly to a decimal string when serializing a lexical record to JSON; JavaScript's default JSON serializer rejects bigints.
 
+## Model-store management
+
+`ModelStore` exposes offline selection of installed model directories. Construction and `discover()` capture the directory at call time; `resolve` and `register` perform filesystem work asynchronously. Registration selects an existing direct child directory and does not inspect model weights. Loading by name still validates the selected model identity and contents.
+
+```typescript
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ModelStore } from './index.js';
+
+const directory = mkdtempSync(join(tmpdir(), 'spars-store-'));
+try {
+  const store = new ModelStore(directory);
+  const installed = join(directory, 'example-installation');
+  mkdirSync(installed);
+  await store.register('en_core_web_sm', installed);
+  assert.equal(await store.resolve('en_core_web_sm'), realpathSync(installed));
+} finally { rmSync(directory, { recursive: true, force: true }); }
+```
+
+Use `ModelStore.discover()` for `SPARS_MODEL_DIR` or the platform cache default. `store.root` supplies the `{path}` option for `loadModel(name, {path: store.root})`. Store operations neither acquire models nor implement update/removal commands.
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
