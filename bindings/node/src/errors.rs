@@ -14,6 +14,7 @@ enum Code {
     InvalidModel,
     Unsupported,
     InvalidText,
+    TextTooLong,
     Bounds,
     Inference,
 }
@@ -25,6 +26,7 @@ impl AsRef<str> for Code {
             Self::InvalidModel => "SPARS_INVALID_MODEL",
             Self::Unsupported => "SPARS_UNSUPPORTED",
             Self::InvalidText => "SPARS_INVALID_TEXT",
+            Self::TextTooLong => "SPARS_TEXT_TOO_LONG",
             Self::Bounds => "SPARS_BOUNDS",
             Self::Inference => "SPARS_INFERENCE",
         }
@@ -83,5 +85,12 @@ impl From<spars_model::Error> for BindingError {
             code,
             message: error.to_string(),
         }
+    }
+}
+
+pub fn text_too_long(length: usize, maximum: u32) -> BindingError {
+    BindingError {
+        code: Code::TextTooLong,
+        message: format!("[E088] Text of length {length} exceeds maximum of {maximum}"),
     }
 }

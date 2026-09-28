@@ -17,6 +17,11 @@ pub struct Model {
     pub(crate) symbols: HashMap<String, u64>,
 }
 impl Model {
+    /// Upstream nlp.batch_size, or spaCy's constructor default when absent.
+    pub fn default_batch_size(&self) -> u32 {
+        self.config.processing.batch_size
+    }
+
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         if let Some(name) = path

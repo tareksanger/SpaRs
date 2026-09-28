@@ -30,7 +30,7 @@ test('admission is shared across models, rejects overflow, and recovers after er
     texts[0] = 'changed';
     await assert.rejects(second.processBatch(['overflow']), { code: 'SPARS_BUSY' });
     assert.equal((await batch)[0]?.text, 'original');
-  } finally { configureExecution({ maxActive: 2, maxQueued: 32 }); }
+  } finally { configureExecution(null); }
 });
 
 function deferred(): { promise: Promise<number>; resolve: (value: number) => void; reject: (error: Error) => void } {
@@ -65,7 +65,7 @@ test('scheduler caps native submissions, preserves FIFO, and releases every slot
 });
 
 test('invalid configuration leaves defaults unchanged', () => {
-  for (const options of [null, [], {}, {maxActive: 0,maxQueued: 1}, {maxActive: 1.5,maxQueued: 1},
+  for (const options of [[], {}, {maxActive: 0,maxQueued: 1}, {maxActive: 1.5,maxQueued: 1},
     {maxActive: 1,maxQueued: -1}, {maxActive: 1,maxQueued: Infinity}, {maxActive: '1',maxQueued: 1},
     {maxActive: Number.MAX_SAFE_INTEGER + 1,maxQueued: 0}]) {
     const scheduler = new Scheduler();
@@ -84,6 +84,13 @@ test('wrappers defer native invocation and reject saturation without reading bat
     gates.set(key, { promise, resolve });
   }
   class FakeModel {
+    private maximum = 1_000_000;
+    private size = 256;
+    get maxLength(): number { return this.maximum; }
+    set maxLength(value: number) { this.maximum = value; }
+    get batchSize(): number { return this.size; }
+    set batchSize(value: number) { this.size = value; }
+    async *pipe(): AsyncGenerator<Document, void, unknown> { yield await this.process('first'); }
     process(text: string): Promise<Document> {
       started.push(text);
       const gate = gates.get(text);
@@ -118,5 +125,124 @@ test('wrappers defer native invocation and reject saturation without reading bat
   assert.deepEqual(started, ['first', 'second', 'third']);
   gates.get('third')?.resolve(doc('third'));
   await third;
-  configureExecution({ maxActive: 2, maxQueued: 32 });
+  configureExecution(null);
+});
+
+
+test('reset restores default admission caps for subsequent submissions', async () => {
+  const model = await loadModel(modelPath);
+  configureExecution({ maxActive: 1, maxQueued: 0 });
+  const first = model.process('a', 'Tokenizer');
+  try {
+    await assert.rejects(model.process('b', 'Tokenizer'), { code: 'SPARS_BUSY' });
+    await first;
+    configureExecution(null);
+    const accepted = Array.from({ length: 34 }, () => model.process('a', 'Tokenizer'));
+    const settled = Promise.allSettled(accepted);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    assert.ok((await settled).every(result => result.status === 'fulfilled'));
+    assert.equal((await model.process('recovered', 'Tokenizer')).text, 'recovered');
+  } finally { await first; configureExecution(null); }
+});
+
+test('native chunks run sequentially under one admission slot and stop on failure', async () => {
+  const chunks: string[][] = [];
+  let gates = [deferred(), deferred(), deferred()];
+  let active = 0;
+  const doc = (text: string): Document => ({ text, tokens: [], entities: null, sentences: null, nounChunks: null });
+  class FakeModel {
+    private maximum = 1_000_000;
+    private size = 2;
+    get maxLength(): number { return this.maximum; }
+    set maxLength(value: number) { this.maximum = value; }
+    get batchSize(): number { return this.size; }
+    set batchSize(value: number) { this.size = value; }
+    async *pipe(): AsyncGenerator<Document, void, unknown> { yield doc('unused'); }
+    async process(text: string): Promise<Document> { return doc(text); }
+    async processBatch(texts: string[]): Promise<Document[]> {
+      assert.equal(active, 0, 'native chunks must not overlap');
+      const gate = gates[chunks.length];
+      assert.ok(gate);
+      chunks.push(texts);
+      active++;
+      try { await gate.promise; return texts.map(doc); }
+      finally { active--; }
+    }
+    vector(): null { return null; }
+  }
+  install({ Model: FakeModel });
+  const model = new FakeModel();
+  configureExecution({ maxActive: 1, maxQueued: 0 });
+  try {
+    const texts = ['a', 'b', 'c', 'd', 'e'];
+    const result = model.processBatch(texts);
+    texts[2] = 'changed';
+    assert.deepEqual(chunks, [['a', 'b']]);
+    gates[0]?.resolve(0);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    gates[1]?.resolve(1);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd'], ['e']]);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    gates[2]?.resolve(2);
+    assert.deepEqual((await result).map(item => item.text), ['a', 'b', 'c', 'd', 'e']);
+    chunks.length = 0;
+    gates = [deferred(), deferred(), deferred()];
+    const failure = model.processBatch(['a', 'b', 'c', 'd', 'e']);
+    const rejected = assert.rejects(failure, /middle chunk failed/);
+    gates[0]?.resolve(0);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    gates[1]?.reject(new Error('middle chunk failed'));
+    await rejected;
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
+    assert.equal((await model.process('recovered')).text, 'recovered');
+  } finally { configureExecution(null); }
+});
+
+
+test('fresh scheduler admits two jobs and queues exactly 32 without configuration', async () => {
+  const scheduler = new Scheduler();
+  const gate = deferred();
+  const started: number[] = [];
+  const accepted = Array.from({ length: 34 }, (_, index) => scheduler.submit(() => {
+    started.push(index);
+    return gate.promise;
+  }));
+  const settled = Promise.allSettled(accepted);
+  try {
+    assert.deepEqual(started, [0, 1]);
+    assert.equal(scheduler.active, 2);
+    assert.equal(scheduler.queued, 32);
+    await assert.rejects(scheduler.submit(async () => 35), { code: 'SPARS_BUSY' });
+  } finally { gate.resolve(0); await settled; }
+  assert.deepEqual(started, Array.from({ length: 34 }, (_, index) => index));
+  scheduler.configure({ maxActive: 4, maxQueued: 0 });
+  scheduler.configure(null);
+  assert.equal(scheduler.maxActive, 2);
+  assert.equal(scheduler.maxQueued, 32);
+});
+
+
+test('an incompatible native addon fails before any inference method is wrapped', () => {
+  for (const variant of ['missingBoth', 'missingBatch', 'readOnlyBatch']) {
+    class LegacyModel {
+      process(): void { throw new Error('must not execute'); }
+      processBatch(): void { throw new Error('must not execute'); }
+    }
+    if (variant !== 'missingBoth') Object.defineProperty(LegacyModel.prototype, 'maxLength', {
+      configurable: true, get() { return 1_000_000; }, set(_value: number) {},
+    });
+    if (variant === 'readOnlyBatch') Object.defineProperty(LegacyModel.prototype, 'batchSize', {
+      configurable: true, get() { return 256; },
+    });
+    const descriptors = Object.getOwnPropertyDescriptors(LegacyModel.prototype);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assert.throws(() => Reflect.apply(install, undefined, [{ Model: LegacyModel }]), {
+        code: 'SPARS_NATIVE_INCOMPATIBLE', message: /NAPI_RS_NATIVE_LIBRARY_PATH/,
+      });
+      assert.deepEqual(Object.getOwnPropertyDescriptors(LegacyModel.prototype), descriptors);
+    }
+  }
 });

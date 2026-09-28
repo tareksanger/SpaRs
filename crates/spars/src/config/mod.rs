@@ -1,8 +1,10 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 mod capabilities;
+mod processing;
 mod resources;
 pub(crate) use capabilities::Capabilities;
+pub(crate) use processing::ProcessingDefaults;
 pub(crate) use resources::*;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(transparent)]
@@ -19,6 +21,8 @@ pub(crate) enum Dtype {
 }
 #[derive(Deserialize)]
 pub(crate) struct Manifest {
+    #[serde(default, rename = "config")]
+    pub processing: ProcessingDefaults,
     pub format_version: u32,
     pub model: String,
     pub model_version: String,

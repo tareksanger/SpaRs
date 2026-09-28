@@ -178,6 +178,8 @@ test('missing, malformed and unsupported assets return useful error codes', asyn
     writeFileSync(`${folder}/manifest.json`, JSON.stringify(manifest));
     writeFileSync(`${folder}/weights.safetensors`, 'corrupt');
     await assert.rejects(loadModel(folder), { code: 'SPARS_INVALID_MODEL', message: /checksum/ });
+    writeFileSync(`${folder}/manifest.json`, JSON.stringify({ ...manifest, config: '[nlp]\nbatch_size = 0' }));
+    await assert.rejects(loadModel(folder), { code: 'SPARS_INVALID_MODEL', message: /batch_size/ });
     writeFileSync(`${folder}/manifest.json`, JSON.stringify({ ...manifest, format_version: 999 }));
     await assert.rejects(loadModel(folder), { code: 'SPARS_UNSUPPORTED' });
   } finally { rmSync(folder, { recursive: true }); }

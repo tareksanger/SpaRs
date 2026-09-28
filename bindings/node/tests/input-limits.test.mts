@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { configureInputLimits, configureExecution, loadModel } from '../index.js';
 import { modelPath } from './fixtures.mts';
 
-const defaults = { maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLength: 65_536 };
+const serverLimits = { maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLength: 65_536 };
 
 test('input limits use UTF-16 units and enforce exact text, count and aggregate boundaries', async () => {
   const model = await loadModel(modelPath);
@@ -23,7 +23,7 @@ test('input limits use UTF-16 units and enforce exact text, count and aggregate 
     await assert.rejects(model.process('\ud800'), { code: 'SPARS_INVALID_TEXT' });
     assert.throws(() => Reflect.apply(model.process, model, [42]));
     assert.throws(() => Reflect.apply(model.processBatch, model, [[null]]));
-  } finally { configureInputLimits(defaults); }
+  } finally { configureInputLimits(null); }
 });
 
 test('oversize batches are rejected before elements are read or an admission slot is taken', async () => {
@@ -37,12 +37,12 @@ test('oversize batches are rejected before elements are read or an admission slo
     const rejected = model.process('12345');
     const accepted = model.process('ok');
     await assert.rejects(rejected, { code: 'SPARS_INPUT_LIMIT' });
-    assert.throws(() => configureInputLimits(defaults), /idle/);
+    assert.throws(() => configureInputLimits(null), /idle/);
     assert.equal((await accepted).text, 'ok');
     assert.equal((await model.processBatch(['ok']))[0]?.text, 'ok');
   } finally {
-    configureExecution({ maxActive: 2, maxQueued: 32 });
-    configureInputLimits(defaults);
+    configureExecution(null);
+    configureInputLimits(null);
   }
 });
 
@@ -52,7 +52,7 @@ test('invalid input-limit configuration is rejected atomically and caller mutati
   configureInputLimits(options);
   options.maxTextLength = 100;
   try {
-    for (const bad of [null, [], {}, { maxTextLength: 0, maxBatchSize: 2, maxBatchTextLength: 6 },
+    for (const bad of [[], {}, { maxTextLength: 0, maxBatchSize: 2, maxBatchTextLength: 6 },
       { maxTextLength: 4, maxBatchSize: -1, maxBatchTextLength: 6 },
       { maxTextLength: 4, maxBatchSize: 1.5, maxBatchTextLength: 6 },
       { maxTextLength: 4, maxBatchSize: 2, maxBatchTextLength: Infinity },
@@ -62,13 +62,32 @@ test('invalid input-limit configuration is rejected atomically and caller mutati
       await assert.rejects(model.process('12345'), { code: 'SPARS_INPUT_LIMIT' });
       assert.equal((await model.process('1234', 'Tokenizer')).text, '1234');
     }
-  } finally { configureInputLimits(defaults); }
+  } finally { configureInputLimits(null); }
 });
 
-test('default limits reject extreme workloads', async () => {
+test('explicit server limits reject extreme workloads', async () => {
+  configureInputLimits(serverLimits);
   const model = await loadModel(modelPath);
-  await assert.rejects(model.process('x'.repeat(defaults.maxTextLength + 1)), { code: 'SPARS_INPUT_LIMIT' });
-  await assert.rejects(model.processBatch(Array(defaults.maxBatchSize + 1).fill('')), { code: 'SPARS_INPUT_LIMIT' });
-  await assert.rejects(model.processBatch(Array(3).fill('x'.repeat(defaults.maxTextLength))), { code: 'SPARS_INPUT_LIMIT' });
+  await assert.rejects(model.process('x'.repeat(serverLimits.maxTextLength + 1)), { code: 'SPARS_INPUT_LIMIT' });
+  await assert.rejects(model.processBatch(Array(serverLimits.maxBatchSize + 1).fill('')), { code: 'SPARS_INPUT_LIMIT' });
+  await assert.rejects(model.processBatch(Array(3).fill('x'.repeat(serverLimits.maxTextLength))), { code: 'SPARS_INPUT_LIMIT' });
   assert.equal((await model.process('still usable')).text, 'still usable');
+  configureInputLimits(null);
+});
+
+
+test('reset removes each server cap while preserving the pipeline length limit', async () => {
+  const model = await loadModel(modelPath);
+  model.maxLength = 8;
+  configureInputLimits({ maxTextLength: 4, maxBatchSize: 2, maxBatchTextLength: 6 });
+  try {
+    await assert.rejects(model.process('12345'), { code: 'SPARS_INPUT_LIMIT' });
+    await assert.rejects(model.processBatch(['a', 'b', 'c']), { code: 'SPARS_INPUT_LIMIT' });
+    await assert.rejects(model.processBatch(['1234', '5678']), { code: 'SPARS_INPUT_LIMIT' });
+    configureInputLimits(null);
+    assert.equal((await model.process('12345', 'Tokenizer')).text, '12345');
+    assert.equal((await model.processBatch(['a', 'b', 'c'], 'Tokenizer')).length, 3);
+    assert.equal((await model.processBatch(['1234', '5678'], 'Tokenizer')).length, 2);
+    await assert.rejects(model.process('123456789'), { code: 'SPARS_TEXT_TOO_LONG' });
+  } finally { configureInputLimits(null); }
 });

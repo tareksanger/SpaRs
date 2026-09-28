@@ -2,7 +2,9 @@
 
 Native Rust NLP using official spaCy pretrained weights. Node.js 24 or newer is required. Release packages target Linux x64/ARM64 with glibc or musl, macOS x64/ARM64, and Windows x64/ARM64; other platforms require a source build and separate verification. See the [Node guide](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md) for the typed API and limitations.
 
-Model loading and NLP inference (`loadModel`, `process`, and `processBatch`) run asynchronously on background worker threads, keeping CPU-heavy inference off the event loop. Input copying and result creation still use the JavaScript thread. Inference admission defaults to two active jobs and 32 queued jobs across models in each JavaScript isolate; excess calls reject with `SPARS_BUSY`. Inputs default to at most 32,768 UTF-16 units per text, 128 texts per batch, and 65,536 units per batch; excess calls reject with `SPARS_INPUT_LIMIT`. See the Node guide for `configureExecution`, `configureInputLimits`, and worker-pool limits.
+Model loading and NLP inference (`loadModel`, `process`, `processBatch`, and `pipe`) run asynchronously on background worker threads, keeping CPU-heavy inference off the event loop. Input copying and result creation still use the JavaScript thread. Each model defaults to spaCy's 1,000,000-code-point document limit (`model.maxLength`) and its exported batch size (`model.batchSize`, 256 for the supported releases). `pipe` lazily yields documents from an iterable. Inference admission defaults to two active jobs and 32 queued jobs per package instance and JavaScript isolate; excess calls reject with `SPARS_BUSY`. Customize these limits with `configureExecution`; additional input caps are opt-in through `configureInputLimits`; see the Node guide for configuration, errors, and worker-pool limits.
+
+Upgrading from npm 0.2.0 introduces bounded inference admission and a document-length limit. Applications submitting many concurrent calls or very long documents should review the [migration cases and fixes](https://github.com/tareksanger/SpaRs/blob/main/docs/NODE.md#upgrade-from-npm-020) before upgrading.
 
 After installing a published version:
 

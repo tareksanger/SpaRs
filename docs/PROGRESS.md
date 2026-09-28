@@ -23,12 +23,12 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `crates/spars/tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `crates/spars/tests/model_loading.rs` and `crates/spars/tests/model_parity.rs` |
 | Executed Rust Markdown examples | 1 README example and 10 guide examples |
-| Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API, async lifecycle/error tests, and bounded inference admission in `bindings/node/tests/queue.test.mts` and input limits in `bindings/node/tests/input-limits.test.mts` |
-| Executed TypeScript guide examples | 3 examples checked and run from Markdown |
+| Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API, async lifecycle/error tests, spaCy processing defaults and lazy iteration in `bindings/node/tests/processing-parity.test.mts`, default bounded inference admission in `bindings/node/tests/queue.test.mts` and input limits in `bindings/node/tests/input-limits.test.mts` |
+| Executed TypeScript guide examples | 5 examples checked and run from Markdown |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 11 Rust and 3 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 11 Rust and 5 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
