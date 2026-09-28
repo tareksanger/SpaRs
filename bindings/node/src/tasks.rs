@@ -60,13 +60,10 @@ impl Task for ProcessTask {
     type JsValue = Document;
 
     fn compute(&mut self) -> Result<Self::Output> {
-        Ok(process(
-            &self.model,
-            &self.text,
-            self.stage,
-            self.max_length,
+        Ok(
+            process(&self.model, &self.text, self.stage, self.max_length)
+                .and_then(|doc| convert::document(&doc)),
         )
-        .and_then(|doc| convert::document(&doc)))
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
@@ -115,12 +112,19 @@ impl Task for ProcessDocumentTask {
     type JsValue = crate::document::NativeDocument;
 
     fn compute(&mut self) -> Result<Self::Output> {
-        Ok(process(&self.model, &self.text, self.stage, self.max_length))
+        Ok(process(
+            &self.model,
+            &self.text,
+            self.stage,
+            self.max_length,
+        ))
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
         output
-            .map(|doc| crate::document::NativeDocument { inner: Arc::new(doc) })
+            .map(|doc| crate::document::NativeDocument {
+                inner: Arc::new(doc),
+            })
             .map_err(|error| error.into_napi(env))
     }
 }
