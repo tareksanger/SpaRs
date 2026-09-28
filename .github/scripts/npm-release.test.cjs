@@ -12,18 +12,20 @@ function fixture() {
     version:'0.2.0',
     comparison:'identical',
   };
+  state.source = undefined;
+  state.ancestry = 'ahead';
   const github = {rest:{
-    repos:{compareCommits:async args=>{assert.equal(args.base,state.ref.object.sha);assert.equal(args.head,state.context.sha);return {data:{status:state.comparison}};},getReleaseByTag:async()=>({data:state.release}),getContent:async args => {
-      assert.equal(args.ref,state.context.sha);
+    repos:{compareCommits:async args=>{if(state.source && args.base === state.source) {assert.equal(args.head,state.context.sha);return {data:{status:state.ancestry}};}assert.equal(args.base,state.ref.object.sha);assert.equal(args.head,state.source || state.context.sha);return {data:{status:state.comparison}};},getReleaseByTag:async()=>({data:state.release}),getContent:async args => {
+      assert.equal(args.ref,state.source || state.context.sha);
       return {data:{type:'file',encoding:'base64',content:Buffer.from(JSON.stringify({version:state.version})).toString('base64')}};
     }},
     git:{getRef:async()=>({data:state.ref})},
     actions:{listWorkflowRuns:async args => {
-      assert.equal(args.head_sha,state.context.sha); assert.equal(args.branch,'trunk'); assert.equal(args.event,'push');
+      assert.equal(args.head_sha,state.source || state.context.sha); assert.equal(args.branch,'trunk'); assert.equal(args.event,'push');
       return {data:{workflow_runs:[state.run]}};
     }},
   }};
-  return {state,run:()=>validate({github,context:state.context,tag:state.tag})};
+  return {state,run:()=>validate({github,context:state.context,tag:state.tag,source:state.source})};
 }
 test('npm release resolves exact successful commit on renamed default branch', async()=>{
   const f=fixture(); assert.deepEqual(await f.run(),{sha:'a'.repeat(40),version:'0.2.0'});
@@ -55,7 +57,7 @@ test('workflow gates publishing on all platform smoke jobs and uses immutable ch
   assert.equal(workflow.on.workflow_dispatch.inputs.publish.default,false);
   assert.equal(workflow.jobs.publish.if,"github.event_name == 'workflow_dispatch' && inputs.publish");
   assert.equal(workflow.jobs.publish.environment,'npm');
-  assert.deepEqual(workflow.jobs.publish.needs,['validate','smoke']);
+  assert.deepEqual(workflow.jobs.publish.needs,['validate','retain']);
   assert.deepEqual(workflow.jobs.smoke.needs,['validate','assemble']);
   assert.deepEqual(workflow.jobs.assemble.needs,['validate','build']);
   assert.deepEqual(workflow.jobs.smoke.strategy.matrix.include.map(row=>row.os),workflow.jobs.build.strategy.matrix.include.map(row=>row.os));
@@ -81,7 +83,7 @@ test('old release tag uses the CI-verified workflow commit at the same version',
 
 test('old tag CI cannot substitute for successful workflow-commit CI',async()=>{
   const f=fixture();f.state.context.sha='b'.repeat(40);f.state.comparison='ahead';
-  await assert.rejects(f.run(),/Workflow commit needs successful/);
+  await assert.rejects(f.run(),/Source commit needs successful/);
 });
 
 test('Linux ARM64 is built, tested, and packaged on a native runner', async()=>{
@@ -184,3 +186,28 @@ test('native Alpine uses its system compiler for both musl targets',()=>{
   const dockerfile=require('node:fs').readFileSync('bindings/node/scripts/release-alpine.Dockerfile','utf8');
   for(const arch of ['X86_64','AARCH64']) assert.ok(dockerfile.includes(`CARGO_TARGET_${arch}_UNKNOWN_LINUX_MUSL_LINKER=cc`));
 });
+
+ test('historical source uses its own version and successful CI, constrained to default branch ancestry',async()=>{
+   const f=fixture();f.state.context.sha='c'.repeat(40);f.state.source='b'.repeat(40);
+   f.state.run.head_sha=f.state.source;f.state.comparison='ahead';
+   assert.deepEqual(await f.run(),{sha:f.state.source,version:'0.2.0'});
+   f.state.ancestry='diverged';await assert.rejects(f.run(),/default branch history/);
+   f.state.ancestry='ahead';f.state.run.head_sha=f.state.context.sha;await assert.rejects(f.run(),/Source commit needs successful/);
+   f.state.source='main';await assert.rejects(f.run(),/exact workflow commit/);
+ });
+ test('only manual smoke-tested runs can retain assets, and publication waits for retention',()=>{
+   const {parse}=require('../../tools/node_modules/yaml');
+   const {readFileSync}=require('node:fs');
+   const workflow=parse(readFileSync('.github/workflows/npm-release.yml','utf8'));
+   assert.equal(workflow.jobs.retain.if,"github.event_name == 'workflow_dispatch'");
+   assert.deepEqual(workflow.jobs.retain.needs,['validate','smoke']);
+   assert.deepEqual(workflow.jobs.publish.needs,['validate','retain']);
+   assert.equal(workflow.jobs.retain.permissions.contents,'write');
+   for(const [name,job] of Object.entries(workflow.jobs)) if(name!=='retain') assert.notEqual(job.permissions?.contents,'write');
+   const steps=workflow.jobs.retain.steps;
+   const artifact=steps.findIndex(step=>step.with?.name==='npm-release-set');
+   assert.ok(artifact>0);
+   assert.equal(steps[artifact].with.overwrite,true);
+   assert.match(steps[artifact-1].run,/release-assets.mts seal/);
+   assert.match(steps[artifact+1].run,/release-assets.mts upload/);
+ });

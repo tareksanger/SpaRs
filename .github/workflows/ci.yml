@@ -120,4 +120,4 @@ jobs:
         with:
           node-version: 24
       - run: npm --prefix tools ci --ignore-scripts --no-audit --no-fund
-      - run: node --test .github/scripts/*.test.cjs
+      - run: node --test .github/scripts/*.test.cjs bindings/node/tests/release-assets.test.mts bindings/node/tests/release-publish.test.mts
