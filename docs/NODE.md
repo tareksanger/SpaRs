@@ -170,6 +170,83 @@ Oversized inputs reject with `SPARS_INPUT_LIMIT` before copying into Rust or sub
 
 `vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Native documents support the additional vector, traversal, and matcher APIs below.
 
+## Handle processing errors
+
+Processing failures reach a caller in two ways. Invalid configuration values and invalid JavaScript arguments throw synchronously when the function is called, before any promise exists: `configureExecution` and `configureInputLimits` throw `RangeError` or `TypeError` for invalid values, and a plain `Error` without a `code` when called while inference is pending, so configure them during startup. `process` and `processBatch` throw `TypeError` for non-string text or an unknown stage when the call is admitted (see below). Admission and processing failures reject the returned promise with an `Error` whose `code` is one of the `SPARS_*` values listed under [errors and verification](#errors-and-verification). The example below does not depend on a web framework and exercises each path deterministically:
+
+```typescript
+import assert from 'node:assert/strict';
+import { configureExecution, configureInputLimits, loadModel } from './index.js';
+import type { Document, InputLimits, Model } from './index.js';
+
+// Caught values are unknown
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
+}
+
+async function processWithRetry(model: Model, text: string, attempts = 3): Promise<Document> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await model.process(text);
+    } catch (error) {
+      if (errorCode(error) !== 'SPARS_BUSY' || attempt >= attempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, 50 * attempt));
+    }
+  }
+}
+
+function planBatches(texts: readonly string[], limits: InputLimits): string[][] {
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let length = 0;
+  for (const text of texts) {
+    if (text.length > Math.min(limits.maxTextLength, limits.maxBatchTextLength)) throw new RangeError('Document exceeds the input policy');
+    if (current.length > 0 && (current.length === limits.maxBatchSize || length + text.length > limits.maxBatchTextLength)) {
+      batches.push(current);
+      current = [];
+      length = 0;
+    }
+    current.push(text);
+    length += text.length;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+assert.throws(() => configureExecution({ maxActive: 0, maxQueued: 0 }), RangeError);
+assert.throws(() => model.processBatch(['ok', 42 as unknown as string]), TypeError);
+
+configureExecution({ maxActive: 1, maxQueued: 0 });
+const running = model.process('Alice visits London.', 'Tokenizer');
+await assert.rejects(model.process('Overflow.'), { code: 'SPARS_BUSY' });
+await assert.rejects(model.processBatch(['ok', 42 as unknown as string]), { code: 'SPARS_BUSY' });
+await running;
+configureExecution(null);
+assert.equal((await processWithRetry(model, 'Recovered.')).text, 'Recovered.');
+
+// Oversize rejection the big batch
+const limits: InputLimits = { maxTextLength: 20, maxBatchSize: 2, maxBatchTextLength: 30 };
+configureInputLimits(limits);
+await assert.rejects(model.processBatch(['Short.', 'x'.repeat(21)]), { code: 'SPARS_INPUT_LIMIT' });
+assert.throws(() => planBatches(['x'.repeat(21)], limits), RangeError);
+const texts = ['Dogs bark.', 'Cats sleep.', 'Birds fly.'];
+const docs: Document[] = [];
+for (const batch of planBatches(texts, limits)) docs.push(...await model.processBatch(batch));
+assert.deepEqual(docs.map(doc => doc.text), texts);
+configureInputLimits(null);
+
+await assert.rejects(processWithRetry(model, '\ud800'), { code: 'SPARS_INVALID_TEXT' });
+assert.equal((await model.process('Still works.')).text, 'Still works.');
+```
+
+For `process`, `processBatch`, `pipe`, and `findMatches`, `SPARS_BUSY` means every active slot is in use and the waiting queue is full; it does not indicate a problem with the input. (Matcher `add` and `remove` also throw `SPARS_BUSY` synchronously while a search on that matcher is pending; see [token matching](#token-matching).) Retrying immediately and without a limit adds calls to a queue that is already full and prolongs the overload. Use a bounded policy instead: a few delayed attempts, as `processWithRetry` shows, or reject the request (for example with HTTP 503) and let the client retry later. The same call can fail differently depending on load. While the queue has room, `processBatch(['ok', 42])` throws `TypeError`; while the queue is full, it rejects with `SPARS_BUSY`, because admission is checked before batch elements are inspected. A retried call that is admitted can therefore still throw `TypeError`, so validate arguments before retrying.
+
+`SPARS_INPUT_LIMIT` means an input exceeded the policy set with `configureInputLimits`. A batch is rejected as a whole when its element count, total length, or any single element exceeds the policy; no documents from that call are returned. Either reject the input, or group separate, independent documents into smaller batches, as `planBatches` does. Do not cut one document into arbitrary pieces to fit a limit: each piece is processed without the surrounding text, so tokens, sentences, entities, and dependencies near a cut can change, and offsets start again at zero in each piece. The per-model `model.maxLength` limit is separate: it counts Unicode code points and rejects with `SPARS_TEXT_TOO_LONG` after admission, also failing the whole batch. With `pipe`, a rejection stops iteration after earlier buffers may already have been yielded, so account for consumed documents instead of restarting the source.
+
+Handle only the codes that the application's policy understands, and rethrow the rest, as `processWithRetry` does with `SPARS_INVALID_TEXT`. A rejected call does not leave the package unusable: later valid calls succeed after busy, input-limit, and processing rejections. The defaults remain two active jobs, 32 queued jobs, and no additional input caps. Both policies apply per package instance and JavaScript isolate. They bound admission and input size, not the JavaScript-thread cost of converting large accepted results into objects.
+
 ## Retain and restore native documents
 
 `model.processDocument(text, stage?)` runs the same pipeline as `process` and retains an immutable native document. It shares the inference queue, optional text input limit, and per-model `maxLength`. Existing `process` and `processBatch` results remain plain JavaScript objects. Call `toObject()` when you need that output shape; each call returns an independent copy.
