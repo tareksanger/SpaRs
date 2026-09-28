@@ -17,3 +17,7 @@ The Linux x64 artifact is `spacy-3.8.14-cp312-cp312-manylinux2014_x86_64.manylin
 The Linux ARM64 artifact is `spacy-3.8.14-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl` from the same official PyPI release. Its complete archive SHA-256 is `daeb64b048f12c059997281aed53eb8776d26416dd313cf17ad6f63124b2b564`. Comparing its complete generated file against the Linux x64 wheel found only a build-directory comment difference. All other spaCy files in the pinned source inventory matched the ARM64 wheel.
 
 `tools/installer_provenance.py` accepts these exact alternate hashes for this file and version when regenerating the installer recipe. Unknown hashes, other source changes, changed versions, and changed licenses still fail. The exported provenance records the files observed on that machine; the immutable installer recipe retains its original capture. `tools/test_installer_provenance.py` tests both acceptance and rejection paths.
+
+## PhraseMatcher ordering dependency
+
+[phrase-source-lock.json](phrase-source-lock.json) additionally pins preshed 3.0.13 terminal-map source and its MIT license. Equal-span PhraseMatcher result order depends on this map's capacity, collision probing, tombstones and resizing. The phrase reference generator verifies installed versions and relevant source hashes before generating output. Native reserved label IDs in `crates/spars/src/phrase_matcher/symbols.json` derive from the pinned spaCy `symbols.IDS`; phrase-reference tooling tests compare the full table.
