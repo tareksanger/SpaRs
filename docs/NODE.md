@@ -229,6 +229,27 @@ try {
 
 Use `ModelStore.discover()` for `SPARS_MODEL_DIR` or the platform cache default. `store.root` supplies the `{path}` option for `loadModel(name, {path: store.root})`. Store operations neither acquire models nor implement update/removal commands.
 
+## Token and span views
+
+Native documents expose checked token and span views that retain the document. Indices must be nonnegative integers within the document; spans use an exclusive end. `doc.tokens()` and `span.tokens()` return arrays of token views. Traversal returns arrays in the same order as the Rust API; unavailable dependency annotations raise an error, while unavailable sentence lists return `null`.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('Alice runs.');
+const alice = doc.token(0);
+assert.equal(alice.text, 'Alice');
+assert.equal(alice.head()?.text, 'runs');
+assert.deepEqual(alice.ancestors().map(token => token.text), ['runs']);
+assert.equal(alice.sentence().text, 'Alice runs.');
+assert.equal(doc.span(0, 2).text, 'Alice runs');
+assert.equal(doc.sentenceViews()?.length, 1);
+```
+
+`token.annotations()` returns a copied record of the native annotations and byte/code-point start offsets. `token.children()`, `ancestors()`, `subtree()`, `head()`, `span()`, and `sentence()` provide graph and sentence access. Use `doc.toObject()` for the full JavaScript output with UTF-16 offsets. Views are immutable; retaining even one view retains its full document and contextual tensor. Traversal and view creation run synchronously and allocate in proportion to the returned results.
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
