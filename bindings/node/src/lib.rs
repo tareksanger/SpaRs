@@ -1,8 +1,8 @@
 //! Native Node-API boundary for SpaRs.
 mod convert;
 mod document;
-mod lexical;
 mod errors;
+mod lexical;
 mod models;
 pub use models::{download_model, DownloadOptions, LoadOptions};
 mod output;

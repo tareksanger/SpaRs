@@ -16,7 +16,9 @@ impl NativeDocument {
     pub fn from_snapshot(env: Env, json: Utf16String) -> Result<Self> {
         let json = errors::text(&json).map_err(|error| error.into_napi(env))?;
         spars::Doc::from_json(&json)
-            .map(|doc| Self { inner: Arc::new(doc) })
+            .map(|doc| Self {
+                inner: Arc::new(doc),
+            })
             .map_err(|error| errors::BindingError::from(error).into_napi(env))
     }
 
