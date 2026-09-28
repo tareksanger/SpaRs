@@ -1,0 +1,80 @@
+{
+  "format_version": 1,
+  "versions": {
+    "spacy": "3.8.14",
+    "preshed": "3.0.13"
+  },
+  "sources": {
+    "spacy/matcher/phrasematcher.pyx": "8c22ddfc644475de2cb0b3d63574e08c71e390f8eb233f1a46e24a4d82b97457",
+    "spacy/tests/matcher/test_phrase_matcher.py": "7eef296e4220013f6fce895837900383e9707afd03984cf5aeb44e1ed0018751",
+    "spacy/strings.pyx": "0621982099a90abe8b5cd21ed4457b462ad7dae45bd1f92bfa3d0a157b3c900d",
+    "spacy/symbols.pyx": "81866a0ba310e73e0fa628ac0bdde9988736875c13f033622f5c0b7d8a6d4147",
+    "preshed/maps.pyx": "5aaece898062bb00f2e6e734062846a4ff2241c027387286c64ea2c763e2da94"
+  },
+  "sentence_starts": [
+    true,
+    false,
+    true
+  ],
+  "sentence": {
+    "id": "explicit-sentence-boundary",
+    "words": [
+      "a",
+      ".",
+      "b"
+    ],
+    "spaces": [
+      false,
+      true,
+      false
+    ],
+    "operations": [
+      {
+        "action": "add",
+        "rule": "cross",
+        "patterns": [
+          [
+            "a",
+            ".",
+            "b"
+          ]
+        ]
+      }
+    ],
+    "states": [
+      {
+        "error": null,
+        "rules": [
+          "cross"
+        ],
+        "matches": [
+          {
+            "rule": "cross",
+            "start": 0,
+            "end": 3
+          }
+        ]
+      }
+    ]
+  },
+  "probes": [
+    {
+      "attribute": "TAG-partial",
+      "error": "ValueError",
+      "registered": true,
+      "matches": [
+        {
+          "rule": "partial",
+          "start": 0,
+          "end": 1
+        }
+      ]
+    },
+    {
+      "attribute": "ORTH-single-doc",
+      "error": "ValueError",
+      "registered": true,
+      "matches": []
+    }
+  ]
+}

@@ -15,6 +15,7 @@ class PackageTests(unittest.TestCase):
         required = {
             'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md',
             'src/lib.rs', 'src/nested/runtime.rs', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
+            'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
         }
         excluded = {
             f'{directory}/{name}'
@@ -51,6 +52,7 @@ class PackageTests(unittest.TestCase):
         files = sources | {
             'Cargo.toml', 'Cargo.toml.orig', 'Cargo.lock', 'README.md', 'LICENSE',
             'THIRD_PARTY_NOTICES.md', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
+            'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
         }
         validate_inventory(files, sources)
         validate_inventory(files | {'.cargo_vcs_info.json'}, sources)

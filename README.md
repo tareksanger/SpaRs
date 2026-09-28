@@ -48,6 +48,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `vector` returns static lexical vectors or `None` for missing keys. For `sm`, `token_vector` uses contextual rows produced by the shared encoder; it returns `None` before encoding. `span_vector` and `document_vector` average all tokens, including OOV zero rows for static models. Empty `sm` documents/spans return zero-length vectors. Contextual rows survive native v2 document snapshots. Similarity returns 1 for identical token sequences (including two empty sequences), otherwise cosine, or 0 when either vector norm is zero, following the pinned reference. No warnings are emitted for OOV similarity. Static vectors are distinct from `tok2vec` output.
 
+`PhraseMatcher` matches reusable tokenized phrase patterns by exact text (ORTH/TEXT), including ordered overlaps and registration/removal. It accepts existing documents without inference or downloads. See the [PhraseMatcher guide](docs/PHRASE_MATCHER.md); LOWER and Node matching remain planned.
+
 ## Install a model without Python
 
 Clone the [SpaRs repository](https://github.com/tareksanger/SpaRs) and run these commands from its root. The native installer and examples are maintained in the repository and are not included in the Cargo crate:

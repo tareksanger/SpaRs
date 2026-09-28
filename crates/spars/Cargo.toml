@@ -19,6 +19,8 @@ include = [
     "/THIRD_PARTY_NOTICES.md",
     "/licenses/spacy-MIT.txt",
     "/licenses/thinc-MIT.txt",
+    "/licenses/preshed-MIT.txt",
+    "/licenses/flashtext-MIT.txt",
 ]
 
 [lib]
