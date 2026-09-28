@@ -1,5 +1,6 @@
 //! Native Node-API boundary for SpaRs.
 mod convert;
+mod dependency_matcher;
 mod document;
 mod errors;
 mod lexical;
