@@ -269,6 +269,28 @@ The receiving model selects vector behavior: md/lg use their static vocabulary, 
 
 These methods run synchronously. Mean vectors and similarities scan the selected tokens and vector dimensions; they do not run inference. Large repeated comparisons can delay the JavaScript thread.
 
+## Token matching
+
+`TokenMatcher` compiles the existing native token patterns and returns ordered, overlapping matches over a `NativeDocument`. Patterns use the typed SpaRs schema, not spaCy's Python dictionary syntax. Registration validates the complete addition before changing rules; unsupported fields and predicate/operator values reject.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('Alice visits London.', 'Tokenizer');
+const matcher = new TokenMatcher();
+matcher.add('place', [{ tokens: [{
+  constraints: [{ attribute: 'text', predicate: { kind: 'equals', value: 'London' } }],
+  repetition: { kind: 'once' },
+}] }]);
+assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'place', start: 2, end: 3 }]);
+```
+
+Supported token attributes are `text`, `norm`, `lemma`, `pos`, `tag`, `dep`, and `morphology`. Predicates are `equals` with `value`, or `in`, `not_in`, `morph_superset`, and `morph_intersects` with `values`. The last two require morphology. Repetition kinds are `once`, `optional`, `zero_or_more`, `one_or_more`, `negated`, and `range`; a range requires `min` and accepts an optional inclusive `max`. Missing required document annotations fail explicitly. See the [token matcher guide](TOKEN_MATCHER.md) for native semantics and unsupported options.
+
+Matcher instances support `size`, `contains(rule)`, `get(rule)`, `add(rule, patterns)`, and `remove(rule)`. Repeated additions append to an existing rule; `get` returns independent pattern copies or `null`. Matching runs on the worker pool using the retained native document, without rerunning inference or copying compiled rules. Searches share the inference admission queue and optional `maxTextLength` policy. Rule mutation is rejected with `SPARS_BUSY` while any search on that matcher is queued or active; after the returned promise settles, mutation is available again. Registration and inspection are synchronous and are not limited by inference input policies. Large match arrays still require JavaScript-thread allocation.
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.

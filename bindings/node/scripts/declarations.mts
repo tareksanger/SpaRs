@@ -56,5 +56,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   for (const name of ['Model', 'NativeDocument', 'NativeToken', 'NativeSpan']) declarations = restrictConstructor(declarations, name);
   writeFileSync(path, addExecutionTypes(declarations));
   const loader = new URL('../index.js', import.meta.url);
-  writeFileSync(loader, addExecutionLoader(readFileSync(loader, 'utf8')));
+  let source = addExecutionLoader(readFileSync(loader, 'utf8'));
+  for (const name of ['TokenMatcher']) {
+    const hook = `require('./execution.cjs').installMatcher(module.exports.${name}, module.exports.NativeDocument, '${name.replace('Matcher', '').toLowerCase()}');`;
+    if (!source.includes(hook)) source += `\n${hook}\n`;
+  }
+  writeFileSync(loader, source);
 }

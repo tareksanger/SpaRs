@@ -216,4 +216,77 @@ function install(binding) {
   };
 }
 
-module.exports = { Scheduler, configureExecution, configureInputLimits, install };
+/**
+ * Keep rule mutation excluded from queued as well as actively executing searches.
+ * @template T
+ * @template {unknown[]} A
+ * @param {{prototype: {findMatches(doc: import('./index.js').NativeDocument): Promise<T[]>; add(...args: A): void; remove(rule: string): void}; [Symbol.hasInstance](value: unknown): boolean}} Matcher
+ * @param {typeof import('./index.js').NativeDocument} NativeDocument
+ * @param {'phrase' | 'token' | 'dependency'} kind
+ */
+function installMatcher(Matcher, NativeDocument, kind) {
+  const prototype = Matcher.prototype;
+  if (installed.has(prototype)) return;
+  installed.add(prototype);
+  const find = prototype.findMatches;
+  const add = prototype.add;
+  const remove = prototype.remove;
+  /** @type {WeakMap<object, number>} */
+  const pending = new WeakMap();
+  prototype.findMatches = function(doc) {
+    if (!(this instanceof Matcher)) throw new TypeError('Expected a matcher receiver');
+    if (!(doc instanceof NativeDocument)) throw new TypeError('Expected a NativeDocument');
+    if (inputLimits && doc.utf16Length > inputLimits.maxTextLength) return tooLarge('Document exceeds maxTextLength (UTF-16 units)');
+    if (scheduler.full()) return busy();
+    pending.set(this, (pending.get(this) ?? 0) + 1);
+    return scheduler.submit(() => find.call(this, doc)).finally(() => {
+      const count = (pending.get(this) ?? 1) - 1;
+      if (count) pending.set(this, count);
+      else pending.delete(this);
+    });
+  };
+  /** @param {object} matcher */
+  const assertMutable = matcher => {
+    if (pending.has(matcher)) throw Object.assign(new Error('Matcher rules cannot change while matching is pending'), { code: 'SPARS_BUSY' });
+  };
+  prototype.add = function(...args) {
+    assertMutable(this);
+    if (kind !== 'phrase') validatePatterns(args[1], kind);
+    add.apply(this, args);
+  };
+  prototype.remove = function(rule) { assertMutable(this); remove.call(this, rule); };
+}
+
+/** @param {unknown} value @param {string[]} allowed @returns {Record<string, unknown>} */
+function patternRecord(value, allowed) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+      || Reflect.ownKeys(value).some(key => typeof key !== 'string' || !allowed.includes(key))) {
+    throw Object.assign(new Error('Invalid matcher pattern object or unsupported field'), { code: 'SPARS_INVALID_PATTERN' });
+  }
+  return Object.fromEntries(Object.entries(value));
+}
+
+/** @param {unknown} value @returns {unknown[]} */
+function patternArray(value) {
+  if (!Array.isArray(value)) throw Object.assign(new Error('Expected a matcher pattern array'), { code: 'SPARS_INVALID_PATTERN' });
+  return value;
+}
+
+/** @param {unknown} value @param {'token' | 'dependency'} kind */
+function validatePatterns(value, kind) {
+  const field = kind === 'token' ? 'tokens' : 'nodes';
+  for (const valuePattern of patternArray(value)) {
+    const pattern = patternRecord(valuePattern, [field]);
+    for (const valueItem of patternArray(pattern[field])) {
+      const item = patternRecord(valueItem, kind === 'token' ? ['constraints', 'repetition'] : ['id', 'constraints', 'link']);
+      for (const valueConstraint of patternArray(item.constraints)) {
+        const constraint = patternRecord(valueConstraint, ['attribute', 'predicate']);
+        patternRecord(constraint.predicate, ['kind', 'value', 'values']);
+      }
+      if (kind === 'token') patternRecord(item.repetition, ['kind', 'min', 'max']);
+      else if (item.link != null) patternRecord(item.link, ['left', 'relation']);
+    }
+  }
+}
+
+module.exports = { Scheduler, configureExecution, configureInputLimits, install, installMatcher };
