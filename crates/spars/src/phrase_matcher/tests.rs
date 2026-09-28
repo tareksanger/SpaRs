@@ -1,7 +1,7 @@
 use super::*;
 #[test]
 fn typed_options_reject_unsupported_attributes() {
-    assert!(serde_json::from_str::<PhraseAttribute>("\"LOWER\"").is_err());
+    assert!(serde_json::from_str::<PhraseAttribute>("\"LEMMA\"").is_err());
     assert_eq!(
         serde_json::from_str::<PhraseAttribute>("\"ORTH\"").unwrap(),
         PhraseAttribute::Orth
@@ -129,4 +129,32 @@ fn populated_deep_trie_drops_on_small_stack() {
         .unwrap()
         .join()
         .unwrap();
+}
+
+#[test]
+fn lower_lookup_uses_unique_normalized_keys_and_preserves_exact_mode() {
+    let lower_attribute = serde_json::from_str::<PhraseAttribute>("\"LOWER\"").unwrap();
+    let mut lower = PhraseMatcher::with_attribute(lower_attribute);
+    lower.add("r", &[&doc("Ab"), &doc("ab")]).unwrap();
+    assert_eq!(lower.get("r").unwrap().len(), 1);
+    assert_eq!(lower.get("r").unwrap()[0].tokens(), &["a", "b"]);
+    assert_eq!(lower.find_matches(&doc("AB")).unwrap().len(), 1);
+    let mut exact = PhraseMatcher::new();
+    exact.add("r", &[&doc("ab")]).unwrap();
+    assert!(exact.find_matches(&doc("AB")).unwrap().is_empty());
+}
+
+#[test]
+fn lower_sigma_context_scales_across_long_ignorable_sequences() {
+    let ignorables = "\u{301}".repeat(10000);
+    assert_eq!(
+        lower::lower(&format!("AΣ{ignorables}")),
+        format!("aς{ignorables}")
+    );
+    assert_eq!(
+        lower::lower(&format!("AΣ{ignorables}A")),
+        format!("aσ{ignorables}a")
+    );
+    assert_eq!(lower::lower("İẞ𐐀"), "i\u{307}ß𐐨");
+    assert_eq!(lower::lower("ßﬀ"), "ßﬀ");
 }

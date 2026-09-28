@@ -164,7 +164,7 @@ Import `configureExecution` and `configureInputLimits` from the package entry po
 
 `configureInputLimits({maxTextLength, maxBatchSize, maxBatchTextLength})` sets all three additional input limits. All must be positive safe integers. Text lengths count JavaScript UTF-16 units (`string.length`), so `😀` counts as two units for these server policies. `maxBatchSize` limits the whole array passed to `processBatch` or one `pipe` buffer, before any internal chunking. Empty text and empty batches remain supported. `configureInputLimits(null)` removes these extra limits while idle; the per-model `maxLength` still applies.
 
-Both configuration functions copy their settings and throw synchronously for invalid values or changes while inference is pending. Policies are shared by models loaded through this package instance within one JavaScript isolate (the separate JavaScript environment of the main thread or a Node worker), not across Node workers or processes. They cover inference only: load models and download assets during startup. Node's libuv worker pool is shared with other Node operations; these policies do not reserve threads or guarantee latency. Import the package entry point; importing the native `.node` file directly bypasses the JavaScript policies and streaming wrapper.
+Both configuration functions copy their settings and throw synchronously for invalid values or changes while inference is pending. Policies are shared by models loaded through this package instance within one JavaScript isolate (the separate JavaScript environment of the main thread or a Node worker), not across Node workers or processes. They cover inference and matcher searches; model loading and downloads remain outside these policies. Load models and download assets during startup. Node's libuv worker pool is shared with other Node operations; these policies do not reserve threads or guarantee latency. Import the package entry point; importing the native `.node` file directly bypasses the JavaScript policies and streaming wrapper.
 
 Oversized inputs reject with `SPARS_INPUT_LIMIT` before copying into Rust or submitting inference. Batch count is checked before accessing elements; text and aggregate length are checked while capturing the batch, and the first violation rejects the entire call. A `pipe` buffer is checked when submitted. Size rejection does not consume an inference slot. A full queue can return `SPARS_BUSY` before inspecting batch elements. These policies do not limit model loading, downloads, `vector` lookups, other isolates, or memory already allocated by the caller. Large allowed results still require synchronous JavaScript object creation. Increasing limits increases potential CPU, memory, and event-loop cost.
 
@@ -212,7 +212,7 @@ assert.equal(typeof lexeme.orth, 'bigint');
 
 ```typescript
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ModelStore } from './index.js';
@@ -223,7 +223,7 @@ try {
   const installed = join(directory, 'example-installation');
   mkdirSync(installed);
   await store.register('en_core_web_sm', installed);
-  assert.equal(await store.resolve('en_core_web_sm'), installed);
+  assert.equal(await store.resolve('en_core_web_sm'), realpathSync(installed));
 } finally { rmSync(directory, { recursive: true, force: true }); }
 ```
 
@@ -309,9 +309,27 @@ const doc = await model.processDocument('Alice runs.');
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'subject', tokens: [1, 0] }]);
 ```
 
+## Phrase matching, including lowercase names
+
+`PhraseMatcher` accepts tokenized native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, or `ORTH`/`TEXT` for exact token text. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, PhraseMatcher } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const matcher = new PhraseMatcher('LOWER');
+matcher.add('hotel', [await model.processDocument('the ritz', 'Tokenizer')]);
+const doc = await model.processDocument('The Ritz', 'Tokenizer');
+assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'hotel', start: 0, end: 2 }]);
+assert.deepEqual(matcher.get('hotel'), [['the', 'ritz']]);
+```
+
+Lowercase mappings are pinned to Unicode 15.0.0 and include contextual Greek sigma. This is lowercase matching, not case folding or Unicode normalization: `ß` does not become `ss`, and composed/decomposed accents remain distinct. Phrase boundaries still follow tokenization. `get(rule)` returns copied unique token keys in first-registration order, normalized for `LOWER`. Matching preserves overlaps and native result order. Other attributes, span input, callbacks, and Python pattern JSON are unsupported; see the [phrase matcher guide](PHRASE_MATCHER.md).
+
 ## Errors and verification
 
-An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
+An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Invalid matcher registration throws synchronously. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_INVALID_PATTERN`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
 
 After the [reference setup](DEVELOPMENT.md#set-up-the-project), run:
 

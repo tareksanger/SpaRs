@@ -22,13 +22,13 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `crates/spars/tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `crates/spars/tests/model_loading.rs` and `crates/spars/tests/model_parity.rs` |
-| Executed Rust Markdown examples | 1 README example and 10 guide examples |
+| Rust Markdown examples | README and guide examples execute through `tools/check_docs.py` |
 | Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API, async lifecycle/error tests, spaCy processing defaults and lazy iteration in `bindings/node/tests/processing-parity.test.mts`, default bounded inference admission in `bindings/node/tests/queue.test.mts` and input limits in `bindings/node/tests/input-limits.test.mts` |
-| Executed TypeScript guide examples | 5 examples checked and run from Markdown |
+| TypeScript guide examples | Node guide examples type-check and execute through `tools/check_docs.py` |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 11 Rust and 5 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, source doc tests, Rust and TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
@@ -57,15 +57,15 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
 1. Model extensibility for all official pretrained pipelines, following the plan below. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
-2. Matching: add LOWER to the exact-text PhraseMatcher, then extend shared conditions, matcher options and bindings using the [matching implementation plan](#matching-implementation-plan).
+2. Matching: extend shared conditions and matcher options using the [matching implementation plan](#matching-implementation-plan). ORTH/TEXT/LOWER PhraseMatcher and the three Node matcher bindings are implemented.
 
 Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
-The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, static word vectors, and explicit native model downloads. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, and verification of additional platforms. The [npm workflow](RELEASING.md#publish-the-node-package) assembles Linux x64/ARM64 glibc and musl, macOS x64/ARM64, and Windows x64/ARM64 packages with clean-install checks before optional publication; a completed workflow and registry checks are required release evidence. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
+The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, explicit native model downloads, offline model-store management, immutable native documents and snapshots, token/span views, dependency traversal, token/span/document vectors and similarity, lexical queries, and the three native matchers. Its document, traversal, lexical, vector and matcher suites reuse frozen official references; boundary tests cover invalid input and ownership. Per-platform package verification remains required. The [npm workflow](RELEASING.md#publish-the-node-package) assembles Linux x64/ARM64 glibc and musl, macOS x64/ARM64, and Windows x64/ARM64 packages with clean-install checks before optional publication; a completed workflow and registry checks are required release evidence. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
 
 ## Matching implementation plan
 
-Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The first milestone provides the exact-text [PhraseMatcher](PHRASE_MATCHER.md) and its official reference corpus. Steps 3–6 and LOWER remain planned work.
+Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The [PhraseMatcher](PHRASE_MATCHER.md) implements ORTH/TEXT/LOWER and has an official reference corpus. Node exposes all three matchers. Shared condition extensions, remaining matcher options and rule-based annotation remain planned work.
 
 ### 1. Establish the reference contract
 
@@ -83,7 +83,7 @@ Provide registration, lookup, removal, and checked document matching with typed 
 
 Acceptance: exact ordered results and rule lifecycle behavior match every declared reference case. Empty inputs, malformed patterns, repeated calls, and concurrent read-only calls pass. Add a Rust example to a PhraseMatcher guide and execute it through `tools/check_docs.py`. Keep unsupported attributes and options explicit.
 
-Exact-text ORTH/TEXT matching is implemented in `crates/spars/src/phrase_matcher/`, with a safe prefix trie and pinned terminal-table ordering. `crates/spars/tests/phrase_matcher.rs` compares 43 official cases, 1,249 lifecycle states and 31,919 exact ordered matches, including a separately frozen comparison set. `tools/phrase_match_reference.py` regenerates references and verifies source provenance; the guide example executes through `tools/check_docs.py`. LOWER is the next bounded milestone. Rust accepts validated document patterns, rejects distinct rule-name hash collisions, and validates before mutation; see the guide for differences from Python error states and hash-only token identity.
+Exact-text ORTH/TEXT matching is implemented in `crates/spars/src/phrase_matcher/`, with a safe prefix trie and pinned terminal-table ordering. `crates/spars/tests/phrase_matcher.rs` compares 43 official cases, 1,249 lifecycle states and 31,919 exact ordered matches, including a separately frozen comparison set. `tools/phrase_match_reference.py` regenerates references and verifies source provenance; the guide example executes through `tools/check_docs.py`. LOWER uses model-independent Unicode 15.0.0 resources; `crates/spars/tests/phrase_matcher_lower.rs` compares 4 official cases, 24 lifecycle states and 351 ordered matches. `tools/phrase_lower_reference.py --check` checks resource and fixture reproducibility. Rust accepts validated document patterns, rejects distinct rule-name hash collisions, and validates before mutation; see the guide for differences from Python error states and hash-only token identity.
 
 ### 3. Extend shared token conditions
 
@@ -99,7 +99,7 @@ Acceptance: official comparisons cover tie-breaking, overlaps, repetitions, offs
 
 ### 5. Expose matching through Node
 
-Expose the verified Rust matchers through typed Node APIs with reusable compiled patterns. Decide how matching receives a validated document without silently rerunning inference or trusting mutable JavaScript annotations. Preserve rule identities, token indices, ordering, and structured errors across the binding; apply the binding's execution and input limits to the new operations.
+The Node APIs expose reusable native PhraseMatcher, TokenMatcher and DependencyMatcher instances. Matching receives immutable `NativeDocument` handles, preserves rule identities and token-index results, and runs through the binding's bounded execution policy. Mutable plain JavaScript output objects are not accepted as native documents. See the [Node guide](NODE.md) for pattern types, rule operations and supported options.
 
 Acceptance: run the same reference cases through Rust and Node, test ownership and repeated/concurrent use, and execute TypeScript guide examples from Markdown. Verify the packed Node package outside the repository.
 

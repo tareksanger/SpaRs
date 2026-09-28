@@ -28,5 +28,6 @@
   "fixtures/model-sm-v1.expected.json": "05f51b96739202c3209b22332745a9e1d0e14569d4fa45f3620afb809737865c",
   "fixtures/phrase-match-v1.expected.json": "d1a28537584c1c5d144b5bf87bf017e87d413f3ed9d2a0c1c3cc1ed6eafbd128",
   "fixtures/phrase-match-holdout-v1.expected.json": "c1dd0438f81278e035e45a5b77d0b8825e80d8dfe0491c162ed12c805a2befc1",
-  "fixtures/phrase-match-edges-v1.expected.json": "12052eb1949f5979d44fefe11b58d6c5314786993651b105926d90e56dc982f5"
+  "fixtures/phrase-match-edges-v1.expected.json": "12052eb1949f5979d44fefe11b58d6c5314786993651b105926d90e56dc982f5",
+  "fixtures/phrase-match-lower-v1.expected.json": "555918903d51ed4e9bce1936542091bb0e233d3399a661a44067fb8a22c5fbdd"
 }

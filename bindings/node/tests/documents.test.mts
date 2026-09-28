@@ -89,6 +89,9 @@ test('snapshots reject malformed JSON, unsupported versions, offsets, indices an
     value => { record(value.document).sentences = [{ start: 0, end: 99, label: '' }]; },
     value => { value.format_version = 2; record(value.document).tensor = [[1], [1, 2]]; },
     value => { value.format_version = 2; record(value.document).tensor = [[1]]; },
+    value => { value.format_version = 2; record(value.document).tensor = [[], []]; },
+    value => { value.format_version = 2; record(value.document).tensor = [Array(4097).fill(0), Array(4097).fill(0)]; },
+    value => { value.format_version = 2; record(value.document).tensor = [[null], [1]]; },
     value => { record(value.document).tensor = [[1], [2]]; },
   ];
   for (const mutate of mutations) {
@@ -96,6 +99,10 @@ test('snapshots reject malformed JSON, unsupported versions, offsets, indices an
     mutate(malformed);
     assert.throws(() => NativeDocument.fromSnapshot(JSON.stringify(malformed)));
   }
+  const nonfinite = record(JSON.parse(encoded));
+  nonfinite.format_version = 2;
+  record(nonfinite.document).tensor = [[123456789], [1]];
+  assert.throws(() => NativeDocument.fromSnapshot(JSON.stringify(nonfinite).replace('123456789', '1e400')), { code: 'SPARS_INVALID_MODEL' });
   assert.equal(doc.toSnapshot(), encoded);
 });
 
