@@ -103,9 +103,46 @@ assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
 
 These buffers are not spaCy's component-level neural batching, and there is no `n_process` multiprocessing, `as_tuples`, per-component pipe configuration, or cancellation support. `pipe` accepts only `batchSize` and `stage` options; unknown options reject during iteration. Buffer failure timing need not match spaCy for every pipeline, especially tokenizer-only processing. Both input copying and result creation run on the JavaScript thread, so large documents or buffers can still delay the event loop. The default maximum length follows spaCy; it does not promise that all accepted text fits in memory or avoids native regex/inference limits.
 
+## Upgrade from npm 0.2.0
+
+The published `@spars/node@0.2.0` package has no package-level admission queue, configurable input caps, `maxLength`, or `pipe` wrapper. Its npm tarball is the upgrade baseline; the later source-tree defaults are not the defaults that npm consumers received. The published package can be inspected without running lifecycle scripts with `npm pack @spars/node@0.2.0 --ignore-scripts`. The changes below apply to an upgrade that includes the processing API described in this guide.
+
+| Affected usage | Change and observable impact | Migration |
+| --- | --- | --- |
+| More than 34 unfinished inference calls across models in one package instance and JavaScript isolate | Two calls can be active and 32 wait; further calls reject with `SPARS_BUSY`. A synchronous burst of 35 calls previously reached the native pool without package-level rejection. | Bound submissions, consume `pipe` incrementally, or use `processBatch` when retaining all results is acceptable. Configure larger finite `maxActive`/`maxQueued` values during startup only when the service has capacity. |
+| A service relying on more than two concurrent native inference tasks | Admission now limits active jobs to two, regardless of a larger libuv pool. Requests can wait longer and application deadlines may expire. | Measure the workload and tune `configureExecution`, keeping application backpressure. Increasing `UV_THREADPOOL_SIZE` alone does not change package admission. |
+| Any document longer than 1,000,000 Unicode code points | The worker rejects with the new `SPARS_TEXT_TOO_LONG` code before tokenization, including within `processBatch`. The released package had no separate document-length policy. | Set `model.maxLength` to an intentional larger bound on each loaded model while inference is idle, or split input when losing cross-boundary NLP context is acceptable. Handle the new error; raising the limit does not guarantee enough memory or successful inference. |
+| JavaScript callers matching native argument-error codes or messages | Wrapper validation of invalid `process`/`processBatch` arguments and unknown stages throws `TypeError`. Examples that previously reported native `InvalidArg` or `StringExpected` no longer carry those codes; a full queue may reject a batch with `SPARS_BUSY` before checking its elements. | Validate inputs and handle `TypeError` for argument mistakes. Catch documented `SPARS_*` processing errors separately; do not rely on native conversion messages. |
+| Hand-edited or third-party model manifests with previously ignored `config` data | The loader now reads `[nlp] batch_size`; a null/non-string config, malformed or duplicate processing fields, or interpolation can reject loading with `SPARS_INVALID_MODEL`. This loader change also affects direct Rust consumers. | Use an unmodified official export or regenerate compatible model assets. For deliberately maintained manifests, supply the actual literal positive integer batch size in the preserved config; see [model format](MODEL_FORMAT.md). Normal supported official exports need no re-export. |
+| Deployments with `NAPI_RS_NATIVE_LIBRARY_PATH` pointing to an older addon, or manually mixed wrapper and native versions | Package import throws `SPARS_NATIVE_INCOMPATIBLE` when required native settings accessors are absent. This check prevents silently returning empty batches with an older addon. | Remove the override to use the matching packaged addon, or update it to a compatible build. Reinstall the root and platform packages together; do not combine an old binary with a new wrapper. |
+
+A rejected `Promise.all` does not cancel calls already admitted. Do not retry the entire original collection blindly: account for completed and still-running work. The limit is shared across models, so creating another model in the same isolate does not create a separate queue. `configureExecution(null)` restores two active jobs and 32 queued; it does not restore the published package's unbounded submission behavior.
+
+For a collection that previously used `Promise.all(texts.map(text => model.process(text)))`, this example submits one buffer at a time and verifies that all 100 documents are consumed. It assumes no competing producers saturate the shared queue. Configure settings during startup before starting other inference:
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Only raise this if the application intentionally accepts larger documents.
+model.maxLength = 2_000_000;
+const texts = Array.from({ length: 100 }, () => 'Alice visits London.');
+let completed = 0;
+for await (const doc of model.pipe(texts, { batchSize: 64 })) {
+  assert.equal(doc.text, 'Alice visits London.');
+  completed++;
+}
+assert.equal(completed, texts.length);
+```
+
+Valid `process`, `processBatch`, loading, vector lookup, result shapes, and within-batch ordering retain their APIs. Small sequential documents need no call-site rewrite. Batch chunking changes scheduling and result-conversion timing, not the ordered result contract: `processBatch` still collects all results and rejects the whole call on failure. `pipe` is optional; choosing it introduces incremental delivery, so earlier buffers may already have been consumed when a later error occurs.
+
+The former 32,768-unit text, 128-document batch, and 65,536-unit aggregate caps existed in later unreleased source builds, not npm 0.2.0. Users of those builds who relied on the caps should enable `configureInputLimits` as shown below. Existing explicit input policies retain their UTF-16 units and values; a policy allowing text over 1,000,000 code points now also needs an appropriate per-model `maxLength`.
+
 ## Server resource limits
 
-Inference admission retains the default of two active jobs and 32 queued jobs per package instance and JavaScript isolate. Additional input limits are disabled by default. Applications relying on the earlier text and batch caps must configure `configureInputLimits` explicitly at startup; existing queue protection needs no migration. Services can customize either policy while inference is idle. These are Node server policies, not spaCy processing defaults:
+Inference admission defaults to two active jobs and 32 queued jobs per package instance and JavaScript isolate. Additional input limits are disabled by default. Users of unreleased source builds relying on earlier text and batch caps must configure `configureInputLimits` explicitly at startup. Published npm 0.2.0 consumers should follow the upgrade guidance above for the new queue protection. Services can customize either policy while inference is idle. These are Node server policies, not spaCy processing defaults:
 
 ```typescript
 import assert from 'node:assert/strict';
@@ -135,7 +172,7 @@ Oversized inputs reject with `SPARS_INPUT_LIMIT` before copying into Rust or sub
 
 ## Errors and verification
 
-Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
+An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.
 
 After the [reference setup](DEVELOPMENT.md#set-up-the-project), run:
 
