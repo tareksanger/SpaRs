@@ -52,7 +52,9 @@ export function addExecutionLoader(source: string): string {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const path = new URL('../index.d.ts', import.meta.url);
-  writeFileSync(path, addExecutionTypes(restrictConstructor(restrictConstructor(readFileSync(path, 'utf8')), 'NativeDocument')));
+  let declarations = readFileSync(path, 'utf8');
+  for (const name of ['Model', 'NativeDocument', 'NativeToken', 'NativeSpan']) declarations = restrictConstructor(declarations, name);
+  writeFileSync(path, addExecutionTypes(declarations));
   const loader = new URL('../index.js', import.meta.url);
   writeFileSync(loader, addExecutionLoader(readFileSync(loader, 'utf8')));
 }

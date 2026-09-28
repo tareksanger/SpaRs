@@ -5,6 +5,7 @@ mod errors;
 mod lexical;
 mod model_store;
 mod models;
+mod views;
 pub use models::{download_model, DownloadOptions, LoadOptions};
 mod output;
 mod tasks;
