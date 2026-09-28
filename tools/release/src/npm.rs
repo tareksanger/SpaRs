@@ -1,13 +1,21 @@
 use std::{io, path::Path, process::Command};
 
-const HELP: &str = "Usage: cargo publish-npm <vX.Y.Z> [--build-only] [--dry-run]\n       cargo publish-npm --artifacts <directory> [--dry-run]\n\nWith a tag: start the npm workflow from the remote default branch using gh.\nWith --artifacts: publish the complete set of downloaded workflow tarballs using Node.js 24 and npm login.\n--build-only builds and tests without publishing.\n--dry-run prints the command without contacting GitHub or npm.\nSee docs/RELEASING.md for first-release setup.";
+const HELP: &str = "Usage: cargo publish-npm <vX.Y.Z> [--build-only] [--source SHA] [--dry-run]\n       cargo publish-npm <vX.Y.Z> --download-only|--from-release [--output DIR] [--dry-run]\n       cargo publish-npm <vX.Y.Z> --attach-artifacts DIR [--dry-run]\n       cargo publish-npm --artifacts DIR [--dry-run]\n\nWith a tag: build, test, retain release assets, and publish through GitHub Actions.\n--build-only retains tested assets without publishing to npm.\n--source selects an exact historical source commit; workflow uses the remote default branch.\n--download-only verifies retained release files; --from-release also publishes them locally.\n--output selects a new empty directory; default creates a unique directory under target/npm-recovery.\n--attach-artifacts retries attachment of a downloaded npm-release-set artifact.\n--artifacts publishes an existing complete tarball set locally.\nLocal publication requires Node.js 24, npm login, and tar. GitHub operations require gh auth login.\n--dry-run prints the command without contacting GitHub or npm.";
 
 #[derive(Debug, PartialEq)]
 enum Destination<'a> {
-    Workflow { tag: &'a str, publish: bool },
+    Workflow {
+        tag: &'a str,
+        publish: bool,
+        source: Option<&'a str>,
+    },
+    Assets {
+        tag: &'a str,
+        mode: &'static str,
+        directory: &'a str,
+    },
     Artifacts(&'a str),
 }
-
 fn stable_tag(tag: &str) -> bool {
     let Some(version) = tag.strip_prefix('v') else {
         return false;
@@ -20,42 +28,83 @@ fn stable_tag(tag: &str) -> bool {
                 && (part.len() == 1 || !part.starts_with('0'))
         })
 }
-
 fn parse(args: &[String]) -> Result<(Destination<'_>, bool), String> {
-    let (destination, options) = match args {
-        [flag, directory, options @ ..]
-            if flag == "--artifacts" && !directory.is_empty() && !directory.starts_with('-') =>
-        {
-            (Destination::Artifacts(directory), options)
+    let Some(first) = args.first() else {
+        return Err(HELP.into());
+    };
+    let mut options = args[1..].iter();
+    let artifacts = if first == "--artifacts" {
+        Some(
+            options
+                .next()
+                .filter(|s| !s.is_empty() && !s.starts_with('-'))
+                .ok_or(HELP)?,
+        )
+    } else {
+        if !stable_tag(first) {
+            return Err(HELP.into());
         }
-        [tag, options @ ..] if stable_tag(tag) => {
-            (Destination::Workflow { tag, publish: true }, options)
-        }
-        _ => return Err(HELP.into()),
+        None
     };
     let mut dry_run = false;
     let mut build_only = false;
-    for option in options {
+    let mut source = None;
+    let mut mode = None;
+    let mut output = None;
+    while let Some(option) = options.next() {
         match option.as_str() {
             "--dry-run" if !dry_run => dry_run = true,
-            "--build-only"
-                if !build_only && matches!(destination, Destination::Workflow { .. }) =>
-            {
-                build_only = true
+            "--build-only" if !build_only => build_only = true,
+            "--source" if source.is_none() => {
+                let sha = options.next().ok_or(HELP)?;
+                if sha.len() != 40
+                    || !sha
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    return Err(HELP.into());
+                }
+                source = Some(sha.as_str());
             }
+            "--download-only" if mode.is_none() => mode = Some("download"),
+            "--from-release" if mode.is_none() => mode = Some("recover"),
+            "--attach-artifacts" if mode.is_none() && output.is_none() => {
+                mode = Some("upload");
+                output = Some(options.next().ok_or(HELP)?.as_str());
+            }
+            "--output" if output.is_none() => output = Some(options.next().ok_or(HELP)?.as_str()),
             _ => return Err(HELP.into()),
         }
     }
-    let destination = match destination {
-        Destination::Workflow { tag, .. } => Destination::Workflow {
-            tag,
+    if output.is_some_and(|s| s.is_empty() || s.starts_with('-')) {
+        return Err(HELP.into());
+    }
+    let destination = if let Some(directory) = artifacts {
+        if build_only || source.is_some() || mode.is_some() || output.is_some() {
+            return Err(HELP.into());
+        }
+        Destination::Artifacts(directory)
+    } else if let Some(mode) = mode {
+        if build_only || source.is_some() {
+            return Err(HELP.into());
+        }
+        Destination::Assets {
+            tag: first,
+            mode,
+            directory: output.unwrap_or("-"),
+        }
+    } else {
+        if output.is_some() {
+            return Err(HELP.into());
+        }
+        Destination::Workflow {
+            tag: first,
             publish: !build_only,
-        },
-        other => other,
+            source,
+        }
     };
     Ok((destination, dry_run))
 }
-
 pub(super) fn run(
     args: &[String],
     invoke: impl FnOnce(&mut Command) -> io::Result<bool>,
@@ -69,7 +118,11 @@ pub(super) fn run(
     let mut command;
     let prerequisite;
     match destination {
-        Destination::Workflow { tag, publish } => {
+        Destination::Workflow {
+            tag,
+            publish,
+            source,
+        } => {
             command = Command::new("gh");
             command.args([
                 "workflow",
@@ -80,8 +133,16 @@ pub(super) fn run(
                 "-f",
                 &format!("publish={publish}"),
             ]);
+            if let Some(sha) = source {
+                command.args(["-f", &format!("source={sha}")]);
+            }
             prerequisite = "Install gh and authenticate with gh auth login.";
-            println!("gh workflow run npm-release.yml -f tag={tag} -f publish={publish}");
+            println!(
+                "gh workflow run npm-release.yml -f tag={tag} -f publish={publish}{}",
+                source
+                    .map(|s| format!(" -f source={s}"))
+                    .unwrap_or_default()
+            );
             println!("Uses the remote default branch; local changes are not pushed. Check the workflow run for completion.");
         }
         Destination::Artifacts(directory) => {
@@ -89,6 +150,21 @@ pub(super) fn run(
             command.args(["bindings/node/scripts/release-publish.mts", directory]);
             prerequisite = "Install Node.js 24 and authenticate with npm login.";
             println!("node bindings/node/scripts/release-publish.mts {directory:?}");
+        }
+        Destination::Assets {
+            tag,
+            mode,
+            directory,
+        } => {
+            command = Command::new("node");
+            command.args([
+                "bindings/node/scripts/release-assets.mts",
+                mode,
+                tag,
+                directory,
+            ]);
+            prerequisite = "Install Node.js 24 and gh; authenticate with gh auth login and, for publication, npm login.";
+            println!("node bindings/node/scripts/release-assets.mts {mode} {tag} {directory:?}");
         }
     }
     if dry_run {
@@ -103,6 +179,5 @@ pub(super) fn run(
         )),
     }
 }
-
 #[cfg(test)]
 mod tests;

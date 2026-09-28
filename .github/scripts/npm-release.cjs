@@ -1,7 +1,9 @@
-// Build the exact workflow commit, retaining the version of an immutable ancestor release.
-module.exports = async ({github, context, tag}) => {
+// Build a CI-verified source commit without moving the existing release tag.
+module.exports = async ({github, context, tag, source}) => {
   const repo = context.repo;
-  const sha = context.sha;
+  if (typeof context.sha !== 'string' || !/^[0-9a-f]{40}$/.test(context.sha)) throw new Error('Expected exact workflow commit');
+  const sha = source || context.sha;
+  if (source && context.eventName === 'pull_request') throw new Error('PRs cannot select release source');
   if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) throw new Error('Expected exact workflow commit');
   const readVersion = async () => {
     const {data:file} = await github.rest.repos.getContent({...repo,path:'bindings/node/package.json',ref:sha});
@@ -26,11 +28,15 @@ module.exports = async ({github, context, tag}) => {
   if (ref.object.type !== 'commit' || !/^[0-9a-f]{40}$/.test(ref.object.sha)) throw new Error('Expected release commit tag');
   const tagSha = ref.object.sha;
   if (release.target_commitish !== tagSha) throw new Error('Release tag differs from its recorded release commit');
+  if (source) {
+    const {data:ancestry} = await github.rest.repos.compareCommits({...repo,base:sha,head:context.sha});
+    if (!['identical','ahead'].includes(ancestry.status)) throw new Error('Source must belong to the default branch history');
+  }
   const {data:comparison} = await github.rest.repos.compareCommits({...repo,base:tagSha,head:sha});
   if (!['identical','ahead'].includes(comparison.status)) throw new Error('Workflow commit must contain the release tag');
   const {data} = await github.rest.actions.listWorkflowRuns({...repo,workflow_id:'ci.yml',head_sha:sha,event:'push',branch,per_page:100});
   const run = data.workflow_runs[0];
-  if (!run || run.status !== 'completed' || run.conclusion !== 'success' || run.head_sha !== sha || run.event !== 'push' || run.head_branch !== branch || run.head_repository?.full_name !== `${repo.owner}/${repo.repo}`) throw new Error('Workflow commit needs successful default-branch push CI');
+  if (!run || run.status !== 'completed' || run.conclusion !== 'success' || run.head_sha !== sha || run.event !== 'push' || run.head_branch !== branch || run.head_repository?.full_name !== `${repo.owner}/${repo.repo}`) throw new Error('Source commit needs successful default-branch push CI');
   const version = await readVersion();
   if (version !== tag.slice(1)) throw new Error('Node version does not match release tag');
   return {sha,version};

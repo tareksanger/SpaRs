@@ -107,3 +107,57 @@ fn preview_help_and_process_errors_are_explicit() {
             .contains(hint));
     }
 }
+
+#[test]
+fn source_and_recovery_commands_pass_literal_arguments() {
+    let sha = "a".repeat(40);
+    run(
+        &args(&["v0.2.0", "--source", &sha, "--build-only"]),
+        |command| {
+            let arguments = command
+                .get_args()
+                .map(|v| v.to_str().unwrap())
+                .collect::<Vec<_>>();
+            assert!(arguments.contains(&"publish=false"));
+            assert_eq!(arguments.last().unwrap(), &format!("source={sha}"));
+            Ok(true)
+        },
+    )
+    .unwrap();
+    for (flag, mode) in [
+        ("--download-only", "download"),
+        ("--from-release", "recover"),
+        ("--attach-artifacts", "upload"),
+    ] {
+        let options = if mode == "upload" {
+            args(&["v0.2.0", flag, "target/a b"])
+        } else {
+            args(&["v0.2.0", flag, "--output", "target/a b"])
+        };
+        run(&options, |command| {
+            assert_eq!(command.get_program(), "node");
+            assert_eq!(
+                command.get_args().collect::<Vec<_>>(),
+                [
+                    "bindings/node/scripts/release-assets.mts",
+                    mode,
+                    "v0.2.0",
+                    "target/a b"
+                ]
+            );
+            Ok(true)
+        })
+        .unwrap();
+    }
+    for options in [
+        args(&["v0.2.0", "--source", "main"]),
+        args(&["v0.2.0", "--source"]),
+        args(&["v0.2.0", "--from-release", "--build-only"]),
+        args(&["v0.2.0", "--download-only", "--source", &sha]),
+        args(&["v0.2.0", "--output", "target/x"]),
+        args(&["v0.2.0", "--from-release", "--download-only"]),
+        args(&["v0.2.0", "--attach-artifacts", ""]),
+    ] {
+        assert!(run(&options, |_| panic!("invalid arguments executed")).is_err());
+    }
+}
