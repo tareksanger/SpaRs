@@ -1,6 +1,6 @@
-# Match exact token phrases
+# Match token phrases
 
-`PhraseMatcher` compiles tokenized document patterns into a reusable prefix tree. It compares exact token text, preserving case and Unicode spelling. Matching itself requires neither a model nor linguistic annotations, and never downloads assets or runs inference. Patterns and input may come from different models or validated native snapshots; text identity does not depend on a shared vocabulary.
+`PhraseMatcher` compiles tokenized document patterns into a reusable prefix tree. It compares exact token text with `ORTH`/`TEXT`, or pinned Unicode lowercase with `LOWER`. Matching itself requires neither a model nor linguistic annotations, and never downloads assets or runs inference. Patterns and input may come from different models or validated native snapshots; text identity does not depend on a shared vocabulary.
 
 ## Register and match
 
@@ -30,6 +30,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 The result includes both “New” and “New York” at each occurrence. End indices are exclusive token indices, not byte or character offsets. Trailing spaces between tokens do not participate in comparisons; a whitespace token does. Sentence boundaries do not prevent a match.
 
+## Match lowercase token text
+
+`PhraseAttribute::Lower` applies the pinned Python Unicode 15.0.0 lowercase mapping to each complete token in both patterns and input. This includes context-sensitive Greek final sigma and multi-character mappings such as `İ` to `i` plus a combining dot. It does not perform case folding or Unicode normalization: `ß` and `ss`, and composed `é` and decomposed `e` plus an accent, remain different. Original document text and offsets remain unchanged.
+
+```rust
+use spars::{Model, PhraseAttribute, PhraseMatcher, Stage, TokenIndex};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let pattern = model.process_until("the ritz", Stage::Tokenizer)?;
+    let input = model.process_until("The Ritz", Stage::Tokenizer)?;
+    let mut matcher = PhraseMatcher::with_attribute(PhraseAttribute::Lower);
+    matcher.add("hotel", &[&pattern])?;
+    let matches = matcher.find_matches(&input)?;
+    assert_eq!(matches.len(), 1);
+    assert_eq!((matches[0].start, matches[0].end), (TokenIndex(0), TokenIndex(2)));
+    assert_eq!(input.span_text(matches[0].start, matches[0].end)?, "The Ritz");
+    assert_eq!(matcher.get("hotel").unwrap()[0].tokens(), &["the", "ritz"]);
+    Ok(())
+}
+```
+
+`get` returns the stored lowercase token strings for a LOWER matcher; patterns with the same lowercase token sequence are deduplicated. The standalone resource is bundled with the Rust crate, so matching restored documents does not require loading a model. `crates/spars/tests/phrase_matcher_lower.rs` and the Node phrase suite compare 4 official cases, 24 lifecycle states and 351 ordered matches. Regenerate and compare both the resource and fixture with `.venv/bin/python tools/phrase_lower_reference.py --check`.
+
 ## Ordering and rule lifecycle
 
 `new()` selects `PhraseAttribute::Orth`; `Text` is the synonymous exact-text choice. Adding an existing rule accumulates patterns. Identical pattern/rule pairs emit only one occurrence; different rules may match the same span. Empty documents used as patterns are ignored, but an empty pattern collection still registers the rule. `contains`, `len`, `is_empty` and `remove` manage rules. Removing an unknown name returns an error. `get` is a Rust inspection API returning unique nonempty patterns in first-registration order; spaCy PhraseMatcher has no corresponding public `get` method.
@@ -40,8 +63,8 @@ The [frozen reference corpus](../fixtures/README.md#exact-text-phrase-matching) 
 
 ## Rust boundaries and remaining scope
 
-Patterns are borrowed, validated `Doc` objects; the matcher copies only their token text. Python's raw integer arrays, invalid dynamic objects, callbacks and integer rule IDs are not accepted. Rust validates fallible inputs before changing registration state; spaCy may register a rule and earlier patterns before an invalid later item raises an error. Invalid native snapshots fail at `Doc::from_json`, before registration. Distinct rule names that collide in their resolved 64-bit identity return an error instead of sharing an upstream identity. Token text uses full string equality rather than accepting hash collisions or truncating a pattern when a token hash equals spaCy's reserved end-of-phrase marker. These are explicit safer Rust differences, not parity claims for those inputs.
+Patterns are borrowed, validated `Doc` objects; the matcher copies their selected token text, applying lowercase for LOWER. Python's raw integer arrays, invalid dynamic objects, callbacks and integer rule IDs are not accepted. Rust validates fallible inputs before changing registration state; spaCy may register a rule and earlier patterns before an invalid later item raises an error. Invalid native snapshots fail at `Doc::from_json`, before registration. Distinct rule names that collide in their resolved 64-bit identity return an error instead of sharing an upstream identity. Token text uses full string equality rather than accepting hash collisions or truncating a pattern when a token hash equals spaCy's reserved end-of-phrase marker. These are explicit safer Rust differences, not parity claims for those inputs.
 
-`LOWER`, annotation attributes, validation warnings, span input, labeled-span output, matcher serialization and callbacks are not exposed. Unsupported serialized attribute names are rejected. The next milestone is pinned Unicode `LOWER`, followed by the shared-attribute and option work in the [matching plan](PROGRESS.md#matching-implementation-plan). Node matcher bindings and EntityRuler/SpanRuler remain later milestones.
+Annotation attributes, validation warnings, span input, labeled-span output, matcher serialization and callbacks are not exposed. Unsupported serialized attribute names are rejected. The [Node binding](NODE.md) exposes the same ORTH/TEXT/LOWER matching and rule lifecycle through immutable native documents. Shared attributes and options, and EntityRuler/SpanRuler, remain in the [matching plan](PROGRESS.md#matching-implementation-plan).
 
 Compilation and retained storage grow with the total pattern text and shared-prefix tree. Search costs up to document length times the longest matching prefix, plus terminal-table scans and output size; dense overlaps may return many results. A terminal table retains its capacity while any label remains, so matching a heavily pruned dictionary can cost more than matching a freshly built equivalent. Removal prunes unused nodes and releases their contents, while the node arena retains reusable slots. See [performance measurements](PERFORMANCE.md) for reproducible measurement guidance.

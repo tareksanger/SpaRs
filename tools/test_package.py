@@ -16,6 +16,7 @@ class PackageTests(unittest.TestCase):
             'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md',
             'src/lib.rs', 'src/nested/runtime.rs', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
             'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
+            'licenses/Unicode.txt', 'src/phrase_matcher/lower.json',
         }
         excluded = {
             f'{directory}/{name}'
@@ -28,7 +29,7 @@ class PackageTests(unittest.TestCase):
             'fixtures/dependency-match-regressions-v1.expected.json', 'fixtures/README.md',
             'src/tests.rs', 'src/nested/tests.rs', 'examples/example.rs', 'tests/example.rs',
             'docs/guide.md', 'reference/README.md', 'reference/source-lock.json', 'SECURITY.md',
-            'licenses/Unicode.txt', 'licenses/en_core_web_md-MIT.txt', 'licenses/en_core_web_md-SOURCES.txt',
+            'licenses/en_core_web_md-MIT.txt', 'licenses/en_core_web_md-SOURCES.txt',
         }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -53,6 +54,7 @@ class PackageTests(unittest.TestCase):
             'Cargo.toml', 'Cargo.toml.orig', 'Cargo.lock', 'README.md', 'LICENSE',
             'THIRD_PARTY_NOTICES.md', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
             'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
+            'licenses/Unicode.txt', 'src/phrase_matcher/lower.json',
         }
         validate_inventory(files, sources)
         validate_inventory(files | {'.cargo_vcs_info.json'}, sources)

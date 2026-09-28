@@ -7,6 +7,7 @@ mod lexical;
 mod matcher_types;
 mod model_store;
 mod models;
+mod phrase_matcher;
 mod token_matcher;
 mod vectors;
 mod views;

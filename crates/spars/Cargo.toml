@@ -21,6 +21,7 @@ include = [
     "/licenses/thinc-MIT.txt",
     "/licenses/preshed-MIT.txt",
     "/licenses/flashtext-MIT.txt",
+    "/licenses/Unicode.txt",
 ]
 
 [lib]

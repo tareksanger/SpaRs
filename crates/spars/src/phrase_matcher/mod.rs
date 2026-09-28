@@ -1,4 +1,5 @@
 //! Native exact-token-text phrase matching; no model or shared vocabulary required.
+mod lower;
 mod terminal;
 use crate::{Doc, Error, Result, TokenIndex};
 use serde::{Deserialize, Serialize};
@@ -26,13 +27,14 @@ impl std::borrow::Borrow<str> for PhraseRuleId {
     }
 }
 
-/// ORTH and TEXT are synonymous. Other phrase attributes are not yet supported.
+/// ORTH and TEXT match exact text; LOWER uses pinned Python Unicode lowercase.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PhraseAttribute {
     #[default]
     Orth,
     Text,
+    Lower,
 }
 
 /// Owned, unique token-text pattern retained for rule lookup.
@@ -44,10 +46,15 @@ impl PhrasePattern {
     pub fn tokens(&self) -> &[String] {
         &self.tokens
     }
-    fn from_doc(doc: &Doc) -> Result<Self> {
+    fn from_doc(doc: &Doc, attribute: PhraseAttribute) -> Result<Self> {
         Ok(Self {
             tokens: (0..doc.tokens().len())
-                .map(|i| doc.token_text(TokenIndex(i)).map(str::to_owned))
+                .map(|i| {
+                    doc.token_text(TokenIndex(i)).map(|text| match attribute {
+                        PhraseAttribute::Lower => lower::lower(text),
+                        _ => text.to_owned(),
+                    })
+                })
                 .collect::<Result<_>>()?,
         })
     }
@@ -127,7 +134,7 @@ impl PhraseMatcher {
         }
         let patterns = documents
             .iter()
-            .map(|doc| PhrasePattern::from_doc(doc))
+            .map(|doc| PhrasePattern::from_doc(doc, self.attribute))
             .collect::<Result<Vec<_>>>()?;
         self.identities.insert(key, name.clone());
         self.rules.entry(name.clone()).or_insert_with(|| Rule {
@@ -197,17 +204,33 @@ impl PhraseMatcher {
     }
     /// Return all overlapping occurrences in pinned spaCy start/end/terminal-table order.
     pub fn find_matches(&self, doc: &Doc) -> Result<Vec<PhraseMatch>> {
-        let mut matches = Vec::new();
         if self.rules.is_empty() {
-            return Ok(matches);
+            return Ok(Vec::new());
         }
-        for start in 0..doc.tokens().len() {
+        // Dispatch once so exact matching does not branch on attributes for
+        // every trie edge. LOWER keys are computed once per input token.
+        if self.attribute == PhraseAttribute::Lower {
+            let lowered = (0..doc.tokens().len())
+                .map(|i| doc.token_text(TokenIndex(i)).map(lower::lower))
+                .collect::<Result<Vec<_>>>()?;
+            self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
+        } else {
+            self.find_keys(doc.tokens().len(), |index| {
+                doc.token_text(TokenIndex(index))
+            })
+        }
+    }
+
+    fn find_keys<'a>(
+        &self,
+        count: usize,
+        key: impl Fn(usize) -> Result<&'a str>,
+    ) -> Result<Vec<PhraseMatch>> {
+        let mut matches = Vec::new();
+        for start in 0..count {
             let mut node = 0;
-            for end in start..doc.tokens().len() {
-                let Some(&child) = self.nodes[node]
-                    .children
-                    .get(doc.token_text(TokenIndex(end))?)
-                else {
+            for end in start..count {
+                let Some(&child) = self.nodes[node].children.get(key(end)?) else {
                     break;
                 };
                 node = child;

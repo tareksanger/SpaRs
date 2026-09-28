@@ -143,8 +143,12 @@ class FixtureReport:
     passed: bool = False
 
 
-def main() -> None:
-    root = Path(__file__).resolve().parent.parent
+def main(root: Path | None = None) -> None:
+    root = root or Path(__file__).resolve().parent.parent
+    output = root / 'target/reports/reference-regeneration.json'
+    # A failed generator must not leave an earlier successful report visible.
+    output.unlink(missing_ok=True)
+    subprocess.run([sys.executable, str(root / 'tools/phrase_lower_reference.py'), '--check'], check=True)
     expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json', 'phrase-match-v1.expected.json', 'phrase-match-holdout-v1.expected.json', 'phrase-match-edges-v1.expected.json']
     reports: list[FixtureReport] = []
     failure: ReferenceMismatch | None = None
@@ -181,7 +185,6 @@ def main() -> None:
             except ReferenceMismatch as error:
                 report.mismatch = error.mismatch
                 failure = failure or error
-    output = root / 'target/reports/reference-regeneration.json'
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({
         'passed': failure is None,

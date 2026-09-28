@@ -1,0 +1,2487 @@
+{
+  "format_version": 1,
+  "versions": {
+    "spacy": "3.8.14",
+    "preshed": "3.0.13",
+    "unicode": "15.0.0"
+  },
+  "sources": {
+    "spacy/matcher/phrasematcher.pyx": "8c22ddfc644475de2cb0b3d63574e08c71e390f8eb233f1a46e24a4d82b97457",
+    "spacy/tests/matcher/test_phrase_matcher.py": "7eef296e4220013f6fce895837900383e9707afd03984cf5aeb44e1ed0018751",
+    "spacy/strings.pyx": "0621982099a90abe8b5cd21ed4457b462ad7dae45bd1f92bfa3d0a157b3c900d",
+    "spacy/symbols.pyx": "81866a0ba310e73e0fa628ac0bdde9988736875c13f033622f5c0b7d8a6d4147",
+    "preshed/maps.pyx": "5aaece898062bb00f2e6e734062846a4ff2241c027387286c64ea2c763e2da94",
+    "spacy/lang/lex_attrs.py": "a20128d553a876047ae4159cec52d658c04c10dca3ba4f5320c43541e791ac5b"
+  },
+  "cases": [
+    {
+      "id": "ritz",
+      "words": [
+        "The",
+        "Ritz",
+        "the",
+        "ritz",
+        "THE",
+        "RITZ"
+      ],
+      "spaces": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "operations": [
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "the",
+              "ritz"
+            ],
+            [
+              "RITZ"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "second",
+          "patterns": [
+            [
+              "the",
+              "ritz"
+            ],
+            [
+              "RITZ"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "the",
+              "ritz"
+            ],
+            [
+              "RITZ"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "first",
+          "patterns": []
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "the",
+              "ritz"
+            ],
+            [
+              "RITZ"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "second",
+          "patterns": []
+        }
+      ],
+      "states": [
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sigma",
+      "words": [
+        "ΟΣ",
+        "ος",
+        "οσ",
+        "ΟΣΑ",
+        "οσα",
+        "Σ",
+        "σ",
+        "AΣ́",
+        "aς́",
+        "AΣ́A",
+        "aσ́a"
+      ],
+      "spaces": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "operations": [
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "ος"
+            ],
+            [
+              "οσ"
+            ],
+            [
+              "οσα"
+            ],
+            [
+              "σ"
+            ],
+            [
+              "aς́"
+            ],
+            [
+              "aσ́a"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "second",
+          "patterns": [
+            [
+              "ος"
+            ],
+            [
+              "οσ"
+            ],
+            [
+              "οσα"
+            ],
+            [
+              "σ"
+            ],
+            [
+              "aς́"
+            ],
+            [
+              "aσ́a"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "ος"
+            ],
+            [
+              "οσ"
+            ],
+            [
+              "οσα"
+            ],
+            [
+              "σ"
+            ],
+            [
+              "aς́"
+            ],
+            [
+              "aσ́a"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "first",
+          "patterns": []
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "ος"
+            ],
+            [
+              "οσ"
+            ],
+            [
+              "οσα"
+            ],
+            [
+              "σ"
+            ],
+            [
+              "aς́"
+            ],
+            [
+              "aσ́a"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "second",
+          "patterns": []
+        }
+      ],
+      "states": [
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unicode",
+      "words": [
+        "İ",
+        "i̇",
+        "I",
+        "i",
+        "ẞ",
+        "ß",
+        "SS",
+        "ss",
+        "É",
+        "é",
+        "é",
+        "𐐀",
+        "𐐨",
+        "K",
+        "k",
+        "ﬀ",
+        "ff"
+      ],
+      "spaces": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "operations": [
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "i̇"
+            ],
+            [
+              "i"
+            ],
+            [
+              "ß"
+            ],
+            [
+              "ss"
+            ],
+            [
+              "é"
+            ],
+            [
+              "é"
+            ],
+            [
+              "𐐨"
+            ],
+            [
+              "k"
+            ],
+            [
+              "ff"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "second",
+          "patterns": [
+            [
+              "i̇"
+            ],
+            [
+              "i"
+            ],
+            [
+              "ß"
+            ],
+            [
+              "ss"
+            ],
+            [
+              "é"
+            ],
+            [
+              "é"
+            ],
+            [
+              "𐐨"
+            ],
+            [
+              "k"
+            ],
+            [
+              "ff"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "i̇"
+            ],
+            [
+              "i"
+            ],
+            [
+              "ß"
+            ],
+            [
+              "ss"
+            ],
+            [
+              "é"
+            ],
+            [
+              "é"
+            ],
+            [
+              "𐐨"
+            ],
+            [
+              "k"
+            ],
+            [
+              "ff"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "first",
+          "patterns": []
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "i̇"
+            ],
+            [
+              "i"
+            ],
+            [
+              "ß"
+            ],
+            [
+              "ss"
+            ],
+            [
+              "é"
+            ],
+            [
+              "é"
+            ],
+            [
+              "𐐨"
+            ],
+            [
+              "k"
+            ],
+            [
+              "ff"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "second",
+          "patterns": []
+        }
+      ],
+      "states": [
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "first",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "first",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "first",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "first",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "second",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "first",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "second",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "first",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "second",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "first",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "second",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "first",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "second",
+              "start": 16,
+              "end": 17
+            },
+            {
+              "rule": "first",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "second",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "first",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "second",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "first",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "second",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "first",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "second",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "first",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "second",
+              "start": 16,
+              "end": 17
+            },
+            {
+              "rule": "first",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "second",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "second",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "second",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "second",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "second",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "second",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "second",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "second",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "second",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "second",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "second",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "second",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "second",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "first",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "second",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "first",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "second",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "first",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "second",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "first",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "second",
+              "start": 16,
+              "end": 17
+            },
+            {
+              "rule": "first",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 3,
+              "end": 4
+            },
+            {
+              "rule": "first",
+              "start": 4,
+              "end": 5
+            },
+            {
+              "rule": "first",
+              "start": 5,
+              "end": 6
+            },
+            {
+              "rule": "first",
+              "start": 6,
+              "end": 7
+            },
+            {
+              "rule": "first",
+              "start": 7,
+              "end": 8
+            },
+            {
+              "rule": "first",
+              "start": 8,
+              "end": 9
+            },
+            {
+              "rule": "first",
+              "start": 9,
+              "end": 10
+            },
+            {
+              "rule": "first",
+              "start": 10,
+              "end": 11
+            },
+            {
+              "rule": "first",
+              "start": 11,
+              "end": 12
+            },
+            {
+              "rule": "first",
+              "start": 12,
+              "end": 13
+            },
+            {
+              "rule": "first",
+              "start": 13,
+              "end": 14
+            },
+            {
+              "rule": "first",
+              "start": 14,
+              "end": 15
+            },
+            {
+              "rule": "first",
+              "start": 16,
+              "end": 17
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overlap",
+      "words": [
+        "A",
+        "a",
+        "A"
+      ],
+      "spaces": [
+        true,
+        true,
+        true
+      ],
+      "operations": [
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "a"
+            ],
+            [
+              "a",
+              "A"
+            ],
+            [
+              "A",
+              "a",
+              "A"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "second",
+          "patterns": [
+            [
+              "a"
+            ],
+            [
+              "a",
+              "A"
+            ],
+            [
+              "A",
+              "a",
+              "A"
+            ]
+          ]
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "a"
+            ],
+            [
+              "a",
+              "A"
+            ],
+            [
+              "A",
+              "a",
+              "A"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "first",
+          "patterns": []
+        },
+        {
+          "action": "add",
+          "rule": "first",
+          "patterns": [
+            [
+              "a"
+            ],
+            [
+              "a",
+              "A"
+            ],
+            [
+              "A",
+              "a",
+              "A"
+            ]
+          ]
+        },
+        {
+          "action": "remove",
+          "rule": "second",
+          "patterns": []
+        }
+      ],
+      "states": [
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first",
+            "second"
+          ],
+          "matches": [
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "second",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "second",
+              "start": 2,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "error": null,
+          "rules": [
+            "first"
+          ],
+          "matches": [
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 0,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 2
+            },
+            {
+              "rule": "first",
+              "start": 1,
+              "end": 3
+            },
+            {
+              "rule": "first",
+              "start": 2,
+              "end": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
