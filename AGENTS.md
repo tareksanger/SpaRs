@@ -10,6 +10,14 @@ SpaRs (Cargo package `spars-nlp`, Rust import `spars`) is a standalone native Ru
 
 Production tokenization and inference must run natively in Rust. Python belongs only in development, export, and reference tooling. Keep acquisition explicit and processing offline. Use official spaCy, Thinc, and model sources identified by `reference/source-lock.json` and model metadata. Keep third-party executable demos and their assets out of the project. Record licenses and provenance when adding resources. Keep downstream application features in separate projects.
 
+## spaCy behavioral parity
+
+Use the pinned official spaCy implementation as the default design and behavior reference for every ported feature. Before implementing or extending a feature, inspect its upstream source and tests, then capture the relevant behavior in reference comparisons. Preserve supported inputs, defaults, output values and ordering, edge cases, and validation behavior wherever compatible with native Rust, memory safety, and the project's explicit contracts. Use idiomatic Rust types and ownership while keeping the observable behavior equivalent; API spelling and internal code structure may differ.
+
+For matching, check attribute and operator semantics, repetition, overlapping matches, and result ordering. For document manipulation, check preservation of text and whitespace, token and span boundaries, annotation updates, and what happens to existing token/span views after edits. Define these contracts from upstream behavior before choosing data structures or optimization strategies.
+
+When a behavioral difference is necessary, document the upstream behavior, the reason for the difference, and its effect on callers in the relevant guide and `docs/COMPATIBILITY.md`, with tests for the chosen behavior. Keep unsupported and unverified cases explicit. Preserve existing exact-output requirements and numerical tolerances; a documented mismatch remains a compatibility gap unless the user explicitly approves a changed acceptance criterion.
+
 ## Model extensibility
 
 The compatibility target is native loading and inference for all official spaCy pretrained pipelines, across languages, model sizes, and architectures. The verified English models are an implementation milestone, not the design boundary. Loading custom-trained pipelines is future work; preserve extension points for their model data and native component implementations. Training models is a separate capability.

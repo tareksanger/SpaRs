@@ -73,3 +73,8 @@ class DocumentationInstallationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'missing installation receipt'):
                 check_documents(Path.cwd(), Path('target/unused-test-store'))
             self.assertEqual(run.call_count, 3)
+            self.assertEqual(run.call_args_list[2].args[0], [
+                'target/release/spars', 'download', 'en_core_web_sm', '--path',
+                'target/unused-test-store', '--archive',
+                'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
+            ])

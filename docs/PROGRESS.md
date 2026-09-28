@@ -57,11 +57,61 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
 1. Model extensibility for all official pretrained pipelines, following the plan below. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
-2. PhraseMatcher: reusable phrase patterns with explicit attribute selection, overlap behavior, and result ordering. This remains the next matcher feature.
+2. Matching: start with PhraseMatcher, then extend the existing matchers and bindings using the [matching implementation plan](#matching-implementation-plan).
 
 Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
 The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, static word vectors, and explicit native model downloads. Further binding work includes matcher and traversal APIs, document/span vectors and similarities, and verification of additional platforms. The [npm workflow](RELEASING.md#publish-the-node-package) assembles Linux x64/ARM64 glibc and musl, macOS x64/ARM64, and Windows x64/ARM64 packages with clean-install checks before optional publication; a completed workflow and registry checks are required release evidence. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
+
+## Matching implementation plan
+
+Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The steps below are planned work, not verified capabilities.
+
+### 1. Establish the reference contract
+
+Inspect spaCy 3.8.14's `spacy/matcher/phrasematcher.pyx`, `matcher.pyx`, `dependencymatcher.pyx`, their attribute and hashing dependencies, and `spacy/tests/matcher/`. Verify the installed reference against `reference/source-lock.json`. Record required attribution before translating additional code; PhraseMatcher's source includes an upstream adaptation notice that needs review.
+
+Create a separate versioned phrase-matching corpus and official reference generator. Cover nested and overlapping phrases, repeated words, duplicate patterns and labels, repeated registration, removal with shared prefixes, empty patterns and documents, Unicode, whitespace, sentence boundaries, missing annotations, and invalid options. Probe ordering when several rules end at the same position; derive it from the pinned implementation rather than assuming insertion order. Include registration state after errors. Preserve all existing matcher fixtures.
+
+Acceptance: reference generation is reproducible, case counts are explicit, and the first tests demonstrate the missing native behavior. Reserve an untouched comparison set until the initial implementation is ready; record when it becomes regression data.
+
+### 2. Implement native PhraseMatcher
+
+Begin with tokenized document patterns and exact token text (`ORTH`/`TEXT`), then add case-insensitive `LOWER` in a separate increment. Use a typed attribute choice and rule identifiers, compile reusable pattern storage, and keep search state local to each call. Resolve how attributes and string identities remain consistent across pattern and input documents, including restored documents. Use the pinned Unicode lowercase behavior for `LOWER`. Matching must not run inference or download assets implicitly.
+
+Provide registration, lookup, removal, and checked document matching with typed token-index results. Evaluate a token trie that shares phrase prefixes against the upstream design; finalize the data structure after the ordering contract and baseline measurements are available. Preserve overlapping results, duplicate handling, and registration/removal behavior from the reference. Record any intentional safer Rust error-state behavior as a compatibility difference.
+
+Acceptance: exact ordered results and rule lifecycle behavior match every declared reference case. Empty inputs, malformed patterns, repeated calls, and concurrent read-only calls pass. Add a Rust example to a PhraseMatcher guide and execute it through `tools/check_docs.py`. Keep unsupported attributes and options explicit.
+
+### 3. Extend shared token conditions
+
+Inventory missing attributes and predicates across Token Matcher, DependencyMatcher, and PhraseMatcher. Add lowercase and lexical attributes, annotation-based phrase attributes, numeric comparisons, remaining set comparisons, regex, and fuzzy matching in independently tested increments. Share reusable attribute extraction and predicate logic where semantics agree, while retaining each matcher's validation rules. Use concrete types for text, flags, numbers, and morphology rather than converting every value to a string.
+
+Acceptance: each addition has official positive, negative, missing-annotation, malformed-input, and Unicode cases in every affected matcher. Regex matching and fuzzy distance rules must be checked against the pinned implementation before selecting an engine or algorithm; an unsupported construct returns an explicit error. Existing matcher outputs remain unchanged.
+
+### 4. Complete matcher options
+
+Add Token Matcher's greedy `FIRST`/`LONGEST` selection and alignments, then checked span input and labeled-span results where the corresponding spaCy matcher supports them. Test span-relative versus document-relative indices explicitly for each API. Plan callback invocation order and safe mutation separately, after the document-editing contract is defined. Keep custom extensions, spaCy pattern-JSON interoperability, and integer rule-ID interoperability visible in the backlog until their prerequisites are implemented.
+
+Acceptance: official comparisons cover tie-breaking, overlaps, repetitions, offsets, unavailable annotations, and option combinations. Existing default behavior and typed Rust callers remain compatible.
+
+### 5. Expose matching through Node
+
+Expose the verified Rust matchers through typed Node APIs with reusable compiled patterns. Decide how matching receives a validated document without silently rerunning inference or trusting mutable JavaScript annotations. Preserve rule identities, token indices, ordering, and structured errors across the binding; apply the binding's execution and input limits to the new operations.
+
+Acceptance: run the same reference cases through Rust and Node, test ownership and repeated/concurrent use, and execute TypeScript guide examples from Markdown. Verify the packed Node package outside the repository.
+
+### 6. Add rule-based annotation after document-editing contracts
+
+Build EntityRuler and SpanRuler on the verified matchers once document annotation updates are supported. First define conflict resolution, overwrite policy, entity IOB updates, span groups, and token/span view validity against spaCy. Retokenization has separate merge/split and dependency-update requirements and is not a prerequisite for read-only matching.
+
+Acceptance: official comparisons verify complete documents after rule application, including overlaps and existing annotations. Failed edits preserve the documented state contract, and native snapshots retain the resulting annotations.
+
+### Quality and performance gates
+
+For every increment, follow `docs/QUALITY.md` and obtain reference, test, documentation, and performance reviews. Run focused cases followed by `.venv/bin/python tools/verify.py`; CI must execute new parity tests with explicit denominators. Keep generated mismatch and timing reports under ignored `target/reports/` and update the compatibility inventory only for behavior actually verified.
+
+Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The first bounded delivery is the reference corpus plus exact-text PhraseMatcher, not completion of the entire matching surface.
 
 ## Model extensibility plan
 
