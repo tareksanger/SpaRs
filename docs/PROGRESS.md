@@ -22,13 +22,13 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `crates/spars/tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `crates/spars/tests/model_loading.rs` and `crates/spars/tests/model_parity.rs` |
-| Executed Rust Markdown examples | 1 README example and 9 guide examples |
+| Executed Rust Markdown examples | 1 README example and 10 guide examples |
 | Node-API binding | 190 documents / 7,029 tokens, all mapped annotations and offset units; eight static-vector lookup cases; typed API, async lifecycle/error tests, and bounded inference admission in `bindings/node/tests/queue.test.mts` and input limits in `bindings/node/tests/input-limits.test.mts` |
 | Executed TypeScript guide examples | 3 examples checked and run from Markdown |
 
 The reference comparisons require exact token annotations and spans. Floating-point calculations use the limits in [validation](VALIDATION.md). Each run records the observed numerical differences in its generated reports. Eight static-vector lookup cases and six similarity pairs also pass.
 
-The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 10 Rust and 3 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
+The [acceptance script](../tools/verify.py) checks strict Python and TypeScript types, the typing policy, formatting, Clippy, Rust, Python and Node tests, 2 source doc tests, 11 Rust and 3 TypeScript examples executed from Markdown, the separate native consumer, packaging, and a byte-identical model re-export. One source doc example is compile-only; it is not counted among the executed Markdown examples. The Rust consumer runs with no interpreters on its PATH. Run `.venv/bin/python tools/verify.py` after setup to generate evidence under ignored `target/reports/`. CI uploads these files as run artifacts; see the [quality process](QUALITY.md).
 
 ## Strong typing
 
@@ -57,7 +57,7 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
 1. Model extensibility for all official pretrained pipelines, following the plan below. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
-2. Matching: start with PhraseMatcher, then extend the existing matchers and bindings using the [matching implementation plan](#matching-implementation-plan).
+2. Matching: add LOWER to the exact-text PhraseMatcher, then extend shared conditions, matcher options and bindings using the [matching implementation plan](#matching-implementation-plan).
 
 Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
@@ -65,11 +65,11 @@ The separate [Node binding](NODE.md) exposes loading, processing, batches, order
 
 ## Matching implementation plan
 
-Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The steps below are planned work, not verified capabilities.
+Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The first milestone provides the exact-text [PhraseMatcher](PHRASE_MATCHER.md) and its official reference corpus. Steps 3–6 and LOWER remain planned work.
 
 ### 1. Establish the reference contract
 
-Inspect spaCy 3.8.14's `spacy/matcher/phrasematcher.pyx`, `matcher.pyx`, `dependencymatcher.pyx`, their attribute and hashing dependencies, and `spacy/tests/matcher/`. Verify the installed reference against `reference/source-lock.json`. Record required attribution before translating additional code; PhraseMatcher's source includes an upstream adaptation notice that needs review.
+Inspect spaCy 3.8.14's `spacy/matcher/phrasematcher.pyx`, `matcher.pyx`, `dependencymatcher.pyx`, their attribute and hashing dependencies, and `spacy/tests/matcher/`. Verify the installed reference against `reference/source-lock.json`. Retain the [third-party notices](../THIRD_PARTY_NOTICES.md), including the FlashText adaptation notice and the preshed license.
 
 Create a separate versioned phrase-matching corpus and official reference generator. Cover nested and overlapping phrases, repeated words, duplicate patterns and labels, repeated registration, removal with shared prefixes, empty patterns and documents, Unicode, whitespace, sentence boundaries, missing annotations, and invalid options. Probe ordering when several rules end at the same position; derive it from the pinned implementation rather than assuming insertion order. Include registration state after errors. Preserve all existing matcher fixtures.
 
@@ -82,6 +82,8 @@ Begin with tokenized document patterns and exact token text (`ORTH`/`TEXT`), the
 Provide registration, lookup, removal, and checked document matching with typed token-index results. Evaluate a token trie that shares phrase prefixes against the upstream design; finalize the data structure after the ordering contract and baseline measurements are available. Preserve overlapping results, duplicate handling, and registration/removal behavior from the reference. Record any intentional safer Rust error-state behavior as a compatibility difference.
 
 Acceptance: exact ordered results and rule lifecycle behavior match every declared reference case. Empty inputs, malformed patterns, repeated calls, and concurrent read-only calls pass. Add a Rust example to a PhraseMatcher guide and execute it through `tools/check_docs.py`. Keep unsupported attributes and options explicit.
+
+Exact-text ORTH/TEXT matching is implemented in `crates/spars/src/phrase_matcher/`, with a safe prefix trie and pinned terminal-table ordering. `crates/spars/tests/phrase_matcher.rs` compares 43 official cases, 1,249 lifecycle states and 31,919 exact ordered matches, including a separately frozen comparison set. `tools/phrase_match_reference.py` regenerates references and verifies source provenance; the guide example executes through `tools/check_docs.py`. LOWER is the next bounded milestone. Rust accepts validated document patterns, rejects distinct rule-name hash collisions, and validates before mutation; see the guide for differences from Python error states and hash-only token identity.
 
 ### 3. Extend shared token conditions
 

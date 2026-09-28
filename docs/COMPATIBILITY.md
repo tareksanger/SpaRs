@@ -22,7 +22,7 @@ The target is native loading and inference for all official spaCy pretrained pip
 | Static vectors | Partial | Static token/span/doc vectors and similarities; sm contextual token/span/doc vectors and snapshot round-trips; no floret or vector mutation |
 | DependencyMatcher | Partial | All 20 relationships; seven token attributes and five predicates; ordered official reference comparisons; no callbacks, regex, fuzzy matching, or span input |
 | Token Matcher | Partial | Typed shared conditions, repetition, overlapping spans and default discovery order; no greedy selection, alignments, callbacks, regex, fuzzy matching or span input |
-| PhraseMatcher | Unimplemented | Next matcher priority; attribute selection, overlaps and result ordering need reference suites |
+| PhraseMatcher | Partial | Native ORTH/TEXT tokenized-document patterns, ordered overlapping results and rule lifecycle; 43 official cases / 1,249 states / 31,919 ordered outputs; [Rust safety differences and remaining scope](PHRASE_MATCHER.md#rust-boundaries-and-remaining-scope); LOWER and other attributes/options deferred |
 | EntityRuler/SpanRuler | Unimplemented | No public rule-based span annotation API |
 | Retokenization | Unimplemented | No merge/split API |
 | DocBin / spaCy byte serialization | Unimplemented | Validated native JSON snapshots; no spaCy format interoperability |
