@@ -19,16 +19,24 @@ export interface ExecutionOptions {
   maxActive: number
   maxQueued: number
 }
-/** Set both limits while idle. Defaults: 2 active jobs and 32 queued jobs. */
-export declare function configureExecution(options: ExecutionOptions): void
+/** Enable server admission limits while idle. Disabled by default; null resets them. */
+export declare function configureExecution(options: ExecutionOptions | null): void
 /** Text lengths count UTF-16 units, matching JavaScript string.length. */
 export interface InputLimits {
   maxTextLength: number
   maxBatchSize: number
   maxBatchTextLength: number
 }
-/** Set all input limits while idle. Defaults: 32768 units/text, 128 texts/batch, 65536 units/batch. */
-export declare function configureInputLimits(options: InputLimits): void
+/** Enable additional server input limits while idle. Disabled by default; null resets them. */
+export declare function configureInputLimits(options: InputLimits | null): void
+export interface PipeOptions {
+  batchSize?: number
+  stage?: Stage | null
+}
+export interface Model {
+  /** Lazily buffer and yield documents in order; native inference stays sequential within a batch. */
+  pipe(texts: Iterable<string> | AsyncIterable<string>, options?: PipeOptions): AsyncGenerator<Document, void, unknown>
+}
 `;
 
 export function addExecutionTypes(source: string): string {

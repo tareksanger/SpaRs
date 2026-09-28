@@ -30,7 +30,7 @@ test('admission is shared across models, rejects overflow, and recovers after er
     texts[0] = 'changed';
     await assert.rejects(second.processBatch(['overflow']), { code: 'SPARS_BUSY' });
     assert.equal((await batch)[0]?.text, 'original');
-  } finally { configureExecution({ maxActive: 2, maxQueued: 32 }); }
+  } finally { configureExecution(null); }
 });
 
 function deferred(): { promise: Promise<number>; resolve: (value: number) => void; reject: (error: Error) => void } {
@@ -65,13 +65,13 @@ test('scheduler caps native submissions, preserves FIFO, and releases every slot
 });
 
 test('invalid configuration leaves defaults unchanged', () => {
-  for (const options of [null, [], {}, {maxActive: 0,maxQueued: 1}, {maxActive: 1.5,maxQueued: 1},
+  for (const options of [[], {}, {maxActive: 0,maxQueued: 1}, {maxActive: 1.5,maxQueued: 1},
     {maxActive: 1,maxQueued: -1}, {maxActive: 1,maxQueued: Infinity}, {maxActive: '1',maxQueued: 1},
     {maxActive: Number.MAX_SAFE_INTEGER + 1,maxQueued: 0}]) {
     const scheduler = new Scheduler();
     assert.throws(() => Reflect.apply(scheduler.configure, scheduler, [options]));
-    assert.equal(scheduler.maxActive, 2);
-    assert.equal(scheduler.maxQueued, 32);
+    assert.equal(scheduler.maxActive, Infinity);
+    assert.equal(scheduler.maxQueued, Infinity);
   }
 });
 
@@ -84,6 +84,9 @@ test('wrappers defer native invocation and reject saturation without reading bat
     gates.set(key, { promise, resolve });
   }
   class FakeModel {
+    maxLength = 1_000_000;
+    batchSize = 256;
+    async *pipe(): AsyncGenerator<Document, void, unknown> { yield await this.process('first'); }
     process(text: string): Promise<Document> {
       started.push(text);
       const gate = gates.get(text);
@@ -118,5 +121,71 @@ test('wrappers defer native invocation and reject saturation without reading bat
   assert.deepEqual(started, ['first', 'second', 'third']);
   gates.get('third')?.resolve(doc('third'));
   await third;
-  configureExecution({ maxActive: 2, maxQueued: 32 });
+  configureExecution(null);
+});
+
+
+test('reset disables admission caps for subsequent concurrent submissions', async () => {
+  const model = await loadModel(modelPath);
+  configureExecution({ maxActive: 1, maxQueued: 0 });
+  const first = model.process('a', 'Tokenizer');
+  try {
+    await assert.rejects(model.process('b', 'Tokenizer'), { code: 'SPARS_BUSY' });
+    await first;
+    configureExecution(null);
+    const docs = await Promise.all(['a', 'b', 'c'].map(text => model.process(text, 'Tokenizer')));
+    assert.deepEqual(docs.map(doc => doc.text), ['a', 'b', 'c']);
+  } finally { await first; configureExecution(null); }
+});
+
+test('native chunks run sequentially under one admission slot and stop on failure', async () => {
+  const chunks: string[][] = [];
+  let gates = [deferred(), deferred(), deferred()];
+  let active = 0;
+  const doc = (text: string): Document => ({ text, tokens: [], entities: null, sentences: null, nounChunks: null });
+  class FakeModel {
+    maxLength = 1_000_000;
+    batchSize = 2;
+    async *pipe(): AsyncGenerator<Document, void, unknown> { yield doc('unused'); }
+    async process(text: string): Promise<Document> { return doc(text); }
+    async processBatch(texts: string[]): Promise<Document[]> {
+      assert.equal(active, 0, 'native chunks must not overlap');
+      const gate = gates[chunks.length];
+      assert.ok(gate);
+      chunks.push(texts);
+      active++;
+      try { await gate.promise; return texts.map(doc); }
+      finally { active--; }
+    }
+    vector(): null { return null; }
+  }
+  install({ Model: FakeModel });
+  const model = new FakeModel();
+  configureExecution({ maxActive: 1, maxQueued: 0 });
+  try {
+    const texts = ['a', 'b', 'c', 'd', 'e'];
+    const result = model.processBatch(texts);
+    texts[2] = 'changed';
+    assert.deepEqual(chunks, [['a', 'b']]);
+    gates[0]?.resolve(0);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    gates[1]?.resolve(1);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd'], ['e']]);
+    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    gates[2]?.resolve(2);
+    assert.deepEqual((await result).map(item => item.text), ['a', 'b', 'c', 'd', 'e']);
+    chunks.length = 0;
+    gates = [deferred(), deferred(), deferred()];
+    const failure = model.processBatch(['a', 'b', 'c', 'd', 'e']);
+    const rejected = assert.rejects(failure, /middle chunk failed/);
+    gates[0]?.resolve(0);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    gates[1]?.reject(new Error('middle chunk failed'));
+    await rejected;
+    assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
+    assert.equal((await model.process('recovered')).text, 'recovered');
+  } finally { configureExecution(null); }
 });

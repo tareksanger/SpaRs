@@ -21,6 +21,7 @@ spars = { package = "spars-nlp", version = "0.1.0" }
 use spars::{Model, TokenIndex};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+    assert_eq!(nlp.default_batch_size(), 256);
     let doc = nlp.process("Alice works at Microsoft in New York.")?;
     for (i, token) in doc.tokens().iter().enumerate() {
         println!(

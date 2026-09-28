@@ -36,25 +36,52 @@ impl From<Stage> for spars::Stage {
     }
 }
 
-/// A reusable, immutable native model. Create it with loadModel.
+/// A reusable model with immutable native weights and configurable processing settings. Create it with loadModel.
 #[napi]
 pub struct Model {
     inner: Arc<spars::Model>,
+    max_length: u32,
+    batch_size: u32,
 }
 
 #[napi]
 impl Model {
+    /// Maximum Unicode code points per document, following spaCy max_length (default 1,000,000).
+    #[napi(getter)]
+    pub fn max_length(&self) -> u32 {
+        self.max_length
+    }
+
+    #[napi(setter)]
+    pub fn set_max_length(&mut self, value: f64) -> Result<()> {
+        self.max_length = setting(value, 0, "maxLength")?;
+        Ok(())
+    }
+
+    /// Number of documents buffered by pipe and each native processBatch chunk.
+    #[napi(getter)]
+    pub fn batch_size(&self) -> u32 {
+        self.batch_size
+    }
+
+    #[napi(setter)]
+    pub fn set_batch_size(&mut self, value: f64) -> Result<()> {
+        self.batch_size = setting(value, 1, "batchSize")?;
+        Ok(())
+    }
+
     /// Run native inference on Node's worker pool. Defaults to the full pipeline.
     #[napi(strict)]
     pub fn process(&self, text: Utf16String, stage: Option<Stage>) -> AsyncTask<ProcessTask> {
         AsyncTask::new(ProcessTask {
             model: Arc::clone(&self.inner),
+            max_length: self.max_length,
             text,
             stage: stage.unwrap_or(Stage::Ner).into(),
         })
     }
 
-    /// Process an ordered batch sequentially in one worker job, retaining input order.
+    /// Process an ordered batch, chunked by batchSize by the package wrapper.
     #[napi(strict)]
     pub fn process_batch(
         &self,
@@ -63,6 +90,7 @@ impl Model {
     ) -> AsyncTask<BatchTask> {
         AsyncTask::new(BatchTask {
             model: Arc::clone(&self.inner),
+            max_length: self.max_length,
             texts,
             stage: stage.unwrap_or(Stage::Ner).into(),
         })
@@ -85,4 +113,17 @@ pub fn load_model(path: Utf16String, options: Option<models::LoadOptions>) -> As
     AsyncTask::new(LoadTask {
         source: models::LoadSource::prepare(&path, options),
     })
+}
+
+fn setting(value: f64, minimum: u32, name: &str) -> Result<u32> {
+    if !value.is_finite()
+        || value.fract() != 0.0
+        || value < f64::from(minimum)
+        || value > f64::from(u32::MAX)
+    {
+        return Err(napi::Error::from_reason(format!(
+            "{name} must be an integer in {minimum}..=4294967295"
+        )));
+    }
+    Ok(value as u32)
 }
