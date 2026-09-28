@@ -84,8 +84,12 @@ test('wrappers defer native invocation and reject saturation without reading bat
     gates.set(key, { promise, resolve });
   }
   class FakeModel {
-    maxLength = 1_000_000;
-    batchSize = 256;
+    private maximum = 1_000_000;
+    private size = 256;
+    get maxLength(): number { return this.maximum; }
+    set maxLength(value: number) { this.maximum = value; }
+    get batchSize(): number { return this.size; }
+    set batchSize(value: number) { this.size = value; }
     async *pipe(): AsyncGenerator<Document, void, unknown> { yield await this.process('first'); }
     process(text: string): Promise<Document> {
       started.push(text);
@@ -147,8 +151,12 @@ test('native chunks run sequentially under one admission slot and stop on failur
   let active = 0;
   const doc = (text: string): Document => ({ text, tokens: [], entities: null, sentences: null, nounChunks: null });
   class FakeModel {
-    maxLength = 1_000_000;
-    batchSize = 2;
+    private maximum = 1_000_000;
+    private size = 2;
+    get maxLength(): number { return this.maximum; }
+    set maxLength(value: number) { this.maximum = value; }
+    get batchSize(): number { return this.size; }
+    set batchSize(value: number) { this.size = value; }
     async *pipe(): AsyncGenerator<Document, void, unknown> { yield doc('unused'); }
     async process(text: string): Promise<Document> { return doc(text); }
     async processBatch(texts: string[]): Promise<Document[]> {
@@ -214,4 +222,27 @@ test('fresh scheduler admits two jobs and queues exactly 32 without configuratio
   scheduler.configure(null);
   assert.equal(scheduler.maxActive, 2);
   assert.equal(scheduler.maxQueued, 32);
+});
+
+
+test('an incompatible native addon fails before any inference method is wrapped', () => {
+  for (const variant of ['missingBoth', 'missingBatch', 'readOnlyBatch']) {
+    class LegacyModel {
+      process(): void { throw new Error('must not execute'); }
+      processBatch(): void { throw new Error('must not execute'); }
+    }
+    if (variant !== 'missingBoth') Object.defineProperty(LegacyModel.prototype, 'maxLength', {
+      configurable: true, get() { return 1_000_000; }, set(_value: number) {},
+    });
+    if (variant === 'readOnlyBatch') Object.defineProperty(LegacyModel.prototype, 'batchSize', {
+      configurable: true, get() { return 256; },
+    });
+    const descriptors = Object.getOwnPropertyDescriptors(LegacyModel.prototype);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assert.throws(() => Reflect.apply(install, undefined, [{ Model: LegacyModel }]), {
+        code: 'SPARS_NATIVE_INCOMPATIBLE', message: /NAPI_RS_NATIVE_LIBRARY_PATH/,
+      });
+      assert.deepEqual(Object.getOwnPropertyDescriptors(LegacyModel.prototype), descriptors);
+    }
+  }
 });

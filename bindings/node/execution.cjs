@@ -122,6 +122,16 @@ function validateStage(stage) {
 function install(binding) {
   const prototype = binding.Model.prototype;
   if (installed.has(prototype)) return;
+  // An older override can load successfully but lacks settings needed for chunking.
+  // Validate every required accessor before changing any native method or descriptor.
+  for (const name of ['maxLength', 'batchSize']) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+    if (typeof descriptor?.get !== 'function' || typeof descriptor?.set !== 'function') {
+      throw Object.assign(new Error('Native addon is incompatible with this @spars/node wrapper. Reinstall matching package versions and remove or update NAPI_RS_NATIVE_LIBRARY_PATH.'), {
+        code: 'SPARS_NATIVE_INCOMPATIBLE',
+      });
+    }
+  }
   installed.add(prototype);
   // Freeze pipeline settings during submitted work, including JS-queued jobs.
   for (const name of ['maxLength', 'batchSize']) {
