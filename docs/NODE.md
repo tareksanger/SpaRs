@@ -212,7 +212,7 @@ assert.equal(typeof lexeme.orth, 'bigint');
 
 ```typescript
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ModelStore } from './index.js';
@@ -223,7 +223,7 @@ try {
   const installed = join(directory, 'example-installation');
   mkdirSync(installed);
   await store.register('en_core_web_sm', installed);
-  assert.equal(await store.resolve('en_core_web_sm'), installed);
+  assert.equal(await store.resolve('en_core_web_sm'), realpathSync(installed));
 } finally { rmSync(directory, { recursive: true, force: true }); }
 ```
 
