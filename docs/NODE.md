@@ -291,6 +291,24 @@ Supported token attributes are `text`, `norm`, `lemma`, `pos`, `tag`, `dep`, and
 
 Matcher instances support `size`, `contains(rule)`, `get(rule)`, `add(rule, patterns)`, and `remove(rule)`. Repeated additions append to an existing rule; `get` returns independent pattern copies or `null`. Matching runs on the worker pool using the retained native document, without rerunning inference or copying compiled rules. Searches share the inference admission queue and optional `maxTextLength` policy. Rule mutation is rejected with `SPARS_BUSY` while any search on that matcher is queued or active; after the returned promise settles, mutation is available again. Registration and inspection are synchronous and are not limited by inference input policies. Large match arrays still require JavaScript-thread allocation.
 
+## Dependency matching
+
+`DependencyMatcher` uses the same token constraints and matcher lifecycle as `TokenMatcher`. Each node after the first links to an earlier named node. Matches contain token indices in pattern-node order. All 20 native relationship operators are supported; see the [dependency matcher guide](DEPENDENCY_MATCHER.md) for their meanings and remaining scope.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, DependencyMatcher } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const matcher = new DependencyMatcher();
+matcher.add('subject', [{ nodes: [
+  { id: 'verb', constraints: [] },
+  { id: 'subject', constraints: [{ attribute: 'dep', predicate: { kind: 'equals', value: 'nsubj' } }], link: { left: 'verb', relation: '>' } },
+] }]);
+const doc = await model.processDocument('Alice runs.');
+assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'subject', tokens: [1, 0] }]);
+```
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.

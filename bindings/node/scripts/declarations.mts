@@ -57,7 +57,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   writeFileSync(path, addExecutionTypes(declarations));
   const loader = new URL('../index.js', import.meta.url);
   let source = addExecutionLoader(readFileSync(loader, 'utf8'));
-  for (const name of ['TokenMatcher']) {
+  for (const name of ['TokenMatcher', 'DependencyMatcher']) {
     const hook = `require('./execution.cjs').installMatcher(module.exports.${name}, module.exports.NativeDocument, '${name.replace('Matcher', '').toLowerCase()}');`;
     if (!source.includes(hook)) source += `\n${hook}\n`;
   }
