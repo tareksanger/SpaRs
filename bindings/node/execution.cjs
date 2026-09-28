@@ -118,7 +118,8 @@ function validateStage(stage) {
   }
 }
 
-/** @param {{ Model: typeof import('./index.js').Model }} binding */
+/** @typedef {Pick<import('./index.js').Model, 'process' | 'processBatch' | 'pipe' | 'maxLength' | 'batchSize'> & Partial<Pick<import('./index.js').Model, 'processDocument'>>} ProcessingModel */
+/** @param {{ Model: { prototype: ProcessingModel; [Symbol.hasInstance](value: unknown): boolean } }} binding */
 function install(binding) {
   const prototype = binding.Model.prototype;
   if (installed.has(prototype)) return;
@@ -150,6 +151,14 @@ function install(binding) {
     validateStage(stage);
     if (inputLimits && text.length > inputLimits.maxTextLength) return tooLarge('Text exceeds maxTextLength (UTF-16 units)');
     return scheduler.submit(() => process.call(this, text, stage));
+  };
+  const processDocument = prototype.processDocument;
+  if (processDocument) prototype.processDocument = function(text, stage) {
+    if (!(this instanceof binding.Model)) throw new TypeError('Expected a Model receiver');
+    if (typeof text !== 'string') throw new TypeError('Expected a text string');
+    validateStage(stage);
+    if (inputLimits && text.length > inputLimits.maxTextLength) return tooLarge('Text exceeds maxTextLength (UTF-16 units)');
+    return scheduler.submit(() => processDocument.call(this, text, stage));
   };
   prototype.processBatch = function(texts, stage) {
     if (!(this instanceof binding.Model)) throw new TypeError('Expected a Model receiver');

@@ -1,7 +1,7 @@
 use crate::errors::{number, Result};
 use crate::output::{Document, Span, Token};
 
-pub fn document(doc: spars::Doc) -> Result<Document> {
+pub fn document(doc: &spars::Doc) -> Result<Document> {
     // Walk text once in order. Counting each token's prefix would be quadratic.
     let mut byte_cursor = 0;
     let mut utf16_cursor = 0;

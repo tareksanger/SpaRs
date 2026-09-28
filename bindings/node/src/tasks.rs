@@ -43,7 +43,7 @@ fn process(
     text: &[u16],
     stage: spars::Stage,
     max_length: u32,
-) -> errors::Result<Document> {
+) -> errors::Result<spars::Doc> {
     let text = errors::text(text)?;
     if text.len() > max_length as usize {
         let length = text.chars().count();
@@ -51,7 +51,7 @@ fn process(
             return Err(errors::text_too_long(length, max_length));
         }
     }
-    convert::document(model.process_until(&text, stage)?)
+    Ok(model.process_until(&text, stage)?)
 }
 
 #[napi]
@@ -60,12 +60,10 @@ impl Task for ProcessTask {
     type JsValue = Document;
 
     fn compute(&mut self) -> Result<Self::Output> {
-        Ok(process(
-            &self.model,
-            &self.text,
-            self.stage,
-            self.max_length,
-        ))
+        Ok(
+            process(&self.model, &self.text, self.stage, self.max_length)
+                .and_then(|doc| convert::document(&doc)),
+        )
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
@@ -89,11 +87,44 @@ impl Task for BatchTask {
         Ok(self
             .texts
             .iter()
-            .map(|text| process(&self.model, text, self.stage, self.max_length))
+            .map(|text| {
+                process(&self.model, text, self.stage, self.max_length)
+                    .and_then(|doc| convert::document(&doc))
+            })
             .collect())
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
         output.map_err(|error| error.into_napi(env))
+    }
+}
+
+pub struct ProcessDocumentTask {
+    pub(crate) model: Arc<spars::Model>,
+    pub(crate) max_length: u32,
+    pub(crate) text: Utf16String,
+    pub(crate) stage: spars::Stage,
+}
+
+#[napi]
+impl Task for ProcessDocumentTask {
+    type Output = errors::Result<spars::Doc>;
+    type JsValue = crate::document::NativeDocument;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        Ok(process(
+            &self.model,
+            &self.text,
+            self.stage,
+            self.max_length,
+        ))
+    }
+
+    fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        output
+            .map(|doc| crate::document::NativeDocument {
+                inner: Arc::new(doc),
+            })
+            .map_err(|error| error.into_napi(env))
     }
 }
