@@ -2,6 +2,7 @@
 mod convert;
 mod document;
 mod views;
+mod vectors;
 mod lexical;
 mod model_store;
 mod errors;

@@ -168,7 +168,7 @@ Both configuration functions copy their settings and throw synchronously for inv
 
 Oversized inputs reject with `SPARS_INPUT_LIMIT` before copying into Rust or submitting inference. Batch count is checked before accessing elements; text and aggregate length are checked while capturing the batch, and the first violation rejects the entire call. A `pipe` buffer is checked when submitted. Size rejection does not consume an inference slot. A full queue can return `SPARS_BUSY` before inspecting batch elements. These policies do not limit model loading, downloads, `vector` lookups, other isolates, or memory already allocated by the caller. Large allowed results still require synchronous JavaScript object creation. Increasing limits increases potential CPU, memory, and event-loop cost.
 
-`vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, and matchers are not yet exposed through this binding; their Rust APIs remain available separately.
+`vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Native documents support the additional vector, traversal, and matcher APIs below.
 
 ## Retain and restore native documents
 
@@ -249,6 +249,25 @@ assert.equal(doc.sentenceViews()?.length, 1);
 ```
 
 `token.annotations()` returns a copied record of the native annotations and byte/code-point start offsets. `token.children()`, `ancestors()`, `subtree()`, `head()`, `span()`, and `sentence()` provide graph and sentence access. Use `doc.toObject()` for the full JavaScript output with UTF-16 offsets. Views are immutable; retaining even one view retains its full document and contextual tensor. Traversal and view creation run synchronously and allocate in proportion to the returned results.
+
+## Vectors and similarity
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('dog cat');
+assert.ok(model.documentVector(doc) instanceof Float32Array);
+assert.ok(model.tokenVector(doc, 0) instanceof Float32Array);
+assert.ok(model.spanVector(doc, 0, 1) instanceof Float32Array);
+assert.equal(model.similarity(doc, doc), 1);
+assert.equal(model.spanSimilarity(doc, 0, 1, doc, 0, 1), 1);
+```
+
+The receiving model selects vector behavior: md/lg use their static vocabulary, while sm uses contextual rows retained in the supplied document. Documents do not record model identity; when comparing contextual documents, callers should use the same model and processing stage. Token vectors return `null` when unavailable; unavailable document/span vectors are empty arrays. All returned vectors are independent copies. Similarity preserves identical-token and zero-vector shortcuts, then rejects incompatible nonzero vector dimensions with `SPARS_UNSUPPORTED`; this check is stricter than the current Rust similarity helpers, which truncate unequal dimensions during their dot product.
+
+These methods run synchronously. Mean vectors and similarities scan the selected tokens and vector dimensions; they do not run inference. Large repeated comparisons can delay the JavaScript thread.
 
 ## Errors and verification
 
