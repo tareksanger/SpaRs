@@ -204,27 +204,33 @@ impl PhraseMatcher {
     }
     /// Return all overlapping occurrences in pinned spaCy start/end/terminal-table order.
     pub fn find_matches(&self, doc: &Doc) -> Result<Vec<PhraseMatch>> {
-        let mut matches = Vec::new();
         if self.rules.is_empty() {
-            return Ok(matches);
+            return Ok(Vec::new());
         }
-        // Normalize each input token once; shared trie prefixes reuse the keys.
-        let lowered = if self.attribute == PhraseAttribute::Lower {
-            Some(
-                (0..doc.tokens().len())
-                    .map(|i| doc.token_text(TokenIndex(i)).map(lower::lower))
-                    .collect::<Result<Vec<_>>>()?,
-            )
+        // Dispatch once so exact matching does not branch on attributes for
+        // every trie edge. LOWER keys are computed once per input token.
+        if self.attribute == PhraseAttribute::Lower {
+            let lowered = (0..doc.tokens().len())
+                .map(|i| doc.token_text(TokenIndex(i)).map(lower::lower))
+                .collect::<Result<Vec<_>>>()?;
+            self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
         } else {
-            None
-        };
-        for start in 0..doc.tokens().len() {
+            self.find_keys(doc.tokens().len(), |index| {
+                doc.token_text(TokenIndex(index))
+            })
+        }
+    }
+
+    fn find_keys<'a>(
+        &self,
+        count: usize,
+        key: impl Fn(usize) -> Result<&'a str>,
+    ) -> Result<Vec<PhraseMatch>> {
+        let mut matches = Vec::new();
+        for start in 0..count {
             let mut node = 0;
-            for end in start..doc.tokens().len() {
-                let Some(&child) = self.nodes[node].children.get(match &lowered {
-                    Some(tokens) => tokens[end].as_str(),
-                    None => doc.token_text(TokenIndex(end))?,
-                }) else {
+            for end in start..count {
+                let Some(&child) = self.nodes[node].children.get(key(end)?) else {
                     break;
                 };
                 node = child;
