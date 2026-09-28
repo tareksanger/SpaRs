@@ -57,6 +57,7 @@ test('workflow gates publishing on all platform smoke jobs and uses immutable ch
   assert.equal(workflow.on.workflow_dispatch.inputs.publish.default,false);
   assert.equal(workflow.jobs.publish.if,"github.event_name == 'workflow_dispatch' && inputs.publish");
   assert.equal(workflow.jobs.publish.environment,'npm');
+  assert.ok(workflow.jobs.publish['timeout-minutes'] >= 60, 'Allow confirmation waits for all nine packages plus upload time');
   assert.deepEqual(workflow.jobs.publish.needs,['validate','retain']);
   assert.deepEqual(workflow.jobs.smoke.needs,['validate','assemble']);
   assert.deepEqual(workflow.jobs.assemble.needs,['validate','build']);

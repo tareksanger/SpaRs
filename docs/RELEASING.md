@@ -178,7 +178,11 @@ npm login
 cargo publish-npm v0.3.1 --from-release
 ```
 
-The publisher checks the entire package set before uploading. It skips already published versions only when npm reports the exact SHA-512 integrity of the retained tarball and stops if any published version has different bytes. If local publication fails after download, retry using the printed directory with `cargo publish-npm --artifacts DIRECTORY`. Do not rebuild a partially published version to recover missing packages. npm does not allow replacing a published version; changed binaries require a new release version.
+The publisher checks the entire package set before uploading. After each accepted upload, it checks whether npm makes the version available with the expected SHA-512 checksum, waiting five seconds between checks for up to 60 waits per package. It reports progress and continues automatically through all eight platform packages, then the main package. An npm conflict reporting a previously staged version triggers the same confirmation checks without another upload.
+
+If npm still has not made the version available, the command stops with instructions to check processing or staged approval; ordinary upload errors, registry lookup errors, and checksum mismatches also stop publication. It skips already published versions only when npm reports the exact SHA-512 integrity of the retained tarball and stops if any published version has different bytes.
+
+If local publication fails after download, retry using the printed directory with `cargo publish-npm --artifacts DIRECTORY`. Do not rebuild a partially published version to recover missing packages. npm does not allow replacing a published version; changed binaries require a new release version.
 
 If release attachment fails, rerun only the failed retention job. It skips identical assets, rejects different bytes before uploading any files, and uploads the manifest last. Alternatively, download that run's `npm-release-set` artifact after all smoke jobs passed and attach it manually:
 

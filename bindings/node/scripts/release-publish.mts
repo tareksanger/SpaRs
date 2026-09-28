@@ -1,8 +1,9 @@
 /** Retry publication only when already-published bytes match the tested tarballs. */
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { setTimeout } from 'node:timers/promises';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { targets } from './release.mts';
 
@@ -12,17 +13,60 @@ export interface Registry {
   publish(pkg: ReleasePackage): Promise<void>;
 }
 
-export async function publishPackages(packages: readonly ReleasePackage[], registry: Registry): Promise<void> {
+export class PendingPublicationError extends Error {}
+export interface PublishOptions {
+  wait?: (milliseconds: number) => Promise<void>;
+  report?: (message: string) => void;
+}
+
+export async function publishPackages(packages: readonly ReleasePackage[], registry: Registry, options: PublishOptions = {}): Promise<void> {
+  const wait = options.wait ?? (async milliseconds => { await setTimeout(milliseconds); });
+  const report = options.report ?? (() => {});
   // Preflight the complete set before the first mutation.
   const existing = await Promise.all(packages.map(pkg => registry.integrity(pkg)));
   for (const [i,pkg] of packages.entries()) {
     if (existing[i] !== undefined && existing[i] !== pkg.integrity) throw new Error(`Registry integrity mismatch: ${pkg.name}@${pkg.version}`);
   }
   for (const [i,pkg] of packages.entries()) {
-    if (existing[i] !== undefined) continue;
-    await registry.publish(pkg);
-    if (await registry.integrity(pkg) !== pkg.integrity) throw new Error(`Published integrity not yet confirmed: ${pkg.name}; rerun this job with the same tarballs`);
+    if (existing[i] !== undefined) { report(`Verified existing ${pkg.name}@${pkg.version}; skipping upload`); continue; }
+    report(`Publishing ${i + 1}/${packages.length}: ${pkg.name}@${pkg.version}`);
+    try { await registry.publish(pkg); }
+    catch (error) {
+      if (!(error instanceof PendingPublicationError)) throw error;
+      report(`npm already has a staged upload for ${pkg.name}; waiting for registry confirmation`);
+    }
+    // npm can accept an upload several minutes before its version endpoint is visible.
+    // Never upload again while waiting, and never advance on a checksum mismatch.
+    for (let attempt = 0; ; attempt++) {
+      const integrity = await registry.integrity(pkg);
+      if (integrity === pkg.integrity) { report(`Confirmed ${pkg.name}@${pkg.version}`); break; }
+      if (integrity !== undefined) throw new Error(`Registry integrity mismatch: ${pkg.name}@${pkg.version}`);
+      if (attempt === 60) throw new Error(`Published integrity not yet confirmed: ${pkg.name}@${pkg.version} after 60 waits of 5 seconds; check npm processing or staged approval before retrying with the same tarballs`);
+      report(`Waiting for npm to make ${pkg.name}@${pkg.version} available (${attempt + 1}/60)`);
+      await wait(5000);
+    }
   }
+  report(`Confirmed all ${packages.length} release packages`);
+}
+
+export async function publishTarball(pkg: ReleasePackage): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('npm', ['publish', pkg.path, '--access', 'public', '--ignore-scripts'], {stdio:['inherit','inherit','pipe']});
+    let tail = '';
+    let stagedConflict = false;
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      process.stderr.write(chunk);
+      tail = (tail + chunk).slice(-8192);
+      stagedConflict ||= /Cannot publish over previously staged version/.test(tail);
+    });
+    child.on('error', reject);
+    child.on('close', (code, signal) => {
+      if (code === 0) resolve();
+      else if (stagedConflict) reject(new PendingPublicationError(`npm has a staged version of ${pkg.name}@${pkg.version}`));
+      else reject(new Error(`npm publish failed for ${pkg.name}@${pkg.version} (${signal ?? code})`));
+    });
+  });
 }
 
 export function releasePackages(directory: string): ReleasePackage[] {
@@ -59,8 +103,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (typeof value !== 'object' || value === null || !('dist' in value) || typeof value.dist !== 'object' || value.dist === null || !('integrity' in value.dist) || typeof value.dist.integrity !== 'string') throw new Error('Registry response lacks integrity');
       return value.dist.integrity;
     },
-    async publish(pkg) {
-      execFileSync('npm',['publish',join(pkg.path),'--access','public','--ignore-scripts'],{stdio:'inherit'});
-    },
-  });
+    publish: publishTarball,
+  }, {report: console.log});
 }
