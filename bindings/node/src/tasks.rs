@@ -108,23 +108,17 @@ pub struct ProcessDocumentTask {
 
 #[napi]
 impl Task for ProcessDocumentTask {
-    type Output = errors::Result<spars::Doc>;
+    type Output = errors::Result<crate::document::NativeDocument>;
     type JsValue = crate::document::NativeDocument;
 
     fn compute(&mut self) -> Result<Self::Output> {
-        Ok(process(
-            &self.model,
-            &self.text,
-            self.stage,
-            self.max_length,
-        ))
+        Ok(
+            process(&self.model, &self.text, self.stage, self.max_length)
+                .and_then(crate::document::NativeDocument::from_doc),
+        )
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
-        output
-            .map(|doc| crate::document::NativeDocument {
-                inner: Arc::new(doc),
-            })
-            .map_err(|error| error.into_napi(env))
+        output.map_err(|error| error.into_napi(env))
     }
 }

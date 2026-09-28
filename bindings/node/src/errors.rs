@@ -17,6 +17,8 @@ enum Code {
     TextTooLong,
     Bounds,
     Inference,
+    InvalidPattern,
+    Busy,
 }
 
 impl AsRef<str> for Code {
@@ -29,6 +31,8 @@ impl AsRef<str> for Code {
             Self::TextTooLong => "SPARS_TEXT_TOO_LONG",
             Self::Bounds => "SPARS_BOUNDS",
             Self::Inference => "SPARS_INFERENCE",
+            Self::InvalidPattern => "SPARS_INVALID_PATTERN",
+            Self::Busy => "SPARS_BUSY",
         }
     }
 }
@@ -49,12 +53,20 @@ impl From<spars::Error> for BindingError {
             spars::Error::Json(_) | spars::Error::Model(_) => Code::InvalidModel,
             spars::Error::Unsupported(_) => Code::Unsupported,
             spars::Error::Bounds => Code::Bounds,
+            spars::Error::Pattern(_) => Code::InvalidPattern,
             _ => Code::Inference,
         };
         Self {
             code,
             message: error.to_string(),
         }
+    }
+}
+
+pub fn busy() -> BindingError {
+    BindingError {
+        code: Code::Busy,
+        message: "Matcher rules cannot change while matching is pending".into(),
     }
 }
 
