@@ -78,8 +78,8 @@ test('checksum corruption and incomplete or duplicate manifests cannot be recove
   const f=fixture();try {
     upload(f.directory,'v0.2.0',f.invoke);
     const name=readdirSync(f.directory).find(name=>name.endsWith('.tgz'))!;
-    // A valid but different tar archive keeps package parsing valid while its hash changes.
-    f.stored.set(name,Buffer.concat([f.stored.get(name)!,Buffer.alloc(512)]));
+    // Corrupt bytes must be rejected by the checksum before any platform-specific tar parser runs.
+    f.stored.set(name,Buffer.from('not a tar archive'));
     assert.throws(()=>download(join(f.root,'out'),'v0.2.0',f.invoke),/checksum/);
     const manifest=verify(f.directory,'v0.2.0');
     assert.throws(()=>validateManifest({...manifest,files:[...manifest.files,manifest.files[0]]},'v0.2.0'),/Duplicate/);
@@ -100,7 +100,7 @@ test('recovery command publishes only verified files and reports the directory b
     assert.deepEqual(events,[`Verified npm release files: ${output}`,'publish']);
     runAssets(['download','v0.2.0',join(f.root,'only')],f.invoke,()=>assert.fail('download published'),()=>{});
     const name=[...f.stored.keys()].find(name=>name.endsWith('.tgz'))!;
-    f.stored.set(name,Buffer.concat([f.stored.get(name)!,Buffer.alloc(512)]));
+    f.stored.set(name,Buffer.from('not a tar archive'));
     assert.throws(()=>runAssets(['recover','v0.2.0',join(f.root,'bad')],f.invoke,()=>assert.fail('corrupt recovery published'),()=>{}),/checksum/);
   } finally {rmSync(f.root,{recursive:true,force:true});}
 });

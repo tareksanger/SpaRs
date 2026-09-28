@@ -36,6 +36,12 @@ export function validateManifest(value: unknown, tag: string): Manifest {
 }
 export function verify(directory: string, tag: string): Manifest {
   const manifest = validateManifest(JSON.parse(readFileSync(join(directory,manifestName),'utf8')),tag);
+  // Check the complete byte inventory before invoking any archive parser.
+  const names = readdirSync(directory).filter(name=>name.endsWith('.tgz'));
+  if (names.length !== manifest.files.length || manifest.files.some(file=>!names.includes(file.name))) throw new Error('Incomplete release manifest');
+  for (const file of manifest.files) {
+    if (integrity(join(directory,file.name)) !== file.integrity) throw new Error(`Release checksum mismatch: ${file.name}`);
+  }
   const packages = releasePackages(directory);
   if (packages.length !== manifest.files.length) throw new Error('Incomplete release manifest');
   for (const pkg of packages) {
