@@ -58,7 +58,7 @@ export async function smoke(tarballs: string, model: string): Promise<void> {
     assert.deepEqual(nativeManifest.cpu,[target.cpu]);
     assert.deepEqual('libc' in nativeManifest ? nativeManifest.libc : undefined,target.libc ? [target.libc] : undefined);
     const source = `import assert from 'node:assert/strict';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync, realpathSync} from 'node:fs';
 import {join} from 'node:path';
 import {loadModel, NativeDocument, PhraseMatcher, TokenMatcher, DependencyMatcher, ModelStore, __napiBindingTarget} from ${JSON.stringify(name)};
 assert.equal(__napiBindingTarget,'native');
@@ -98,7 +98,7 @@ const child = join(storeRoot, 'installed');
 mkdirSync(child, {recursive:true});
 const store = new ModelStore(storeRoot);
 await store.register('example', child);
-assert.equal(await store.resolve('example'), child);
+assert.equal(realpathSync.native(await store.resolve('example')), realpathSync.native(child));
 await assert.rejects(loadModel('missing_model'));
 `;
     writeFileSync(join(project,'check.mjs'),source);
