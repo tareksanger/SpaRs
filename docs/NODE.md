@@ -170,6 +170,25 @@ Oversized inputs reject with `SPARS_INPUT_LIMIT` before copying into Rust or sub
 
 `vector(word)` is a synchronous, case-sensitive static-vector lookup. It returns a copied `Float32Array`, or `null` when the lexical key has no row. Modifying the array is safe. Document/span vectors, similarities, traversal helpers, and matchers are not yet exposed through this binding; their Rust APIs remain available separately.
 
+## Retain and restore native documents
+
+`model.processDocument(text, stage?)` runs the same pipeline as `process` and retains an immutable native document. It shares the inference queue, optional text input limit, and per-model `maxLength`. Existing `process` and `processBatch` results remain plain JavaScript objects. Call `toObject()` when you need that output shape; each call returns an independent copy.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, NativeDocument } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('Alice visits London.');
+const restored = NativeDocument.fromSnapshot(doc.toSnapshot());
+assert.deepEqual(restored.toObject(), doc.toObject());
+const output = restored.toObject();
+output.tokens.length = 0;
+assert.ok(restored.toObject().tokens.length > 0);
+```
+
+`toSnapshot()` preserves native annotations and contextual vectors when available. `NativeDocument.fromSnapshot(json)` validates the complete snapshot, including text boundaries, annotation indices, and tensor shapes. This versioned native format is separate from spaCy JSON and DocBin. Native documents remain usable after their originating model is released. Snapshot import/export and plain-object conversion run synchronously on the JavaScript thread and allocate memory proportional to the document, including any contextual tensor; inference admission limits do not bound these operations.
+
 ## Errors and verification
 
 An incompatible native addon can throw `SPARS_NATIVE_INCOMPATIBLE` during package import; remove stale native-library overrides or install matching package versions. Model and processing failures reject their promises with an `Error` containing a `code` and message. Codes are `SPARS_IO`, `SPARS_INVALID_MODEL`, `SPARS_UNSUPPORTED`, `SPARS_INVALID_TEXT`, `SPARS_BOUNDS`, `SPARS_INFERENCE`, `SPARS_BUSY`, `SPARS_INPUT_LIMIT`, and `SPARS_TEXT_TOO_LONG`. For `pipe`, errors reject iteration; `process` and `processBatch` throw immediately for invalid JavaScript argument types or unknown stages; when the queue is full, `SPARS_BUSY` takes precedence over checking individual batch elements. `vector` also throws immediately for malformed text. Use `loadModel`; constructing `Model` directly is unsupported and its TypeScript constructor is private.

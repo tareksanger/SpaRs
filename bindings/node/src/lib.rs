@@ -1,5 +1,6 @@
 //! Native Node-API boundary for SpaRs.
 mod convert;
+mod document;
 mod errors;
 mod models;
 pub use models::{download_model, DownloadOptions, LoadOptions};
@@ -10,7 +11,7 @@ use napi::bindgen_prelude::{AsyncTask, Either, Float32Array, Null, Utf16String};
 use napi::{Env, Result};
 use napi_derive::napi;
 use std::sync::Arc;
-use tasks::{BatchTask, LoadTask, ProcessTask};
+use tasks::{BatchTask, LoadTask, ProcessDocumentTask, ProcessTask};
 
 /// An ordered prefix of the pipeline. Later annotations remain null.
 #[napi(string_enum)]
@@ -74,6 +75,21 @@ impl Model {
     #[napi(strict)]
     pub fn process(&self, text: Utf16String, stage: Option<Stage>) -> AsyncTask<ProcessTask> {
         AsyncTask::new(ProcessTask {
+            model: Arc::clone(&self.inner),
+            max_length: self.max_length,
+            text,
+            stage: stage.unwrap_or(Stage::Ner).into(),
+        })
+    }
+
+    /// Retain an immutable native document for matching, views, and snapshots.
+    #[napi(strict)]
+    pub fn process_document(
+        &self,
+        text: Utf16String,
+        stage: Option<Stage>,
+    ) -> AsyncTask<ProcessDocumentTask> {
+        AsyncTask::new(ProcessDocumentTask {
             model: Arc::clone(&self.inner),
             max_length: self.max_length,
             text,
