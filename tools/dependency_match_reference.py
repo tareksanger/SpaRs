@@ -31,11 +31,13 @@ class StringOperator(TypedDict, total=False):
 
 class OfficialNode(TypedDict):
     RIGHT_ID: str
-    RIGHT_ATTRS: dict[str, str | StringOperator]
+    RIGHT_ATTRS: dict[str, str | bool | StringOperator]
     LEFT_ID: NotRequired[str]
     REL_OP: NotRequired[str]
 
-Attribute = Literal['text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology']
+Attribute = Literal['text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology',
+                    'is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num']
+FLAG_ATTRIBUTES: tuple[Attribute, ...] = ('is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num')
 
 @dataclass(frozen=True)
 class Equals:
@@ -48,9 +50,14 @@ class Membership:
     values: list[str]
 
 @dataclass(frozen=True)
+class Flag:
+    value: bool
+    kind: Literal['flag'] = 'flag'
+
+@dataclass(frozen=True)
 class Constraint:
     attribute: Attribute
-    predicate: Equals | Membership
+    predicate: Equals | Membership | Flag
 
 @dataclass(frozen=True)
 class Link:
@@ -101,19 +108,22 @@ class Fixture:
     cases: list[Case]
 
 OPERATORS = ('<', '>', '<<', '>>', '.', '.*', ';', ';*', '$+', '$-', '$++', '$--', '>+', '>-', '>++', '>--', '<+', '<-', '<++', '<--')
-ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH'}
+ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH',
+              'is_alpha': 'IS_ALPHA', 'is_digit': 'IS_DIGIT', 'is_space': 'IS_SPACE', 'is_punct': 'IS_PUNCT', 'like_num': 'LIKE_NUM'}
 
 
 def official(pattern: Pattern) -> list[OfficialNode]:
     result: list[OfficialNode] = []
     for node in pattern.nodes:
-        attrs: dict[str, str | StringOperator] = {}
+        attrs: dict[str, str | bool | StringOperator] = {}
         for constraint in node.constraints:
             if ATTRIBUTES[constraint.attribute] in attrs:
                 raise ValueError('Official converter requires distinct attributes per node')
             predicate = constraint.predicate
-            if isinstance(predicate, Equals):
-                value: str | StringOperator = predicate.value
+            if isinstance(predicate, Flag):
+                value: str | bool | StringOperator = predicate.value
+            elif isinstance(predicate, Equals):
+                value = predicate.value
             elif predicate.kind == 'in':
                 value = {'IN': predicate.values}
             elif predicate.kind == 'not_in':
@@ -198,9 +208,40 @@ def lower_rules() -> list[Rule]:
     return result
 
 
+# Lexical flag inputs: Unicode letters, digits and punctuation categories, whitespace,
+# signed, grouped and fractional numbers, ordinals, and English number words, which
+# spaCy's English LIKE_NUM adds to the language-independent rule.
+FLAG_WORDS = ['Hello', 'hello123', '123', '\u0661\u0662\u0663', '\u00b2', '\u216b', '\u00bd', '...', '\u2014', '$',
+              '\u00bf', '\u00ab', '@', '+', '_', '-5', '+1,000.5', '1/2', '1/2/3', '3rd', '21st', '11th', '3th',
+              'ten', 'TEN', 'Million', 'first', 'Tenth', 'twenty-one', 'Σ', 'e\u0301', '\u00a0', '\n', '\U0001f642',
+              "n't", '1.5e3', '\u0663rd', '\u00b15', '~5', '--5', '3RD', 'st', '.', 'Twelfth', '\u2026', '--',
+              '\u0085', '\u001c']
+FLAG_PIPELINE_TEXT = 'I paid $1,000.50 for twenty-one tickets on the 3rd \u2014 ten were free!'
+
+
+def flag_constraints() -> list[tuple[str, Constraint]]:
+    return [(f'{attribute}_{str(value).lower()}', Constraint(attribute, Flag(value)))
+            for attribute in FLAG_ATTRIBUTES for value in (True, False)]
+
+
+def flag_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Node('a', [constraint])])]) for name, constraint in flag_constraints()]
+    result.extend([
+        Rule('alpha_hello', [Pattern([Node('a', [Constraint('is_alpha', Flag(True)), Constraint('lower', Equals('hello'))])])]),
+        Rule('number_not_alpha', [Pattern([Node('a', [Constraint('is_alpha', Flag(False)), Constraint('like_num', Flag(True))])])]),
+        Rule('number_word', [Pattern([Node('a', [Constraint('is_alpha', Flag(True)), Constraint('like_num', Flag(True))])])]),
+        Rule('word_with_number_child', [Pattern([Node('head', [Constraint('is_alpha', Flag(True))]),
+                                                 Node('number', [Constraint('like_num', Flag(True))], Link('head', '>'))])]),
+    ])
+    return result
+
+
 def attribute_name(value: str) -> Attribute:
     if value in ('text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology'):
         return value
+    for flag in FLAG_ATTRIBUTES:
+        if value == flag:
+            return flag
     raise ValueError('Unsupported attribute')
 
 
@@ -214,7 +255,7 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
     return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, expected)
 
 
-def generate(regressions: bool = False, lower: bool = False) -> Fixture:
+def generate(regressions: bool = False, lower: bool = False, flags: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -224,6 +265,8 @@ def generate(regressions: bool = False, lower: bool = False) -> Fixture:
         return generate_regressions(nlp)
     if lower:
         return generate_lower(nlp)
+    if flags:
+        return generate_flags(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -277,6 +320,19 @@ def generate_lower(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def generate_flags(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = flag_rules()
+    count = len(FLAG_WORDS)
+    words = make_doc(nlp.vocab, words=FLAG_WORDS, spaces=[index + 1 < count for index in range(count)],
+                     heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases = [case(nlp, 'flag-words', ' '.join(FLAG_WORDS), words, patterns),
+             case(nlp, 'flag-pipeline', FLAG_PIPELINE_TEXT, nlp(FLAG_PIPELINE_TEXT), patterns),
+             case(nlp, 'flag-empty', '', make_doc(nlp.vocab, words=[]), patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'dependencymatcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def write_fixture(output: Path, fixture: Fixture) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x', encoding='utf-8') as stream:
@@ -289,6 +345,7 @@ def main() -> None:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--regressions', action='store_true')
     modes.add_argument('--lower', action='store_true')
+    modes.add_argument('--flags', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -301,7 +358,10 @@ def main() -> None:
     lower_mode: object = args.lower
     if not isinstance(lower_mode, bool):
         raise TypeError('Lower flag must be boolean')
-    write_fixture(output, generate(regressions, lower_mode))
+    flag_mode: object = args.flags
+    if not isinstance(flag_mode, bool):
+        raise TypeError('Flags flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode, flag_mode))
 
 
 if __name__ == '__main__':

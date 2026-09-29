@@ -124,10 +124,15 @@ pub struct TokenMatcher {
 }
 #[napi]
 impl TokenMatcher {
+    /// Pass a model to enable lexical flag conditions with its language rules.
     #[napi(constructor)]
-    pub fn new() -> Self {
+    pub fn new(model: Option<&crate::Model>) -> Self {
+        let matcher = match model {
+            Some(model) => spars::TokenMatcher::with_lexicon(model.inner.lexicon()),
+            None => spars::TokenMatcher::new(),
+        };
         Self {
-            inner: Arc::new(spars::TokenMatcher::new()),
+            inner: Arc::new(matcher),
         }
     }
     #[napi(getter)]
@@ -178,7 +183,7 @@ impl TokenMatcher {
 }
 impl Default for TokenMatcher {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 pub struct TokenMatchTask {

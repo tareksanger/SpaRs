@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 mod capabilities;
 mod processing;
 mod resources;
@@ -34,7 +34,8 @@ pub(crate) struct Manifest {
     pub vector_keys: HashMap<u64, usize>,
     pub norms: HashMap<u64, String>,
     pub symbols: HashMap<String, u64>,
-    pub lexical: Lexical,
+    #[serde(deserialize_with = "shared")]
+    pub lexical: Arc<Lexical>,
     pub tok2vec: Encoder,
     pub tagger: Tagger,
     pub parser: Transition,
@@ -181,6 +182,15 @@ impl<'de> Deserialize<'de> for Action {
             label: label.into(),
         })
     }
+}
+
+// Lexical resources are shared with matchers through `Lexicon` without copying.
+fn shared<'de, D, T>(d: D) -> Result<Arc<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(d).map(Arc::new)
 }
 
 #[cfg(test)]

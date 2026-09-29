@@ -1,4 +1,4 @@
-use crate::{Doc, Error, Result, TokenIndex, TokenView};
+use crate::{Doc, Error, Lexicon, Result, TokenIndex, TokenView};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
@@ -17,9 +17,35 @@ pub enum TokenAttribute {
     Tag,
     Dep,
     Morphology,
+    /// Lexical flags from the matcher's [`Lexicon`], compared with [`Predicate::Flag`].
+    /// Like spaCy's `IS_ALPHA`, `IS_DIGIT`, `IS_SPACE`, `IS_PUNCT` and `LIKE_NUM`.
+    IsAlpha,
+    IsDigit,
+    IsSpace,
+    IsPunct,
+    LikeNum,
 }
 
-/// A comparison applied to one token attribute. Set predicates apply to morphology.
+impl TokenAttribute {
+    /// The bit for a lexical flag attribute in per-token flag masks.
+    fn flag_bit(self) -> Option<u8> {
+        match self {
+            TokenAttribute::IsAlpha => Some(1),
+            TokenAttribute::IsDigit => Some(1 << 1),
+            TokenAttribute::IsSpace => Some(1 << 2),
+            TokenAttribute::IsPunct => Some(1 << 3),
+            TokenAttribute::LikeNum => Some(1 << 4),
+            _ => None,
+        }
+    }
+    /// Whether this attribute needs a matcher created with a [`Lexicon`].
+    pub(crate) fn needs_lexicon(self) -> bool {
+        self.flag_bit().is_some()
+    }
+}
+
+/// A comparison applied to one token attribute. Set predicates apply to morphology;
+/// `Flag` applies only to lexical flag attributes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Predicate {
@@ -28,6 +54,7 @@ pub enum Predicate {
     NotIn { values: Vec<String> },
     MorphSuperset { values: Vec<String> },
     MorphIntersects { values: Vec<String> },
+    Flag { value: bool },
 }
 
 /// All constraints on a pattern node must match the same token.
@@ -52,22 +79,124 @@ pub(crate) struct CompiledConstraint {
     predicate: CompiledPredicate,
 }
 
+/// The lexical flag conditions of one pattern item or node, compiled into a single
+/// mask comparison so string predicates keep their own evaluation path.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct FlagTest {
+    mask: u8,
+    expected: u8,
+    // Requiring a flag to be both true and false can never match.
+    contradictory: bool,
+}
+
+impl FlagTest {
+    fn require(&mut self, bit: u8, value: bool) {
+        if self.mask & bit != 0 && (self.expected & bit != 0) != value {
+            self.contradictory = true;
+        }
+        self.mask |= bit;
+        if value {
+            self.expected |= bit;
+        }
+    }
+    pub(crate) fn mask(self) -> u8 {
+        self.mask
+    }
+    pub(crate) fn matches(self, values: &TokenValues<'_>, index: usize) -> Result<bool> {
+        if self.mask == 0 {
+            return Ok(true);
+        }
+        let flags = values.flags.get(index).ok_or_else(missing_lexicon)?;
+        Ok(!self.contradictory && flags & self.mask == self.expected)
+    }
+}
+
+/// The compiled conditions shared by one pattern item or dependency node.
+pub(crate) struct CompiledConditions {
+    pub(crate) constraints: Vec<CompiledConstraint>,
+    pub(crate) flags: FlagTest,
+}
+
+pub(crate) fn compile_conditions(constraints: &[TokenConstraint]) -> Result<CompiledConditions> {
+    let mut compiled = Vec::new();
+    let mut flags = FlagTest::default();
+    for constraint in constraints {
+        match (constraint.attribute.flag_bit(), &constraint.predicate) {
+            (Some(bit), Predicate::Flag { value }) => flags.require(bit, *value),
+            _ => compiled.push(constraint.compile()?),
+        }
+    }
+    Ok(CompiledConditions {
+        constraints: compiled,
+        flags,
+    })
+}
+
+#[cold]
+fn missing_lexicon() -> Error {
+    Error::Pattern("lexical flag conditions require a matcher lexicon".into())
+}
+
 /// Token values derived once per matching call and shared by every constraint.
-/// Lowercase text is computed only when a registered constraint needs it.
+/// Lowercase text and lexical flags are computed only for attributes in use.
 pub(crate) struct TokenValues<'a> {
     lower: Vec<Cow<'a, str>>,
+    flags: Vec<u8>,
 }
 
 impl<'a> TokenValues<'a> {
-    pub(crate) fn new(doc: &'a Doc, needs_lower: bool) -> Result<Self> {
-        let lower = if needs_lower {
-            (0..doc.tokens().len())
-                .map(|index| doc.token_text(TokenIndex(index)).map(lower))
-                .collect::<Result<_>>()?
+    pub(crate) fn new(
+        doc: &'a Doc,
+        attributes: &HashSet<TokenAttribute>,
+        mask: u8,
+        lexicon: Option<&Lexicon>,
+    ) -> Result<Self> {
+        let texts = || (0..doc.tokens().len()).map(|index| doc.token_text(TokenIndex(index)));
+        let lower = if attributes.contains(&TokenAttribute::Lower) {
+            texts().map(|text| text.map(lower)).collect::<Result<_>>()?
         } else {
             Vec::new()
         };
-        Ok(Self { lower })
+        let flags = if mask == 0 {
+            Vec::new()
+        } else {
+            let lexicon = lexicon.ok_or_else(missing_lexicon)?;
+            let r = lexicon.resources();
+            texts()
+                .map(|text| {
+                    let text = text?;
+                    Ok(FLAG_ATTRIBUTES.iter().fold(0, |flags, &attribute| {
+                        let bit = attribute.flag_bit().unwrap_or(0);
+                        if mask & bit != 0 && lexical_flag(r, attribute, text) {
+                            flags | bit
+                        } else {
+                            flags
+                        }
+                    }))
+                })
+                .collect::<Result<_>>()?
+        };
+        Ok(Self { lower, flags })
+    }
+}
+
+const FLAG_ATTRIBUTES: [TokenAttribute; 5] = [
+    TokenAttribute::IsAlpha,
+    TokenAttribute::IsDigit,
+    TokenAttribute::IsSpace,
+    TokenAttribute::IsPunct,
+    TokenAttribute::LikeNum,
+];
+
+// The same functions compute these fields in `Model::lexeme`.
+fn lexical_flag(r: &crate::config::Lexical, attribute: TokenAttribute, text: &str) -> bool {
+    match attribute {
+        TokenAttribute::IsAlpha => r.is_alpha(text),
+        TokenAttribute::IsDigit => r.is_digit(text),
+        TokenAttribute::IsSpace => r.is_space(text),
+        TokenAttribute::IsPunct => r.is_punct(text),
+        TokenAttribute::LikeNum => r.like_num(text),
+        _ => false,
     }
 }
 
@@ -86,7 +215,17 @@ impl TokenConstraint {
                 })
                 .collect()
         };
+        let mismatched_flag = || {
+            Error::Pattern(
+                "lexical flag attributes require flag predicates, and flag predicates require lexical flag attributes".into(),
+            )
+        };
+        // Valid flag conditions compile into a `FlagTest` in `compile_conditions`.
+        if self.attribute.needs_lexicon() {
+            return Err(mismatched_flag());
+        }
         let predicate = match &self.predicate {
+            Predicate::Flag { .. } => return Err(mismatched_flag()),
             Predicate::Equals { value } => CompiledPredicate::Equals(value.clone()),
             Predicate::In { values } => CompiledPredicate::In(set(values)?),
             Predicate::NotIn { values } => CompiledPredicate::NotIn(set(values)?),
@@ -119,13 +258,23 @@ impl CompiledConstraint {
         if matches!(
             self.attribute,
             TokenAttribute::Text | TokenAttribute::Lower | TokenAttribute::Norm
-        ) {
+        ) || self.attribute.needs_lexicon()
+        {
             return Ok(());
         }
-        for i in 0..doc.tokens().len() {
-            let value = self.value(doc.token(TokenIndex(i))?, None)?;
+        // Check presence directly; the per-check value lookup is not needed here.
+        let (field, name): (fn(&crate::Token) -> Option<&str>, _) = match self.attribute {
+            TokenAttribute::Lemma => (|t| t.lemma.as_deref(), "lemma"),
+            TokenAttribute::Pos => (|t| t.pos.as_deref(), "POS"),
+            TokenAttribute::Tag => (|t| t.tag.as_deref(), "tag"),
+            TokenAttribute::Dep => (|t| t.dep.as_deref(), "dependency label"),
+            TokenAttribute::Morphology => (|t| t.morphology.as_deref(), "morphology"),
+            _ => return Ok(()),
+        };
+        for token in doc.tokens() {
+            let value = field(token).ok_or(Error::MissingAnnotation(name))?;
             if self.attribute == TokenAttribute::Morphology {
-                validate_canonical_morph(&value)?;
+                validate_canonical_morph(value)?;
             }
         }
         Ok(())
@@ -151,6 +300,11 @@ impl CompiledConstraint {
             TokenAttribute::Tag => (t.tag.as_deref(), "tag"),
             TokenAttribute::Dep => (t.dep.as_deref(), "dependency label"),
             TokenAttribute::Morphology => (t.morphology.as_deref(), "morphology"),
+            TokenAttribute::IsAlpha
+            | TokenAttribute::IsDigit
+            | TokenAttribute::IsSpace
+            | TokenAttribute::IsPunct
+            | TokenAttribute::LikeNum => return Err(no_string_value()),
         };
         value
             .map(Cow::Borrowed)
@@ -188,6 +342,11 @@ impl CompiledConstraint {
             CompiledPredicate::Intersects(expected) => expected.iter().any(feature),
         })
     }
+}
+
+#[cold]
+fn no_string_value() -> Error {
+    Error::Pattern("lexical flags have no string value".into())
 }
 
 // Most tokens are lowercase ASCII already; avoid allocating for them.

@@ -1,7 +1,6 @@
 use super::{CompiledPattern, Quantifier, TokenMatch};
 use crate::dependency_matcher::predicates::TokenValues;
-use crate::TokenAttribute;
-use crate::{Doc, Result, TokenIndex};
+use crate::{Doc, Lexicon, Result, TokenIndex};
 use std::collections::HashSet;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -11,13 +10,35 @@ struct State {
     start: usize,
 }
 
-pub(super) fn find(patterns: &[CompiledPattern], doc: &Doc) -> Result<Vec<TokenMatch>> {
+pub(super) fn find(
+    patterns: &[CompiledPattern],
+    doc: &Doc,
+    lexicon: Option<&Lexicon>,
+) -> Result<Vec<TokenMatch>> {
+    if patterns.iter().all(|pattern| pattern.nodes.is_empty()) {
+        return Ok(Vec::new());
+    }
+    let mut checked = HashSet::new();
+    for constraint in patterns
+        .iter()
+        .flat_map(|p| &p.items)
+        .flat_map(|item| &item.constraints)
+    {
+        if checked.insert(constraint.attribute()) {
+            constraint.validate_document(doc)?;
+        }
+    }
+    let mask = patterns
+        .iter()
+        .flat_map(|pattern| &pattern.items)
+        .fold(0, |mask, item| mask | item.flags.mask());
+    let values = TokenValues::new(doc, &checked, mask, lexicon)?;
     // For short patterns the extra lookup costs more than repeated suffix work.
     // Separate compiled paths keep ordinary matching free of per-state overhead.
     if patterns.iter().any(needs_suffix_cache) {
-        run::<true>(patterns, doc)
+        run::<true>(patterns, doc, &values)
     } else {
-        run::<false>(patterns, doc)
+        run::<false>(patterns, doc, &values)
     }
 }
 
@@ -31,36 +52,26 @@ fn needs_suffix_cache(pattern: &CompiledPattern) -> bool {
         > 8
 }
 
+#[inline(never)]
 fn run<const CACHE_SUFFIXES: bool>(
     patterns: &[CompiledPattern],
     doc: &Doc,
+    values: &TokenValues<'_>,
 ) -> Result<Vec<TokenMatch>> {
-    if patterns.iter().all(|pattern| pattern.nodes.is_empty()) {
-        return Ok(Vec::new());
-    }
     let branching: Vec<bool> = if CACHE_SUFFIXES {
         patterns.iter().map(needs_suffix_cache).collect()
     } else {
         Vec::new()
     };
     let mut visited = HashSet::new();
-    let mut checked = HashSet::new();
-    for constraint in patterns.iter().flat_map(|p| &p.constraints).flatten() {
-        if checked.insert(constraint.attribute()) {
-            constraint.validate_document(doc)?;
-        }
-    }
-    let values = TokenValues::new(doc, checked.contains(&TokenAttribute::Lower))?;
     let mut states = Vec::new();
     let mut retained = Vec::new();
     let mut branches = Vec::new();
     let mut unique_states = HashSet::new();
     let mut seen = HashSet::new();
     let mut output = Vec::new();
-    let mut cache: Vec<Vec<Option<bool>>> = patterns
-        .iter()
-        .map(|p| vec![None; p.constraints.len()])
-        .collect();
+    let mut cache: Vec<Vec<Option<bool>>> =
+        patterns.iter().map(|p| vec![None; p.items.len()]).collect();
     let mut emit = |pattern: usize, start: usize, end: usize| {
         if start < end && seen.insert((patterns[pattern].name.as_str(), start, end)) {
             output.push(TokenMatch {
@@ -97,11 +108,14 @@ fn run<const CACHE_SUFFIXES: bool>(
                 let matches = if let Some(value) = cache[state.pattern][node.item] {
                     value
                 } else {
-                    let mut value = true;
-                    for constraint in &pattern.constraints[node.item] {
-                        if !constraint.matches(token, &values)? {
-                            value = false;
-                            break;
+                    let item = &pattern.items[node.item];
+                    let mut value = item.flags.matches(values, index)?;
+                    if value {
+                        for constraint in &item.constraints {
+                            if !constraint.matches(token, values)? {
+                                value = false;
+                                break;
+                            }
                         }
                     }
                     cache[state.pattern][node.item] = Some(value);

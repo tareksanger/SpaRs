@@ -23,7 +23,7 @@ fn check(predicate: Predicate) -> bool {
     .compile()
     .unwrap();
     compiled.validate_document(&doc).unwrap();
-    let values = TokenValues::new(&doc, compiled.attribute() == TokenAttribute::Lower).unwrap();
+    let values = TokenValues::new(&doc, &HashSet::from([compiled.attribute()]), 0, None).unwrap();
     compiled
         .matches(doc.token(TokenIndex(0)).unwrap(), &values)
         .unwrap()
@@ -116,7 +116,7 @@ fn upstream_morphology_duplicate_and_empty_key_rules() {
         }
         .compile()
         .unwrap();
-        let values = TokenValues::new(&doc, false).unwrap();
+        let values = TokenValues::new(&doc, &HashSet::new(), 0, None).unwrap();
         assert_eq!(
             condition
                 .matches(doc.token(TokenIndex(0)).unwrap(), &values)
@@ -148,10 +148,11 @@ fn lower_needs_no_annotations_and_compares_pattern_values_as_written() {
         .compile()
         .unwrap();
         compiled.validate_document(&doc).unwrap();
-        let values = TokenValues::new(&doc, compiled.attribute() == TokenAttribute::Lower).unwrap();
+        let values =
+            TokenValues::new(&doc, &HashSet::from([compiled.attribute()]), 0, None).unwrap();
         let token = doc.token(TokenIndex(index)).unwrap();
         let cached = compiled.matches(token, &values).unwrap();
-        let empty = TokenValues::new(&doc, false).unwrap();
+        let empty = TokenValues::new(&doc, &HashSet::new(), 0, None).unwrap();
         assert_eq!(compiled.matches(token, &empty).unwrap(), cached);
         cached
     };
@@ -248,9 +249,12 @@ fn lower_set_values_are_not_lowercased_and_cache_is_filled_only_when_needed() {
         tensor: Vec::new(),
         dependency_index: Default::default(),
     };
-    let values = TokenValues::new(&doc, true).unwrap();
+    let values = TokenValues::new(&doc, &HashSet::from([TokenAttribute::Lower]), 0, None).unwrap();
     assert_eq!(values.lower, ["ος", "the"]);
-    assert!(TokenValues::new(&doc, false).unwrap().lower.is_empty());
+    assert!(TokenValues::new(&doc, &HashSet::new(), 0, None)
+        .unwrap()
+        .lower
+        .is_empty());
     let check = |predicate: Predicate, index: usize| {
         TokenConstraint {
             attribute: TokenAttribute::Lower,
@@ -286,4 +290,105 @@ fn lower_set_values_are_not_lowercased_and_cache_is_filled_only_when_needed() {
         },
         1
     ));
+}
+#[test]
+fn malformed_lexical_flag_conditions_are_rejected() {
+    for raw in [
+        r#"{"attribute":"is_alpha","predicate":{"kind":"flag","value":1}}"#,
+        r#"{"attribute":"is_alpha","predicate":{"kind":"flag","value":"true"}}"#,
+        r#"{"attribute":"is_alpha","predicate":{"kind":"flag","value":null}}"#,
+        r#"{"attribute":"is_alpha","predicate":{"kind":"flag"}}"#,
+        r#"{"attribute":"IS_ALPHA","predicate":{"kind":"flag","value":true}}"#,
+        r#"{"attribute":"is_upper","predicate":{"kind":"flag","value":true}}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<TokenConstraint>(raw).is_err(),
+            "{raw}"
+        );
+    }
+    for attribute in FLAG_ATTRIBUTES {
+        let parsed: TokenConstraint = serde_json::from_value(serde_json::json!({
+            "attribute": attribute, "predicate": {"kind": "flag", "value": false}
+        }))
+        .unwrap();
+        assert_eq!(parsed.attribute, attribute);
+        let compiled = compile_conditions(std::slice::from_ref(&parsed)).unwrap();
+        assert!(compiled.constraints.is_empty());
+        assert_eq!(compiled.flags.mask(), attribute.flag_bit().unwrap());
+        for predicate in [
+            Predicate::Equals {
+                value: "true".into(),
+            },
+            Predicate::In {
+                values: vec!["true".into()],
+            },
+            Predicate::NotIn { values: vec![] },
+        ] {
+            assert!(compile_conditions(&[TokenConstraint {
+                attribute,
+                predicate
+            }])
+            .is_err());
+        }
+    }
+    for attribute in [
+        TokenAttribute::Text,
+        TokenAttribute::Lower,
+        TokenAttribute::Morphology,
+    ] {
+        assert!(compile_conditions(&[TokenConstraint {
+            attribute,
+            predicate: Predicate::Flag { value: true }
+        }])
+        .is_err());
+    }
+}
+#[test]
+fn flag_tests_compare_every_required_bit_and_need_a_lexicon() {
+    let doc = doc();
+    let mask = TokenAttribute::LikeNum.flag_bit().unwrap();
+    assert!(TokenValues::new(&doc, &HashSet::new(), mask, None).is_err());
+    let flag = |attribute: TokenAttribute, value: bool| TokenConstraint {
+        attribute,
+        predicate: Predicate::Flag { value },
+    };
+    let test = |constraints: &[TokenConstraint]| compile_conditions(constraints).unwrap().flags;
+    let alpha = TokenAttribute::IsAlpha.flag_bit().unwrap();
+    // Token 0 is alphabetic only; token 1 is a number only; token 2 has neither flag.
+    let values = TokenValues {
+        lower: Vec::new(),
+        flags: vec![alpha, mask, 0],
+    };
+    let check = |flags: FlagTest| {
+        (0..3)
+            .map(|index| flags.matches(&values, index).unwrap())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(check(test(&[])), [true, true, true]);
+    assert_eq!(
+        check(test(&[flag(TokenAttribute::IsAlpha, true)])),
+        [true, false, false]
+    );
+    assert_eq!(
+        check(test(&[flag(TokenAttribute::IsAlpha, false)])),
+        [false, true, true]
+    );
+    assert_eq!(
+        check(test(&[
+            flag(TokenAttribute::IsAlpha, false),
+            flag(TokenAttribute::LikeNum, true)
+        ])),
+        [false, true, false]
+    );
+    assert_eq!(
+        check(test(&[
+            flag(TokenAttribute::LikeNum, true),
+            flag(TokenAttribute::LikeNum, false)
+        ])),
+        [false, false, false]
+    );
+    let empty = TokenValues::new(&doc, &HashSet::new(), 0, None).unwrap();
+    assert!(test(&[flag(TokenAttribute::IsAlpha, true)])
+        .matches(&empty, 0)
+        .is_err());
 }

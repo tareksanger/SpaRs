@@ -33,6 +33,8 @@ pub use dependency_matcher::*;
 mod hash;
 mod lexical;
 pub use lexical::Lexeme;
+mod lexicon;
+pub use lexicon::Lexicon;
 mod attributes;
 mod chunks;
 mod lemmatizer;

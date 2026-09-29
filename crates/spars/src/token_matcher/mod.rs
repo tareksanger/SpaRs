@@ -1,7 +1,7 @@
 //! Reusable patterns over contiguous tokens, with explicit repetition.
 mod engine;
-use crate::dependency_matcher::predicates::CompiledConstraint;
-use crate::{Doc, Error, Result, TokenConstraint, TokenIndex};
+use crate::dependency_matcher::predicates::{compile_conditions, CompiledConditions, FlagTest};
+use crate::{Doc, Error, Lexicon, Result, TokenConstraint, TokenIndex};
 use serde::{Deserialize, Serialize};
 
 /// An ordered sequence of token conditions.
@@ -54,7 +54,7 @@ struct Node {
 }
 struct CompiledPattern {
     name: String,
-    constraints: Vec<Vec<CompiledConstraint>>,
+    items: Vec<CompiledConditions>,
     nodes: Vec<Node>,
 }
 struct Rule {
@@ -66,10 +66,19 @@ struct Rule {
 pub struct TokenMatcher {
     rules: Vec<Rule>,
     compiled: Vec<CompiledPattern>,
+    lexicon: Option<Lexicon>,
 }
 impl TokenMatcher {
     pub fn new() -> Self {
         Self::default()
+    }
+    /// A matcher that can also evaluate lexical flags, such as `LikeNum`, with a
+    /// model's language rules. Obtain the lexicon with [`crate::Model::lexicon`].
+    pub fn with_lexicon(lexicon: Lexicon) -> Self {
+        Self {
+            lexicon: Some(lexicon),
+            ..Self::default()
+        }
     }
     pub fn len(&self) -> usize {
         self.rules.len()
@@ -89,6 +98,17 @@ impl TokenMatcher {
     /// Validate every pattern before modifying the matcher. Repeated names append patterns.
     pub fn add(&mut self, name: impl Into<String>, patterns: Vec<TokenPattern>) -> Result<()> {
         let name = name.into();
+        if self.lexicon.is_none()
+            && patterns
+                .iter()
+                .flat_map(|pattern| &pattern.tokens)
+                .flat_map(|item| &item.constraints)
+                .any(|constraint| constraint.attribute.needs_lexicon())
+        {
+            return Err(Error::Pattern(
+                "lexical flag conditions require a matcher created with a lexicon".into(),
+            ));
+        }
         let compiled = patterns
             .iter()
             .map(|pattern| compile(&name, pattern))
@@ -114,7 +134,7 @@ impl TokenMatcher {
     }
     /// Return overlapping matches in the reference state-machine emission order.
     pub fn find_matches(&self, doc: &Doc) -> Result<Vec<TokenMatch>> {
-        engine::find(&self.compiled, doc)
+        engine::find(&self.compiled, doc, self.lexicon.as_ref())
     }
 }
 fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
@@ -123,7 +143,7 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
         return Err(Error::Pattern("token pattern must contain an item".into()));
     }
     let mut nodes = Vec::new();
-    let mut constraints = Vec::new();
+    let mut items = Vec::new();
     for (item, spec) in pattern.tokens.iter().enumerate() {
         let (required, optional, star, negated) = match spec.repetition {
             Repetition::Once => (1, 0, false, false),
@@ -150,13 +170,12 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
                 "token pattern exceeds {MAX_NODES} expanded nodes"
             )));
         }
-        let compiled = spec
-            .constraints
-            .iter()
-            .map(TokenConstraint::compile)
-            .collect::<Result<Vec<_>>>()?;
-        constraints.push(if required == 0 && optional == 0 && !star {
-            Vec::new()
+        let compiled = compile_conditions(&spec.constraints)?;
+        items.push(if required == 0 && optional == 0 && !star {
+            CompiledConditions {
+                constraints: Vec::new(),
+                flags: FlagTest::default(),
+            }
         } else {
             compiled
         });
@@ -181,7 +200,7 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
     }
     Ok(CompiledPattern {
         name: name.into(),
-        constraints,
+        items,
         nodes,
     })
 }

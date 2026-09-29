@@ -149,7 +149,7 @@ def main(root: Path | None = None) -> None:
     # A failed generator must not leave an earlier successful report visible.
     output.unlink(missing_ok=True)
     subprocess.run([sys.executable, str(root / 'tools/phrase_lower_reference.py'), '--check'], check=True)
-    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'dependency-match-lower-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json', 'token-match-lower-v1.expected.json', 'phrase-match-v1.expected.json', 'phrase-match-holdout-v1.expected.json', 'phrase-match-edges-v1.expected.json']
+    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'dependency-match-lower-v1.expected.json', 'dependency-match-flags-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json', 'token-match-lower-v1.expected.json', 'token-match-flags-v1.expected.json', 'phrase-match-v1.expected.json', 'phrase-match-holdout-v1.expected.json', 'phrase-match-edges-v1.expected.json']
     reports: list[FixtureReport] = []
     failure: ReferenceMismatch | None = None
     with tempfile.TemporaryDirectory(prefix='spars-reference-check-') as temporary:
@@ -167,6 +167,8 @@ def main(root: Path | None = None) -> None:
                         '--regressions', str(work / 'fixtures/dependency-match-regressions-v1.expected.json')], cwd=work, check=True)
         subprocess.run([sys.executable, str(root / 'tools/dependency_match_reference.py'),
                         '--lower', str(work / 'fixtures/dependency-match-lower-v1.expected.json')], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/dependency_match_reference.py'),
+                        '--flags', str(work / 'fixtures/dependency-match-flags-v1.expected.json')], cwd=work, check=True)
         subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
                         str(work / 'fixtures/token-match-v1.expected.json')], cwd=work, check=True)
         subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
@@ -175,6 +177,8 @@ def main(root: Path | None = None) -> None:
                         '--branching', str(work / 'fixtures/token-match-branching-v1.expected.json')], cwd=work, check=True)
         subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
                         '--lower', str(work / 'fixtures/token-match-lower-v1.expected.json')], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/token_match_reference.py'),
+                        '--flags', str(work / 'fixtures/token-match-flags-v1.expected.json')], cwd=work, check=True)
         for name, arguments in [('phrase-match-v1.expected.json', []), ('phrase-match-holdout-v1.expected.json', ['--holdout']), ('phrase-match-edges-v1.expected.json', ['--edges'])]:
             subprocess.run([sys.executable, str(root / 'tools/phrase_match_reference.py'), *arguments,
                             str(work / 'fixtures' / name)], cwd=work, check=True)

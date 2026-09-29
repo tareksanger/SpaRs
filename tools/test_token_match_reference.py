@@ -1,14 +1,15 @@
 """Check the typed reference boundary and frozen repetition expectations."""
 import tempfile
+from typing import Callable
 import unicodedata
 from unittest.mock import patch
 from pathlib import Path
 import unittest
 
 import token_match_reference
-from dependency_match_reference import LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Membership, Versions
+from dependency_match_reference import FLAG_WORDS, LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Membership, Versions
 from json_types import json_array, json_int, json_object, json_string, parse_json
-from token_match_reference import Fixture, Item, Pattern, Range, Repetition, branching_rules, exhaustive_rules, lower, lower_rules, official, word, write_fixture
+from token_match_reference import Fixture, Item, Pattern, Range, Repetition, branching_rules, exhaustive_rules, flag, flag_rules, lower, lower_rules, official, word, write_fixture
 
 
 class TokenReferenceTests(unittest.TestCase):
@@ -123,11 +124,52 @@ class TokenReferenceTests(unittest.TestCase):
                     patch.object(token_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['token_match_reference.py', '--lower', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, True)
+                generate.assert_called_once_with(False, False, True, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['token_match_reference.py', '--lower', '--exhaustive', str(output)]):
                     with self.assertRaises(SystemExit):
                         token_match_reference.main()
+                generate.reset_mock()
+                with patch('sys.argv', ['token_match_reference.py', '--flags', str(output)]):
+                    token_match_reference.main()
+                generate.assert_called_once_with(False, False, False, True)
+                with patch('sys.argv', ['token_match_reference.py', '--flags', '--lower', str(output)]):
+                    with self.assertRaises(SystemExit):
+                        token_match_reference.main()
+
+    def test_flag_converter_emits_strict_booleans(self) -> None:
+        self.assertEqual(official(Pattern([flag('like_num', True, Repetition('one_or_more')), flag('is_punct', False)])),
+                         [{'LIKE_NUM': True, 'OP': '+'}, {'IS_PUNCT': False}])
+        names = [rule.name for rule in flag_rules()]
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_frozen_flag_suite_matches_python_string_rules_per_token(self) -> None:
+        from spacy.lang.en.lex_attrs import like_num
+        path = Path(__file__).resolve().parent.parent / 'fixtures/token-match-flags-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['flag-words', 'flag-pipeline', 'flag-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 51)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 442)
+        self.assertEqual(cases[2]['expected'], [])
+        self.assertEqual(cases[0]['text'], ' '.join(FLAG_WORDS))
+        self.assertEqual(len(json_array(cases[0]['tokens'])), len(FLAG_WORDS))
+        self.assertEqual(unicodedata.unidata_version, '15.0.0')
+        found: dict[int, set[str]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            rule = json_string(match['rule'])
+            if rule.endswith(('_true', '_false')) and json_int(match['end']) - json_int(match['start']) == 1:
+                found.setdefault(json_int(match['start']), set()).add(rule)
+        def is_punct(text: str) -> bool:
+            return all(unicodedata.category(char).startswith('P') for char in text)
+        checks: dict[str, Callable[[str], bool]] = {
+            'is_alpha': str.isalpha, 'is_digit': str.isdigit, 'is_space': str.isspace,
+            'is_punct': is_punct, 'like_num': like_num,
+        }
+        for index, text in enumerate(FLAG_WORDS):
+            expected = {f'{name}_{str(bool(check(text))).lower()}' for name, check in checks.items()}
+            self.assertEqual(found.get(index, set()), expected, text)
 
 
 if __name__ == '__main__':

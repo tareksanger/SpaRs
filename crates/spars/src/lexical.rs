@@ -28,39 +28,14 @@ pub struct Lexeme {
 }
 impl Model {
     pub(crate) fn char_flag(&self, c: char, flag: CharFlag) -> bool {
-        let ranges = self.config.lexical.ranges.get(flag);
-        let cp = c as u32;
-        let idx = ranges.partition_point(|v| v[1] < cp);
-        ranges.get(idx).is_some_and(|r| r[0] <= cp)
+        self.config.lexical.char_flag(c, flag)
     }
     pub(crate) fn lower(&self, s: &str) -> String {
-        let chars: Vec<char> = s.chars().collect();
-        let mut out = String::new();
-        let cased = |c| {
-            self.char_flag(c, CharFlag::Lower)
-                || self.char_flag(c, CharFlag::Upper)
-                || self.char_flag(c, CharFlag::Title)
-        };
-        for (i, &c) in chars.iter().enumerate() {
-            if c == 'Σ'
-                && chars[..i]
-                    .iter()
-                    .rev()
-                    .find(|c| !self.char_flag(**c, CharFlag::CaseIgnorable))
-                    .is_some_and(|c| cased(*c))
-                && !chars[i + 1..]
-                    .iter()
-                    .find(|c| !self.char_flag(**c, CharFlag::CaseIgnorable))
-                    .is_some_and(|c| cased(*c))
-            {
-                out.push('ς');
-            } else if let Some(lower) = self.config.lexical.lower.get(&c.to_string()) {
-                out.push_str(lower)
-            } else {
-                out.push(c)
-            }
-        }
-        out
+        self.config.lexical.lower(s)
+    }
+    /// A shared handle to this model's language lexical resources, for matchers.
+    pub fn lexicon(&self) -> crate::Lexicon {
+        crate::Lexicon::new(std::sync::Arc::clone(&self.config.lexical))
     }
     pub(crate) fn shape(&self, s: &str) -> String {
         if s.chars().count() >= 100 {
@@ -95,9 +70,8 @@ impl Model {
     }
     /// Lexical properties use the Unicode classifications exported by the pinned reference.
     pub fn lexeme(&self, s: &str) -> crate::Result<Lexeme> {
-        let r = &self.config.lexical;
+        let r = &*self.config.lexical;
         let member = |values: &[String], text: &str| values.iter().any(|v| v == text);
-        let all = |flag: CharFlag| !s.is_empty() && s.chars().all(|c| self.char_flag(c, flag));
         let cased: Vec<char> = s
             .chars()
             .filter(|c| {
@@ -127,21 +101,6 @@ impl Model {
                 prev = false
             }
         }
-        let stripped = s
-            .strip_prefix(['+', '-', '±', '~'])
-            .unwrap_or(s)
-            .replace([',', '.'], "");
-        let lower = self.lower(&stripped);
-        let digit =
-            |v: &str| !v.is_empty() && v.chars().all(|c| self.char_flag(c, CharFlag::Digit));
-        let like_num = digit(&stripped)
-            || stripped
-                .split_once('/')
-                .is_some_and(|(a, b)| digit(a) && digit(b))
-            || member(&r.number_words, &lower)
-            || ["st", "nd", "rd", "th"]
-                .iter()
-                .any(|end| lower.strip_suffix(end).is_some_and(digit));
         let tld = s
             .rsplit_once('.')
             .map(|(_, v)| v.split(':').next().unwrap());
@@ -168,21 +127,21 @@ impl Model {
                 .chars()
                 .skip(s.chars().count().saturating_sub(3))
                 .collect(),
-            is_alpha: all(CharFlag::Alpha),
-            is_digit: all(CharFlag::Digit),
+            is_alpha: r.is_alpha(s),
+            is_digit: r.is_digit(s),
             is_lower,
             is_upper,
             is_title,
-            is_space: !s.is_empty() && s.chars().all(crate::tokenizer::is_space),
+            is_space: r.is_space(s),
             is_ascii: !s.is_empty() && s.is_ascii(),
-            is_punct: !s.is_empty() && s.chars().all(|c| self.char_flag(c, CharFlag::Punct)),
+            is_punct: r.is_punct(s),
             is_currency: !s.is_empty() && s.chars().all(|c| self.char_flag(c, CharFlag::Currency)),
             is_stop: member(&r.stops, &self.lower(s)),
             is_bracket: member(&r.is_bracket, s),
             is_quote: member(&r.is_quote, s),
             is_left_punct: member(&r.is_left_punct, s),
             is_right_punct: member(&r.is_right_punct, s),
-            like_num,
+            like_num: r.like_num(s),
             like_email: self.email_regex.find(s)?.is_some_and(|m| m.start() == 0),
             like_url,
             has_vector: self.vector(s).is_some(),

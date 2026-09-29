@@ -150,10 +150,15 @@ pub struct DependencyMatcher {
 
 #[napi]
 impl DependencyMatcher {
+    /// Pass a model to enable lexical flag conditions with its language rules.
     #[napi(constructor)]
-    pub fn new() -> Self {
+    pub fn new(model: Option<&crate::Model>) -> Self {
+        let matcher = match model {
+            Some(model) => spars::DependencyMatcher::with_lexicon(model.inner.lexicon()),
+            None => spars::DependencyMatcher::new(),
+        };
         Self {
-            inner: Arc::new(spars::DependencyMatcher::new()),
+            inner: Arc::new(matcher),
         }
     }
 
