@@ -1,11 +1,14 @@
 """Check the typed reference boundary and frozen repetition expectations."""
 import tempfile
+import unicodedata
+from unittest.mock import patch
 from pathlib import Path
 import unittest
 
-from dependency_match_reference import Constraint, Equals, Membership, Versions
-from json_types import json_array, json_object, json_string, parse_json
-from token_match_reference import Fixture, Item, Pattern, Range, Repetition, branching_rules, exhaustive_rules, official, word, write_fixture
+import token_match_reference
+from dependency_match_reference import LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Membership, Versions
+from json_types import json_array, json_int, json_object, json_string, parse_json
+from token_match_reference import Fixture, Item, Pattern, Range, Repetition, branching_rules, exhaustive_rules, lower, lower_rules, official, word, write_fixture
 
 
 class TokenReferenceTests(unittest.TestCase):
@@ -84,6 +87,47 @@ class TokenReferenceTests(unittest.TestCase):
         self.assertEqual(stars, [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)])
         negated = [(match['start'], match['end']) for match in matches if match['rule'] == 'a_negated_b']
         self.assertEqual(negated, [(0, 2), (1, 3)])
+
+
+    def test_lower_converter_uses_official_attribute_and_keeps_values_as_written(self) -> None:
+        self.assertEqual(official(Pattern([lower('THE', Repetition('optional'))])), [{'LOWER': 'THE', 'OP': '?'}])
+        names = [rule.name for rule in lower_rules()]
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_frozen_lower_suite_matches_python_lowercase_per_token(self) -> None:
+        path = Path(__file__).resolve().parent.parent / 'fixtures/token-match-lower-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['lower-variants', 'lower-phrases', 'lower-pipeline', 'lower-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 172)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 280)
+        self.assertEqual(cases[3]['expected'], [])
+        matches = [json_object(value) for value in json_array(cases[0]['expected'])]
+        equals: dict[int, set[int]] = {}
+        for match in matches:
+            rule = json_string(match['rule'])
+            self.assertNotIn(rule, ('equals_1', 'uppercase_value', 'in_uppercase'), 'pattern values must not be lowercased')
+            if rule.startswith('equals_'):
+                equals.setdefault(json_int(match['start']), set()).add(int(rule.removeprefix('equals_')))
+        # Independent invariant: official LOWER equality is Python str.lower() of the token text.
+        self.assertEqual(unicodedata.unidata_version, '15.0.0')
+        for index, text in enumerate(LOWER_WORDS):
+            expected = {value for value, candidate in enumerate(LOWER_VALUES) if candidate == text.lower()}
+            self.assertTrue(expected, text)
+            self.assertEqual(equals.get(index, set()), expected, text)
+
+    def test_cli_passes_lower_mode_and_rejects_combined_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'fixture.json'
+            with patch.object(token_match_reference, 'generate') as generate, \
+                    patch.object(token_match_reference, 'write_fixture') as write:
+                with patch('sys.argv', ['token_match_reference.py', '--lower', str(output)]):
+                    token_match_reference.main()
+                generate.assert_called_once_with(False, False, True)
+                write.assert_called_once()
+                with patch('sys.argv', ['token_match_reference.py', '--lower', '--exhaustive', str(output)]):
+                    with self.assertRaises(SystemExit):
+                        token_match_reference.main()
 
 
 if __name__ == '__main__':

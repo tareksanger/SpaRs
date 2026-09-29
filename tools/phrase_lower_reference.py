@@ -15,7 +15,7 @@ from phrase_match_reference import Case, Operation, State, convert_matches, veri
 from json_types import json_object, json_string, read_json
 
 ROOT = Path(__file__).resolve().parent.parent
-RESOURCE = ROOT / 'crates/spars/src/phrase_matcher/lower.json'
+RESOURCE = ROOT / 'crates/spars/src/unicode_lower.json'
 FIXTURE = ROOT / 'fixtures/phrase-match-lower-v1.expected.json'
 
 @dataclass(frozen=True)

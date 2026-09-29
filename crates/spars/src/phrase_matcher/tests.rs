@@ -143,18 +143,3 @@ fn lower_lookup_uses_unique_normalized_keys_and_preserves_exact_mode() {
     exact.add("r", &[&doc("ab")]).unwrap();
     assert!(exact.find_matches(&doc("AB")).unwrap().is_empty());
 }
-
-#[test]
-fn lower_sigma_context_scales_across_long_ignorable_sequences() {
-    let ignorables = "\u{301}".repeat(10000);
-    assert_eq!(
-        lower::lower(&format!("AΣ{ignorables}")),
-        format!("aς{ignorables}")
-    );
-    assert_eq!(
-        lower::lower(&format!("AΣ{ignorables}A")),
-        format!("aσ{ignorables}a")
-    );
-    assert_eq!(lower::lower("İẞ𐐀"), "i\u{307}ß𐐨");
-    assert_eq!(lower::lower("ßﬀ"), "ßﬀ");
-}

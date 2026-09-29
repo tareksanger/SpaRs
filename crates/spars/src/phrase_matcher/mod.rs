@@ -1,5 +1,4 @@
 //! Native exact-token-text phrase matching; no model or shared vocabulary required.
-mod lower;
 mod terminal;
 use crate::{Doc, Error, Result, TokenIndex};
 use serde::{Deserialize, Serialize};
@@ -51,7 +50,7 @@ impl PhrasePattern {
             tokens: (0..doc.tokens().len())
                 .map(|i| {
                     doc.token_text(TokenIndex(i)).map(|text| match attribute {
-                        PhraseAttribute::Lower => lower::lower(text),
+                        PhraseAttribute::Lower => crate::unicode_lower::lower(text),
                         _ => text.to_owned(),
                     })
                 })
@@ -211,7 +210,10 @@ impl PhraseMatcher {
         // every trie edge. LOWER keys are computed once per input token.
         if self.attribute == PhraseAttribute::Lower {
             let lowered = (0..doc.tokens().len())
-                .map(|i| doc.token_text(TokenIndex(i)).map(lower::lower))
+                .map(|i| {
+                    doc.token_text(TokenIndex(i))
+                        .map(crate::unicode_lower::lower)
+                })
                 .collect::<Result<Vec<_>>>()?;
             self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
         } else {

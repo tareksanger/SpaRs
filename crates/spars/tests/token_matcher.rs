@@ -64,6 +64,61 @@ fn official_long_branching_patterns() {
         288,
     );
 }
+#[test]
+fn official_unicode_lower_conditions() {
+    check(
+        "../../fixtures/token-match-lower-v1.expected.json",
+        4,
+        45,
+        172,
+        280,
+    );
+}
+#[test]
+fn reused_lower_matcher_keeps_documents_independent() {
+    let snapshot = |words: &[&str]| {
+        let text = words.join(" ");
+        let mut start = 0;
+        let tokens: Vec<Token> = words
+            .iter()
+            .map(|word| {
+                let idx = text[..start].chars().count();
+                let token: Token = serde_json::from_value(serde_json::json!({
+                    "start": start, "end": start + word.len(), "idx": idx,
+                    "whitespace": start + word.len() < text.len(), "norm": word,
+                }))
+                .unwrap();
+                start += word.len() + 1;
+                token
+            })
+            .collect();
+        Doc::from_json(
+            &serde_json::json!({"format_version": 1, "document": {"text": text, "tokens": tokens}})
+                .to_string(),
+        )
+        .unwrap()
+    };
+    let pattern: TokenPattern = serde_json::from_str(
+        r#"{"tokens":[{"constraints":[{"attribute":"lower","predicate":{"kind":"equals","value":"ritz"}}],"repetition":{"kind":"once"}}]}"#,
+    )
+    .unwrap();
+    let mut matcher = TokenMatcher::new();
+    matcher.add("ritz", vec![pattern]).unwrap();
+    let first = snapshot(&["the", "RITZ"]);
+    let second = snapshot(&["ΟΣ", "Ritz", "x", "ritz"]);
+    let found = |doc: &Doc| {
+        matcher
+            .find_matches(doc)
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.start.0, m.end.0))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(found(&first), [(1, 2)]);
+    assert_eq!(found(&second), [(1, 2), (3, 4)]);
+    assert_eq!(found(&snapshot(&["the"])), []);
+    assert_eq!(found(&first), [(1, 2)]);
+}
 fn check(path: &str, cases: usize, tokens: usize, rules: usize, matches: usize) {
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(fixture.versions["spacy"], "3.8.14");

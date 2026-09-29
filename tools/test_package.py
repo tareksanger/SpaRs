@@ -16,7 +16,7 @@ class PackageTests(unittest.TestCase):
             'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md',
             'src/lib.rs', 'src/nested/runtime.rs', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
             'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
-            'licenses/Unicode.txt', 'src/phrase_matcher/lower.json',
+            'licenses/Unicode.txt', 'src/unicode_lower.json',
         }
         excluded = {
             f'{directory}/{name}'
@@ -54,7 +54,7 @@ class PackageTests(unittest.TestCase):
             'Cargo.toml', 'Cargo.toml.orig', 'Cargo.lock', 'README.md', 'LICENSE',
             'THIRD_PARTY_NOTICES.md', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
             'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
-            'licenses/Unicode.txt', 'src/phrase_matcher/lower.json',
+            'licenses/Unicode.txt', 'src/unicode_lower.json',
         }
         validate_inventory(files, sources)
         validate_inventory(files | {'.cargo_vcs_info.json'}, sources)

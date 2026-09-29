@@ -1,4 +1,6 @@
 use super::{CompiledPattern, Quantifier, TokenMatch};
+use crate::dependency_matcher::predicates::TokenValues;
+use crate::TokenAttribute;
 use crate::{Doc, Result, TokenIndex};
 use std::collections::HashSet;
 
@@ -48,6 +50,7 @@ fn run<const CACHE_SUFFIXES: bool>(
             constraint.validate_document(doc)?;
         }
     }
+    let values = TokenValues::new(doc, checked.contains(&TokenAttribute::Lower))?;
     let mut states = Vec::new();
     let mut retained = Vec::new();
     let mut branches = Vec::new();
@@ -96,7 +99,7 @@ fn run<const CACHE_SUFFIXES: bool>(
                 } else {
                     let mut value = true;
                     for constraint in &pattern.constraints[node.item] {
-                        if !constraint.matches(token)? {
+                        if !constraint.matches(token, &values)? {
                             value = false;
                             break;
                         }

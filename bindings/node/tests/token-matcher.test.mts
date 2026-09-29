@@ -47,6 +47,7 @@ for (const [filename, cases, rules, matches] of [
   ['token-match-v1.expected.json', 10, 480, 704],
   ['token-match-exhaustive-v1.expected.json', 31, 4805, 6261],
   ['token-match-branching-v1.expected.json', 31, 248, 288],
+  ['token-match-lower-v1.expected.json', 4, 172, 280],
 ] as const) {
   test(`TokenMatcher preserves frozen ordered reference corpus ${filename}`, async () => {
     const parsed: unknown = JSON.parse(readFileSync(new URL(`../../../fixtures/${filename}`, import.meta.url), 'utf8'));
@@ -113,6 +114,8 @@ test('TokenMatcher rejects malformed patterns atomically and reports unavailable
     wildcard({ kind: 'range', min: 4097 }),
     ...[
       { attribute: 'unknown', predicate: { kind: 'equals', value: 'a' } },
+      { attribute: 'LOWER', predicate: { kind: 'equals', value: 'a' } },
+      { attribute: 'lower', predicate: { kind: 'morph_superset', values: ['a'] } },
       { attribute: 'text', predicate: { kind: 'unknown', values: [] } },
       { attribute: 'text', predicate: { kind: 'equals' } },
       { attribute: 'text', predicate: { kind: 'equals', value: 'a', values: [] } },

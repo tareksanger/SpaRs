@@ -1,20 +1,27 @@
 """Freeze native dependency-pattern expectations from official spaCy."""
 import argparse
-from dataclasses import asdict, dataclass
 import hashlib
 import json
+import unicodedata
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+
+# Typed boundary records mirror the narrow local spaCy matcher stub.
+from typing import Literal, NotRequired, TypedDict
 
 import spacy
 import thinc
+from reference_types import (
+    Doc,
+    Language,
+    SpanRecord,
+    TokenRecord,
+    span_records,
+    token_records,
+)
 from spacy.matcher import DependencyMatcher
 from spacy.tokens import Doc as make_doc
 
-from reference_types import Doc, Language, SpanRecord, TokenRecord, span_records, token_records
-
-# Typed boundary records mirror the narrow local spaCy matcher stub.
-from typing import TypedDict, NotRequired
 
 class StringOperator(TypedDict, total=False):
     IN: list[str]
@@ -28,7 +35,7 @@ class OfficialNode(TypedDict):
     LEFT_ID: NotRequired[str]
     REL_OP: NotRequired[str]
 
-Attribute = Literal['text', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology']
+Attribute = Literal['text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology']
 
 @dataclass(frozen=True)
 class Equals:
@@ -94,7 +101,7 @@ class Fixture:
     cases: list[Case]
 
 OPERATORS = ('<', '>', '<<', '>>', '.', '.*', ';', ';*', '$+', '$-', '$++', '$--', '>+', '>-', '>++', '>--', '<+', '<-', '<++', '<--')
-ATTRIBUTES = {'text': 'ORTH', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH'}
+ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH'}
 
 
 def official(pattern: Pattern) -> list[OfficialNode]:
@@ -149,8 +156,50 @@ def rules() -> list[Rule]:
     return result
 
 
+# Python str.lower() cases: final sigma, combining marks, expansions, supplementary
+# characters, titlecase, the Kelvin sign, a ligature without a lowercase mapping, and
+# emoji. U+1C89 is unassigned in the pinned Unicode 15.0.0 data but has a lowercase
+# mapping in later Unicode versions, so it detects use of an unpinned lowercase table.
+LOWER_WORDS = ['The', 'THE', 'the', 'Ritz', 'RITZ', 'ritz', 'ΟΣ', 'ΟΣΑ', 'Σ', 'σ', 'AΣ\u0301', 'İ', 'I',
+               'ẞ', 'ß', 'SS', 'É', 'e\u0301', '𐐀', 'K', 'ﬀ', 'ǅ', 'Straße', '123', '👩🏽\u200d💻', '\u212a', '\u1c89']
+LOWER_VALUES = ['the', 'THE', 'ritz', 'ος', 'οσ', 'οσα', 'σ', 'ς', 'aς\u0301', 'i\u0307', 'i', 'ß', 'ss', 'é',
+                'e\u0301', '𐐨', 'k', 'ﬀ', 'ff', 'ǆ', 'straße', '123', '👩🏽\u200d💻', '', '\u1c89', '\u1c8a', 'gon', 'going']
+# Uppercase set values must never match: pattern values are compared as written.
+LOWER_SETS: list[tuple[str, list[str]]] = [('articles', ['the', 'ritz']), ('unicode', ['ος', 'ß', 'i\u0307']), ('empty', []),
+                                           ('uppercase', ['THE', 'ΟΣ'])]
+# Tokenizer exceptions give `Gon`/`na` norms `going`/`to`, separating LOWER from NORM.
+LOWER_PIPELINE_TEXT = 'THE Ritz welcomed ΟΣ guests at the RITZ. Gonna'
+
+
+def require_pinned_unicode() -> None:
+    if unicodedata.unidata_version != '15.0.0':
+        raise ValueError('LOWER references require the pinned Python Unicode 15.0.0 data')
+
+
+def lower_constraints() -> list[tuple[str, Constraint]]:
+    result = [(f'equals_{index}', Constraint('lower', Equals(value))) for index, value in enumerate(LOWER_VALUES)]
+    for name, values in LOWER_SETS:
+        result.append((f'in_{name}', Constraint('lower', Membership('in', values))))
+        result.append((f'not_in_{name}', Constraint('lower', Membership('not_in', values))))
+    return result
+
+
+def lower_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Node('a', [constraint])])]) for name, constraint in lower_constraints()]
+    result.extend([
+        Rule('child_the', [Pattern([Node('head', [Constraint('lower', Equals('ritz'))]),
+                                    Node('child', [Constraint('lower', Equals('the'))], Link('head', '>'))])]),
+        Rule('subject_set', [Pattern([Node('verb', [Constraint('lower', Equals('welcomed'))]),
+                                      Node('arg', [Constraint('lower', Membership('in', ['ritz', 'guests']))], Link('verb', '>'))])]),
+        Rule('conjunction', [Pattern([Node('a', [Constraint('lower', Equals('the')), Constraint('text', Equals('THE'))])])]),
+        Rule('precedes_sigma', [Pattern([Node('a', [Constraint('lower', Equals('ritz'))]),
+                                         Node('b', [Constraint('lower', Equals('ος'))], Link('a', '.*'))])]),
+    ])
+    return result
+
+
 def attribute_name(value: str) -> Attribute:
-    if value in ('text', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology'):
+    if value in ('text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology'):
         return value
     raise ValueError('Unsupported attribute')
 
@@ -165,7 +214,7 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
     return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, expected)
 
 
-def generate(regressions: bool = False) -> Fixture:
+def generate(regressions: bool = False, lower: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -173,6 +222,8 @@ def generate(regressions: bool = False) -> Fixture:
         raise ValueError('Use en_core_web_md 3.8.0')
     if regressions:
         return generate_regressions(nlp)
+    if lower:
+        return generate_lower(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -207,6 +258,25 @@ def generate_regressions(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def generate_lower(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = lower_rules()
+    cases: list[Case] = []
+    count = len(LOWER_WORDS)
+    variants = make_doc(nlp.vocab, words=LOWER_WORDS, spaces=[index + 1 < count for index in range(count)],
+                        heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases.append(case(nlp, 'lower-variants', ' '.join(LOWER_WORDS), variants, patterns))
+    words = ['THE', 'RITZ', 'welcomed', 'ΟΣ', 'Guests']
+    tree = make_doc(nlp.vocab, words=words, spaces=[True] * 4 + [False], heads=[1, 2, 2, 4, 2],
+                    deps=['det', 'nsubj', 'ROOT', 'amod', 'dobj'])
+    cases.append(case(nlp, 'lower-tree', ' '.join(words), tree, patterns))
+    cases.append(case(nlp, 'lower-pipeline', LOWER_PIPELINE_TEXT, nlp(LOWER_PIPELINE_TEXT), patterns))
+    empty = make_doc(nlp.vocab, words=[])
+    cases.append(case(nlp, 'lower-empty', '', empty, patterns))
+    source = Path(spacy.__file__).parent / 'matcher' / 'dependencymatcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def write_fixture(output: Path, fixture: Fixture) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x', encoding='utf-8') as stream:
@@ -216,7 +286,9 @@ def write_fixture(output: Path, fixture: Fixture) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
-    parser.add_argument('--regressions', action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--regressions', action='store_true')
+    modes.add_argument('--lower', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -226,7 +298,10 @@ def main() -> None:
     regressions: object = args.regressions
     if not isinstance(regressions, bool):
         raise TypeError('Regressions flag must be boolean')
-    write_fixture(output, generate(regressions))
+    lower_mode: object = args.lower
+    if not isinstance(lower_mode, bool):
+        raise TypeError('Lower flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode))
 
 
 if __name__ == '__main__':
