@@ -56,18 +56,88 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text and annotation conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Model extensibility for all official pretrained pipelines, following the plan below. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
-2. Matching: extend shared conditions and matcher options using the [matching implementation plan](#matching-implementation-plan). ORTH/TEXT/LOWER PhraseMatcher and the three Node matcher bindings are implemented.
+1. Extend shared matcher conditions and selection options, building on the existing three native matchers.
+2. Add checked annotation updates, EntityRuler, and SpanRuler.
+3. Add dependency-checked component selection, then measured neural batching.
+4. Add independent sentence segmentation: Sentencizer, then trainable senter.
+5. Resume multilingual model expansion after these four milestones. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
 
-Document editing, broader serialization, custom-trained pipeline loading, and training remain later work. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
+The [implementation sequence](#implementation-sequence) defines dependencies and acceptance for these planned milestones. Token merge/split editing, broader spaCy serialization, custom-trained pipeline loading, and training remain later work. Checked annotation updates do not imply retokenization support. The all-official-pipelines target, including transformer architectures, remains unchanged; this sequence defers multilingual expansion without restricting shared component designs to English. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
 The separate [Node binding](NODE.md) exposes loading, processing, batches, ordered stages, explicit native model downloads, offline model-store management, immutable native documents and snapshots, token/span views, dependency traversal, token/span/document vectors and similarity, lexical queries, and the three native matchers. Its document, traversal, lexical, vector and matcher suites reuse frozen official references; boundary tests cover invalid input and ownership. Per-platform package verification remains required. The [npm workflow](RELEASING.md#publish-the-node-package) assembles Linux x64/ARM64 glibc and musl, macOS x64/ARM64, and Windows x64/ARM64 packages with clean-install checks before optional publication; a completed workflow and registry checks are required release evidence. Browser WASM remains unimplemented. These bindings reuse the native library; they do not change the broader spaCy compatibility backlog.
 
+## Implementation sequence
+
+The following deliveries are planned, not implemented or verified. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
+
+### 1. Shared matcher conditions and options
+
+The three native matchers and their reference suites are described in the [matching implementation plan](#matching-implementation-plan). Deliver the remaining matcher work in this order:
+
+| Delivery | Scope | Acceptance |
+|---|---|---|
+| M1 | Shared Unicode LOWER for TokenMatcher and DependencyMatcher, reusing the pinned lowercase resources where semantics agree | Ordered official outputs for Unicode expansions, combining characters, empty documents, repeated calls, and malformed conditions; existing PhraseMatcher LOWER results unchanged |
+| M2 | Inventory missing attributes and predicates across all three matchers; add typed lexical flags, starting with IS_ALPHA, IS_DIGIT, IS_SPACE, IS_PUNCT and LIKE_NUM; then LENGTH and numeric comparisons | Positive and negative cases for every added attribute/operator, including Unicode length semantics and invalid value types; no implicit string conversion for flags or numbers |
+| M3 | Remaining set comparisons and annotation-based PhraseMatcher attributes, one attribute family at a time | Missing annotations, invalid attribute choices, pattern/input consistency, and lifecycle ordering match the declared upstream contract |
+| M4 | TokenMatcher greedy FIRST/LONGEST, then alignments, checked span input and labeled-span results where the corresponding spaCy matcher supports them | Overlap and repetition tie-breaking, duplicate matches, alignment lengths, unavailable annotations and option combinations agree exactly; span-relative and document-relative indices are tested separately for each API; existing default behavior and typed Rust callers remain compatible |
+| M5 | Regex and fuzzy predicates as separate deliveries | Pinned reference semantics for search versus full match, Unicode, distance limits and supported operator combinations, checked before selecting an engine or algorithm; unsupported regex constructs reject explicitly |
+
+Share attribute extraction and predicate logic where semantics agree, while retaining each matcher's validation rules. Use concrete types for text, flags, numbers and morphology rather than converting every value to a string. Every added condition needs official positive, negative, missing-annotation, malformed-input and Unicode cases in each affected matcher, and existing matcher outputs must remain unchanged.
+
+Primary Rust paths are `crates/spars/src/dependency_matcher/predicates.rs`, `crates/spars/src/token_matcher/`, `crates/spars/src/phrase_matcher/`, and lexical resources. Inspect the pinned matcher source and tests before choosing each representation. Extend Node types and boundary tests for each exposed feature using the same frozen references. Callback invocation order and safe mutation are planned after the annotation-update contract in A1. Callbacks, custom extensions, spaCy pattern-JSON import and integer rule-ID interoperability remain outside this milestone and stay in the backlog; do not make them prerequisites for rulers.
+
+### 2. Checked annotations and rule-based annotation
+
+Annotation updates are a prerequisite for rulers and independent sentence segmentation. Inspect the pinned `Doc`, `Token`, `Span`, `SpanGroup`, EntityRuler and SpanRuler sources and tests before choosing the public editing API. Current Rust documents expose immutable borrowed views, while Node holds immutable native handles; preserve these ownership guarantees by defining whether each operation consumes a document, requires exclusive access, or returns a new document. Node must keep existing handles and views valid. Reject invalid edits before changing observable state, and document any difference from upstream failure behavior.
+
+| Delivery | Scope | Acceptance |
+|---|---|---|
+| A1 | Checked entity annotation replacement and the ownership contract for annotation updates | Entity spans, token entity types and IOB tags (inside, outside or beginning of an entity) remain consistent; distinguish missing, empty, blocked and outside states where supported; invalid bounds, overlaps and failed edits preserve the stated contract; text and offsets remain exact |
+| A2 | EntityRuler applied after NER or on a document without entity predictions, using the verified token and phrase pattern subset | Official precedence, overlap filtering, overwrite policy, rule lifecycle and entity IDs; complete document comparisons and snapshot round-trips, including ID storage if required |
+| A3 | Named span groups, followed by SpanRuler | Overlapping spans, labels, IDs, group replacement/append behavior and filtering match the supported options; groups and annotations survive snapshots without losing metadata |
+| A4 | EntityRuler before NER, with preset-entity support in the native recognizer | Reference action traces and final annotations establish that NER respects existing entities and blocking; unsupported preset states fail explicitly |
+
+Primary paths are `crates/spars/src/document.rs`, document validation and traversal, `crates/spars/src/ner.rs`, and pipeline configuration. Put new ruler implementations in focused modules under `crates/spars/src/`. Version snapshots when adding fields requires a new storage contract, preserve existing snapshots, and test malformed new fields. Define cache invalidation for affected derived annotations; annotation edits must not silently leave sentence, entity, noun-chunk or traversal data inconsistent. Retokenization and arbitrary mutation callbacks are separate work.
+
+### 3. Selective execution and neural batching
+
+The current executor follows a declared component order, `process_until` selects an inclusive prefix, and Rust `pipe` processes one document at a time. Component selection and batching are separate deliveries with separate evidence.
+
+| Delivery | Scope | Acceptance |
+|---|---|---|
+| P1 | Typed component selection with explicit dependency validation; preserve existing default and prefix APIs | NER-only, tokenizer-only and valid shared-encoder subsets match equivalent pinned spaCy configurations; missing dependencies, unknown components and unavailable output annotations fail clearly; default full outputs remain unchanged |
+| P2 | Profile sequential processing and preserve an identifiable release-build baseline; batch one measured shared neural stage first | Independent numerical checks and exact final outputs across batch sizes, mixed document lengths, empty inputs, document boundaries and repeated/concurrent calls; no cross-document convolution context |
+| P3 | Extend useful batching to other measured stages and expose bounded ordered streaming in Rust and Node | Input/output order, partial final batches, errors, cancellation where exposed, limits on accepted work and pausing input when processing falls behind have tested contracts; memory stays bounded by documented batch controls |
+
+Primary paths are `crates/spars/src/pipeline.rs`, `crates/spars/src/config/`, `crates/spars/src/neural.rs`, the encoder implementation, and Node processing APIs. Inspect pinned `Language.pipe`, component `pipe` methods and Thinc's sequence batching before changing algorithms. Component selection must not silently enable omitted components or fabricate annotations; loading fewer tensors is a separate optimization from skipping execution. P1 must also support the ruler component order established in milestone 2 without introducing model-name branches.
+
+Measure loading, inference throughput and process memory separately on the same models, corpus, build mode, thread limits and warmup. Include short/long and repeated/unfamiliar text, alternate before/after order, and inspect variation. A batch API alone does not establish a speedup. Preserve exact discrete outputs and existing floating-point limits; resolve measured regressions and batch-dependent prediction changes before completion. Keep measurements under ignored `target/reports/` and follow [performance guidance](PERFORMANCE.md).
+
+### 4. Independent sentence segmentation
+
+Reuse the annotation ownership contract from A1 and component selection from P1. Inspect pinned `sentencizer.pyx`, `senter.pyx`, their tests, and parser handling of preset sentence boundaries. Keep sentence segmentation available without dependency parsing; this does not make noun chunks or dependency traversal available.
+
+| Delivery | Scope | Acceptance |
+|---|---|---|
+| S1 | Checked sentence-start updates and rule-based Sentencizer with configurable punctuation and overwrite behavior | Official boundaries for empty text, whitespace, punctuation runs, quotes, Unicode and existing boundaries; sentence spans and token flags agree, invalid updates preserve state, and snapshots retain annotations |
+| S2 | Pipeline integration, including parser interaction with preset sentence boundaries | Tokenizer-plus-Sentencizer works without neural inference; unsupported component orders reject; parser constraints and final outputs agree with upstream when segmentation precedes parsing |
+| S3 | Trainable senter with typed component/architecture configuration and native package conversion | Export the currently excluded component from a pinned official English package; compare converted parameters, neural outputs, sentence decisions, disabled/enabled defaults and malformed inputs; retain existing full-pipeline parity |
+
+Primary paths are document annotations, pipeline configuration, `crates/spars/src/parser.rs`, new sentence component modules, `tools/export.py`, and `crates/spars-model/`. Sentence-start values must retain the distinction between unknown and explicitly false. Sentencizer does not require learned weights, but model-independent tokenizer acquisition/loading is a separate capability and must not be implied by this milestone. Measure both sentence-only paths against parser-based segmentation for time and memory; reference agreement is not a claim of better linguistic accuracy.
+
+### Completion gates and subsequent scope
+
+Before each runtime delivery, verify the relevant source against `reference/source-lock.json`, freeze new official reference cases separately from existing fixtures, and demonstrate the missing behavior with a failing test. For algorithm changes, establish the baseline and independent equivalence checks instead. Include malformed inputs, unavailable annotations, Unicode, call isolation, and snapshot or binding behavior where affected. Do not mark a milestone complete while any listed delivery remains unsupported or lacks evidence.
+
+Run focused checks, executed Rust and TypeScript guide examples for changed public APIs, and `.venv/bin/python tools/verify.py` with required model assets and model-dependent tests included. Obtain independent reference, test, documentation and performance reviews under [QUALITY.md](QUALITY.md). Update relevant guides, README, model/snapshot format documentation and `COMPATIBILITY.md` only for behavior actually delivered. Record exact-commit CI evidence separately from local acceptance; no plan entry implies passing CI.
+
+Multilingual expansion follows completion of milestones 1–4 using the [model extensibility plan](#model-extensibility-plan). Components added here must remain reusable across model identities and languages. Transformer support remains required by the broader model target; retokenization, DocBin interoperability, custom-trained pipeline loading and training retain separate contracts and acceptance work.
+
 ## Matching implementation plan
 
-Token Matcher and DependencyMatcher already have native implementations and frozen reference suites. Extend these APIs incrementally. PhraseMatcher is the first new matcher; document editing and rule-based annotation follow separate contracts. The [PhraseMatcher](PHRASE_MATCHER.md) implements ORTH/TEXT/LOWER and has an official reference corpus. Node exposes all three matchers. Shared condition extensions, remaining matcher options and rule-based annotation remain planned work.
+Token Matcher, DependencyMatcher and [PhraseMatcher](PHRASE_MATCHER.md) have native implementations and frozen reference suites. PhraseMatcher implements ORTH/TEXT/LOWER, and Node exposes all three matchers. Steps 1–2 below retain the acceptance requirements for the implemented PhraseMatcher, step 3 records the implemented Node bindings, and step 4 describes the subsequent rule-based annotation milestone. Remaining matcher conditions and options are planned as deliveries M1–M5 in the [implementation sequence](#1-shared-matcher-conditions-and-options).
 
-### 1. Establish the reference contract
+### 1. PhraseMatcher reference contract (implemented)
 
 Inspect spaCy 3.8.14's `spacy/matcher/phrasematcher.pyx`, `matcher.pyx`, `dependencymatcher.pyx`, their attribute and hashing dependencies, and `spacy/tests/matcher/`. Verify the installed reference against `reference/source-lock.json`. Retain the [third-party notices](../THIRD_PARTY_NOTICES.md), including the FlashText adaptation notice and the preshed license.
 
@@ -75,7 +145,7 @@ Create a separate versioned phrase-matching corpus and official reference genera
 
 Acceptance: reference generation is reproducible, case counts are explicit, and the first tests demonstrate the missing native behavior. Reserve an untouched comparison set until the initial implementation is ready; record when it becomes regression data.
 
-### 2. Implement native PhraseMatcher
+### 2. Native PhraseMatcher (implemented for ORTH/TEXT/LOWER)
 
 Begin with tokenized document patterns and exact token text (`ORTH`/`TEXT`), then add case-insensitive `LOWER` in a separate increment. Use a typed attribute choice and rule identifiers, compile reusable pattern storage, and keep search state local to each call. Resolve how attributes and string identities remain consistent across pattern and input documents, including restored documents. Use the pinned Unicode lowercase behavior for `LOWER`. Matching must not run inference or download assets implicitly.
 
@@ -85,27 +155,15 @@ Acceptance: exact ordered results and rule lifecycle behavior match every declar
 
 Exact-text ORTH/TEXT matching is implemented in `crates/spars/src/phrase_matcher/`, with a safe prefix trie and pinned terminal-table ordering. `crates/spars/tests/phrase_matcher.rs` compares 43 official cases, 1,249 lifecycle states and 31,919 exact ordered matches, including a separately frozen comparison set. `tools/phrase_match_reference.py` regenerates references and verifies source provenance; the guide example executes through `tools/check_docs.py`. LOWER uses model-independent Unicode 15.0.0 resources; `crates/spars/tests/phrase_matcher_lower.rs` compares 4 official cases, 24 lifecycle states and 351 ordered matches. `tools/phrase_lower_reference.py --check` checks resource and fixture reproducibility. Rust accepts validated document patterns, rejects distinct rule-name hash collisions, and validates before mutation; see the guide for differences from Python error states and hash-only token identity.
 
-### 3. Extend shared token conditions
-
-Inventory missing attributes and predicates across Token Matcher, DependencyMatcher, and PhraseMatcher. Add lowercase and lexical attributes, annotation-based phrase attributes, numeric comparisons, remaining set comparisons, regex, and fuzzy matching in independently tested increments. Share reusable attribute extraction and predicate logic where semantics agree, while retaining each matcher's validation rules. Use concrete types for text, flags, numbers, and morphology rather than converting every value to a string.
-
-Acceptance: each addition has official positive, negative, missing-annotation, malformed-input, and Unicode cases in every affected matcher. Regex matching and fuzzy distance rules must be checked against the pinned implementation before selecting an engine or algorithm; an unsupported construct returns an explicit error. Existing matcher outputs remain unchanged.
-
-### 4. Complete matcher options
-
-Add Token Matcher's greedy `FIRST`/`LONGEST` selection and alignments, then checked span input and labeled-span results where the corresponding spaCy matcher supports them. Test span-relative versus document-relative indices explicitly for each API. Plan callback invocation order and safe mutation separately, after the document-editing contract is defined. Keep custom extensions, spaCy pattern-JSON interoperability, and integer rule-ID interoperability visible in the backlog until their prerequisites are implemented.
-
-Acceptance: official comparisons cover tie-breaking, overlaps, repetitions, offsets, unavailable annotations, and option combinations. Existing default behavior and typed Rust callers remain compatible.
-
-### 5. Expose matching through Node
+### 3. Matching through Node (implemented for the declared subset)
 
 The Node APIs expose reusable native PhraseMatcher, TokenMatcher and DependencyMatcher instances. Matching receives immutable `NativeDocument` handles, preserves rule identities and token-index results, and runs through the binding's bounded execution policy. Mutable plain JavaScript output objects are not accepted as native documents. See the [Node guide](NODE.md) for pattern types, rule operations and supported options.
 
 Acceptance: run the same reference cases through Rust and Node, test ownership and repeated/concurrent use, and execute TypeScript guide examples from Markdown. Verify the packed Node package outside the repository.
 
-### 6. Add rule-based annotation after document-editing contracts
+### 4. Add rule-based annotation after document-editing contracts
 
-Build EntityRuler and SpanRuler on the verified matchers once document annotation updates are supported. First define conflict resolution, overwrite policy, entity IOB updates, span groups, and token/span view validity against spaCy. Retokenization has separate merge/split and dependency-update requirements and is not a prerequisite for read-only matching.
+Build EntityRuler and SpanRuler on the verified matchers once document annotation updates are supported. Deliveries A1–A4 in the [implementation sequence](#2-checked-annotations-and-rule-based-annotation) define the order. First define conflict resolution, overwrite policy, entity IOB updates, span groups, and token/span view validity against spaCy. Retokenization has separate merge/split and dependency-update requirements and is not a prerequisite for read-only matching.
 
 Acceptance: official comparisons verify complete documents after rule application, including overlaps and existing annotations. Failed edits preserve the documented state contract, and native snapshots retain the resulting annotations.
 
@@ -113,7 +171,7 @@ Acceptance: official comparisons verify complete documents after rule applicatio
 
 For every increment, follow `docs/QUALITY.md` and obtain reference, test, documentation, and performance reviews. Run focused cases followed by `.venv/bin/python tools/verify.py`; CI must execute new parity tests with explicit denominators. Keep generated mismatch and timing reports under ignored `target/reports/` and update the compatibility inventory only for behavior actually verified.
 
-Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The first bounded delivery is the reference corpus plus exact-text PhraseMatcher, not completion of the entire matching surface.
+Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded delivery is shared LOWER conditions (M1); later matcher features retain separate acceptance.
 
 ## Model extensibility plan
 
@@ -130,6 +188,8 @@ Use typed, versioned configuration for component factories (constructors for pip
 Keep registration of native component implementations separate from the model catalog. Future custom-trained pipelines built from supported components should reuse the same loading and execution contracts. Additional custom behavior will require a registered native implementation and its validation contract. This extension point does not require a Python fallback, loading separately compiled native plugins, or a training API now. Loaded models remain immutable and reusable, with state owned by each processing call.
 
 ### Implementation order and acceptance
+
+Steps 2 and 4 are implemented for the English CNN family. Step 3 is partial because the manifest still requires all six English component configurations. Steps 1 and 5 have not started. This plan resumes after milestones 1–4 of the [implementation sequence](#implementation-sequence). In the meantime, component selection (P1) and senter conversion (S3) must extend the same typed component configuration rather than adding model-specific paths.
 
 1. Inventory the components, architectures, language resources, and serialization requirements of version-pinned official pipelines. Group work by shared capabilities and record gaps in the compatibility inventory. Include transformer and language-specific families; the English sizes are initial acceptance cases, not the complete scope.
 2. Separate typed model identity and acquisition metadata from reusable conversion and runtime configuration. Introduce the required versioned format changes with an explicit path for existing v1 assets. Preserve checksum, tensor, resource, and unsupported-configuration checks. Test two distinct model identities without duplicating conversion or inference logic.

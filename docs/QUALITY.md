@@ -96,6 +96,8 @@ Ask Codex: “Review this change with reference_review, test_review, and docs_re
 
 The files follow the [official custom-agent format](https://learn.chatgpt.com/docs/agent-configuration/subagents). They inherit the selected model and use read-only review instructions. Configuration syntax is checked in CI; loading the files still depends on the Codex client. These agents are not a background service and do not run inside GitHub Actions.
 
+Claude Code equivalents live in [`.claude/agents`](../.claude/agents), using its [Markdown subagent format](https://code.claude.com/docs/en/sub-agents). Their names are `reference-review`, `test-review`, `docs-review`, and `performance-review`, corresponding to the Codex names with underscores. They inherit the session model and allow only `Read`, `Grep`, and `Glob`; the coordinating agent supplies diffs and command results and owns fixes, tests and benchmarks. For example, ask Claude Code to use `reference-review` to review specified changed files against the pinned source. Keep both sets of review responsibilities consistent when editing them. The existing CI configuration check covers the Codex TOML files; it does not validate Claude Code loading.
+
 ## Write documentation for developers
 
 Use ordinary words, short paragraphs, and concrete examples. Explain a technical term when it is first needed. Show prerequisites, a command or code example, the result to expect, and the feature's limits. Keep conversation history and task handoffs out of public docs. Keep one prose paragraph per source line.
