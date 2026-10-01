@@ -1,5 +1,5 @@
 use super::{CompiledPattern, Quantifier, TokenMatch};
-use crate::dependency_matcher::predicates::TokenValues;
+use crate::dependency_matcher::predicates::{Needs, TokenValues};
 use crate::{Doc, Lexicon, Result, TokenIndex};
 use std::collections::HashSet;
 
@@ -28,11 +28,14 @@ pub(super) fn find(
             constraint.validate_document(doc)?;
         }
     }
-    let mask = patterns
-        .iter()
-        .flat_map(|pattern| &pattern.items)
-        .fold(0, |mask, item| mask | item.flags.mask());
-    let values = TokenValues::new(doc, &checked, mask, lexicon)?;
+    let mut needs = Needs {
+        lower: checked.contains(&crate::TokenAttribute::Lower),
+        ..Needs::default()
+    };
+    for item in patterns.iter().flat_map(|pattern| &pattern.items) {
+        needs.add(&item.lexical);
+    }
+    let values = TokenValues::new(doc, needs, lexicon)?;
     // For short patterns the extra lookup costs more than repeated suffix work.
     // Separate compiled paths keep ordinary matching free of per-state overhead.
     if patterns.iter().any(needs_suffix_cache) {
@@ -109,7 +112,7 @@ fn run<const CACHE_SUFFIXES: bool>(
                     value
                 } else {
                     let item = &pattern.items[node.item];
-                    let mut value = item.flags.matches(values, index)?;
+                    let mut value = item.lexical.matches(values, index, &pattern.lengths)?;
                     if value {
                         for constraint in &item.constraints {
                             if !constraint.matches(token, values)? {

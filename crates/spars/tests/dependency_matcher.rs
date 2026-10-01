@@ -90,6 +90,62 @@ fn reused_flag_matcher_keeps_documents_independent() {
     assert_eq!(found("ten apples"), [vec![0]]);
 }
 #[test]
+fn official_length_conditions() {
+    let path = "../../fixtures/dependency-match-length-v1.expected.json";
+    let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let total = |count: fn(&Case) -> usize| fixture.cases.iter().map(count).sum::<usize>();
+    assert_eq!(total(|c| c.tokens.len()), 28);
+    assert_eq!(total(|c| c.rules.len()), 96);
+    assert_eq!(total(|c| c.expected.len()), 321);
+    check(path, 3, None);
+}
+#[test]
+fn reused_length_matcher_checks_child_nodes_per_document() {
+    // Every token attaches to token 0, the root.
+    let snapshot = |words: &[&str]| {
+        let text = words.join(" ");
+        let mut start = 0;
+        let tokens: Vec<serde_json::Value> = words
+            .iter()
+            .enumerate()
+            .map(|(index, word)| {
+                let token = serde_json::json!({
+                    "start": start, "end": start + word.len(), "idx": text[..start].chars().count(),
+                    "whitespace": start + word.len() < text.len(), "norm": word, "head": 0,
+                    "dep": if index == 0 { "ROOT" } else { "dep" },
+                });
+                start += word.len() + 1;
+                token
+            })
+            .collect();
+        Doc::from_json(
+            &serde_json::json!({"format_version": 1, "document": {"text": text, "tokens": tokens}})
+                .to_string(),
+        )
+        .unwrap()
+    };
+    // LENGTH appears only on the child node; the unconstrained root comes first.
+    let pattern: DependencyPattern = serde_json::from_str(
+        r#"{"nodes":[{"id":"head","constraints":[],"link":null},{"id":"child","constraints":[{"attribute":"length","predicate":{"kind":"compare","operator":">=","value":3}}],"link":{"left":"head","relation":">"}}]}"#,
+    )
+    .unwrap();
+    let mut matcher = DependencyMatcher::new();
+    matcher.add("long_child", vec![pattern]).unwrap();
+    let found = |doc: &Doc| {
+        matcher
+            .find_matches(doc)
+            .unwrap()
+            .into_iter()
+            .map(|m| m.tokens.iter().map(|t| t.0).collect::<Vec<_>>())
+            .collect::<Vec<_>>()
+    };
+    let first = snapshot(&["root", "ab", "abcd"]);
+    let second = snapshot(&["r", "abc", "x"]);
+    assert_eq!(found(&first), [vec![0, 2]]);
+    assert_eq!(found(&second), [vec![0, 1]]);
+    assert_eq!(found(&first), [vec![0, 2]]);
+}
+#[test]
 fn official_unicode_lower_conditions() {
     let path = "../../fixtures/dependency-match-lower-v1.expected.json";
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();

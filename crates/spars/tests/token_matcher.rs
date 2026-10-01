@@ -65,6 +65,16 @@ fn official_long_branching_patterns() {
     );
 }
 #[test]
+fn official_length_conditions() {
+    check(
+        "../../fixtures/token-match-length-v1.expected.json",
+        3,
+        28,
+        105,
+        386,
+    );
+}
+#[test]
 fn official_unicode_lower_conditions() {
     check(
         "../../fixtures/token-match-lower-v1.expected.json",
@@ -120,6 +130,70 @@ fn reused_flag_matcher_keeps_documents_independent() {
     assert_eq!(found("I ate 5 of ten"), [(2, 3), (4, 5)]);
     assert_eq!(found("no numbers"), []);
     assert_eq!(found("ten apples"), [(0, 1)]);
+}
+#[test]
+fn reused_length_matcher_with_mixed_rules_keeps_documents_independent() {
+    let snapshot = |words: &[&str]| {
+        let text = words.join(" ");
+        let mut start = 0;
+        let tokens: Vec<Token> = words
+            .iter()
+            .map(|word| {
+                let idx = text[..start].chars().count();
+                let token: Token = serde_json::from_value(serde_json::json!({
+                    "start": start, "end": start + word.len(), "idx": idx,
+                    "whitespace": start + word.len() < text.len(), "norm": word,
+                }))
+                .unwrap();
+                start += word.len() + 1;
+                token
+            })
+            .collect();
+        Doc::from_json(
+            &serde_json::json!({"format_version": 1, "document": {"text": text, "tokens": tokens}})
+                .to_string(),
+        )
+        .unwrap()
+    };
+    let pattern = |raw: &str| -> TokenPattern { serde_json::from_str(raw).unwrap() };
+    let mut matcher = TokenMatcher::new();
+    // Only the second rule needs lengths; the per-call values must still include them.
+    matcher
+        .add(
+            "text",
+            vec![pattern(
+                r#"{"tokens":[{"constraints":[{"attribute":"text","predicate":{"kind":"equals","value":"x"}}],"repetition":{"kind":"once"}}]}"#,
+            )],
+        )
+        .unwrap();
+    matcher
+        .add(
+            "long",
+            vec![pattern(
+                r#"{"tokens":[{"constraints":[{"attribute":"length","predicate":{"kind":"compare","operator":">=","value":3}}],"repetition":{"kind":"once"}}]}"#,
+            )],
+        )
+        .unwrap();
+    let found = |doc: &Doc| {
+        matcher
+            .find_matches(doc)
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.rule, m.start.0, m.end.0))
+            .collect::<Vec<_>>()
+    };
+    let first = snapshot(&["ab", "abcd"]);
+    let second = snapshot(&["abcd", "x", "abc"]);
+    assert_eq!(found(&first), [("long".into(), 1, 2)]);
+    assert_eq!(
+        found(&second),
+        [
+            ("long".into(), 0, 1),
+            ("text".into(), 1, 2),
+            ("long".into(), 2, 3)
+        ]
+    );
+    assert_eq!(found(&first), [("long".into(), 1, 2)]);
 }
 #[test]
 fn reused_lower_matcher_keeps_documents_independent() {

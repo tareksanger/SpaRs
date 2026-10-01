@@ -13,8 +13,8 @@ from spacy.matcher import Matcher
 from spacy.tokens import Doc as make_doc
 
 from dependency_match_reference import (
-    ATTRIBUTES, FLAG_PIPELINE_TEXT, FLAG_WORDS, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Flag,
-    Membership, StringOperator, Versions, attribute_name, flag_constraints, lower_constraints, require_pinned_unicode,
+    Comparison, FLAG_PIPELINE_TEXT, FLAG_WORDS, LENGTH_PIPELINE_TEXT, LENGTH_WORDS, Compare, length_constraints, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Flag,
+    Membership, OfficialValue, Versions, attribute_name, official_attrs, flag_constraints, lower_constraints, require_pinned_unicode,
 )
 from reference_types import Doc, Language, SpanRecord, TokenRecord, span_records, token_records
 
@@ -75,28 +75,10 @@ class Fixture:
     cases: list[Case]
 
 
-def official(pattern: Pattern) -> list[dict[str, str | bool | StringOperator]]:
-    result: list[dict[str, str | bool | StringOperator]] = []
+def official(pattern: Pattern) -> list[dict[str, OfficialValue]]:
+    result: list[dict[str, OfficialValue]] = []
     for item in pattern.tokens:
-        attrs: dict[str, str | bool | StringOperator] = {}
-        for constraint in item.constraints:
-            attribute = ATTRIBUTES[constraint.attribute]
-            if attribute in attrs:
-                raise ValueError('Official converter requires distinct attributes per item')
-            predicate = constraint.predicate
-            if isinstance(predicate, Flag):
-                value: str | bool | StringOperator = predicate.value
-            elif isinstance(predicate, Equals):
-                value = predicate.value
-            elif predicate.kind == 'in':
-                value = {'IN': predicate.values}
-            elif predicate.kind == 'not_in':
-                value = {'NOT_IN': predicate.values}
-            elif predicate.kind == 'morph_superset':
-                value = {'IS_SUPERSET': predicate.values}
-            else:
-                value = {'INTERSECTS': predicate.values}
-            attrs[attribute] = value
+        attrs = official_attrs(item.constraints)
         repeat = item.repetition
         if isinstance(repeat, Range):
             if repeat.min < 0 or (repeat.max is not None and repeat.max < repeat.min):
@@ -236,6 +218,35 @@ def generate_flags(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def length(operator: Comparison, value: int | float, repeat: Repetition | Range = Repetition()) -> Item:
+    return Item([Constraint('length', Compare(operator, value))], repeat)
+
+
+def length_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Item(constraints)])]) for name, constraints in length_constraints()]
+    for name, items in [
+        ('long_run', [length('>=', 3, Repetition('one_or_more'))]),
+        ('not_single_then_long', [length('==', 1, Repetition('negated')), length('>', 4)]),
+        ('short_then_optional_long', [length('<=', 2), length('>=', 4, Repetition('optional'))]),
+        ('length_range', [length('!=', 1, Range(2, 3))]),
+    ]:
+        result.append(Rule(name, [Pattern(items)]))
+    return result
+
+
+def generate_length(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = length_rules()
+    count = len(LENGTH_WORDS)
+    words = make_doc(nlp.vocab, words=LENGTH_WORDS, spaces=[index + 1 < count for index in range(count)],
+                     heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases = [case(nlp, 'length-words', ' '.join(LENGTH_WORDS), words, patterns),
+             case(nlp, 'length-pipeline', LENGTH_PIPELINE_TEXT, nlp(LENGTH_PIPELINE_TEXT), patterns),
+             case(nlp, 'length-empty', '', make_doc(nlp.vocab, words=[]), patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     patterns = branching_rules() if branching else exhaustive_rules()
     cases: list[Case] = []
@@ -250,7 +261,8 @@ def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
-def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False, flags: bool = False) -> Fixture:
+def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False, flags: bool = False,
+             length: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -260,6 +272,8 @@ def generate(exhaustive: bool = False, branching: bool = False, lower: bool = Fa
         return generate_lower(nlp)
     if flags:
         return generate_flags(nlp)
+    if length:
+        return generate_length(nlp)
     if exhaustive or branching:
         return generate_exhaustive(nlp, branching)
     cases: list[Case] = []
@@ -287,6 +301,7 @@ def main() -> None:
     modes.add_argument('--branching', action='store_true')
     modes.add_argument('--lower', action='store_true')
     modes.add_argument('--flags', action='store_true')
+    modes.add_argument('--length', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -305,7 +320,10 @@ def main() -> None:
     flag_mode: object = args.flags
     if not isinstance(flag_mode, bool):
         raise TypeError('Flags flag must be boolean')
-    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode))
+    length_mode: object = args.length
+    if not isinstance(length_mode, bool):
+        raise TypeError('Length flag must be boolean')
+    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode, length_mode))
 
 
 if __name__ == '__main__':

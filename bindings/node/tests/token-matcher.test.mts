@@ -12,9 +12,19 @@ function record(value: unknown): Record<string, unknown> {
 function array(value: unknown): unknown[] { assert.ok(Array.isArray(value)); return value; }
 function string(value: unknown): string { assert.equal(typeof value, 'string'); return String(value); }
 function number(value: unknown): number { assert.ok(typeof value === 'number' && Number.isSafeInteger(value)); return value; }
+function scalar(value: unknown): string | boolean | number {
+  assert.ok(typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number');
+  return value;
+}
 function predicate(value: unknown): TokenPredicate {
   const data = record(value);
-  return { kind: string(data.kind), ...(data.value === undefined ? {} : { value: typeof data.value === 'boolean' ? data.value : string(data.value) }), ...(data.values === undefined ? {} : { values: array(data.values).map(string) }) };
+  const values = data.values === undefined ? undefined : array(data.values);
+  return {
+    kind: string(data.kind),
+    ...(data.operator === undefined ? {} : { operator: string(data.operator) }),
+    ...(data.value === undefined ? {} : { value: scalar(data.value) }),
+    ...(values === undefined ? {} : { values: values.every(item => typeof item === 'number') && values.length > 0 ? values.map(number) : values.map(string) }),
+  };
 }
 function constraint(value: unknown): TokenConstraint {
   const data = record(value);
@@ -50,6 +60,7 @@ for (const [filename, cases, rules, matches] of [
   ['token-match-exhaustive-v1.expected.json', 31, 4805, 6261],
   ['token-match-branching-v1.expected.json', 31, 248, 288],
   ['token-match-lower-v1.expected.json', 4, 172, 280],
+  ['token-match-length-v1.expected.json', 3, 105, 386],
 ] as const) {
   test(`TokenMatcher preserves frozen ordered reference corpus ${filename}`, async () => {
     const parsed: unknown = JSON.parse(readFileSync(new URL(`../../../fixtures/${filename}`, import.meta.url), 'utf8'));
@@ -113,10 +124,10 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
   for (const predicate of [{ kind: 'flag', value: 'true' }, { kind: 'flag' }, { kind: 'equals', value: true }, { kind: 'flag', value: true, values: [] }] as TokenPredicate[]) {
     assert.throws(() => withModel.add('bad', [flag(predicate)]), hasCode('SPARS_INVALID_PATTERN'));
   }
-  // napi rejects a value that is neither a string nor a boolean before conversion.
-  for (const value of [1, null]) {
-    assert.throws(() => withModel.add('bad', [flag({ kind: 'flag', value } as unknown as TokenPredicate)]), /none of these types/);
-  }
+  // A number is a valid predicate value type, so the binding reports a pattern error.
+  assert.throws(() => withModel.add('bad', [flag({ kind: 'flag', value: 1 })]), hasCode('SPARS_INVALID_PATTERN'));
+  // napi rejects a value that is neither a string, a boolean nor a number before conversion.
+  assert.throws(() => withModel.add('bad', [flag({ kind: 'flag', value: null } as unknown as TokenPredicate)]), /none of these types/);
   assert.throws(() => withModel.add('bad', [{ tokens: [{ constraints: [{ attribute: 'text', predicate: { kind: 'flag', value: true } }], repetition: { kind: 'once' } }] }]), hasCode('SPARS_INVALID_PATTERN'));
   assert.throws(() => new TokenMatcher({} as unknown as Model));
   assert.equal(plain.size, 0);
@@ -124,6 +135,46 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
   const falseFlag = flag({ kind: 'flag', value: false });
   withModel.add('not_digit', [falseFlag]);
   assert.deepStrictEqual(withModel.get('not_digit'), [falseFlag]);
+});
+
+test('TokenMatcher LENGTH predicates validate numbers and read back exactly', () => {
+  const matcher = new TokenMatcher();
+  const item = (predicate: TokenPredicate): TokenPattern => ({ tokens: [{ constraints: [{ attribute: 'length', predicate }], repetition: { kind: 'once' } }] });
+  const valid: TokenPredicate[] = [
+    { kind: 'compare', operator: '>', value: 2.5 },
+    { kind: 'in_integers', values: [1, -1, 3] },
+    { kind: 'not_in_integers', values: [] },
+    { kind: 'in_integers', values: [2, 2, -(2 ** 53 - 1), 2 ** 53 - 1] },
+  ];
+  for (const [index, predicate] of valid.entries()) {
+    matcher.add(`length${index}`, [item(predicate)]);
+    assert.deepStrictEqual(matcher.get(`length${index}`), [item(predicate)]);
+  }
+  const invalid = [
+    { kind: 'compare', value: 1 },
+    { kind: 'compare', operator: '=', value: 1 },
+    { kind: 'compare', operator: '==', value: '1' },
+    { kind: 'compare', operator: '==', value: Infinity },
+    { kind: 'compare', operator: '==', value: Number.NaN },
+    { kind: 'compare', operator: '==', value: 1, values: [1] },
+    { kind: 'in_integers', values: [1.5] },
+    { kind: 'in_integers', values: ['1'] },
+    { kind: 'in_integers', values: [2 ** 60] },
+    { kind: 'in_integers', values: [2 ** 53] },
+    { kind: 'in_integers', values: [-(2 ** 53)] },
+    { kind: 'in_integers', value: 1 },
+    { kind: 'equals', operator: '==', value: '1' },
+    { kind: 'equals', value: '3' },
+    { kind: 'in', values: [1] },
+  ] as unknown as TokenPredicate[];
+  for (const predicate of invalid) {
+    assert.throws(() => matcher.add('bad', [item(predicate)]), hasCode('SPARS_INVALID_PATTERN'), JSON.stringify(predicate));
+  }
+  assert.throws(() => matcher.add('bad', [{ tokens: [{ constraints: [{ attribute: 'text', predicate: { kind: 'compare', operator: '==', value: 1 } }], repetition: { kind: 'once' } }] }]), hasCode('SPARS_INVALID_PATTERN'));
+  // napi rejects an array mixing numbers and strings before conversion.
+  assert.throws(() => matcher.add('bad', [item({ kind: 'in_integers', values: [1, '1'] } as unknown as TokenPredicate)]), /none of these types/);
+  assert.equal(matcher.contains('bad'), false);
+  assert.equal(matcher.size, valid.length);
 });
 
 test('TokenMatcher lifecycle, ownership, and pending mutation', async () => {

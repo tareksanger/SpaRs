@@ -29,14 +29,21 @@ class StringOperator(TypedDict, total=False):
     IS_SUPERSET: list[str]
     INTERSECTS: list[str]
 
+# Numeric pattern operators, keyed exactly as spaCy spells them.
+NumberOperator = TypedDict('NumberOperator', {
+    '==': float, '!=': float, '>=': float, '<=': float, '>': float, '<': float,
+    'IN': list[int], 'NOT_IN': list[int],
+}, total=False)
+OfficialValue = str | bool | StringOperator | NumberOperator
+
 class OfficialNode(TypedDict):
     RIGHT_ID: str
-    RIGHT_ATTRS: dict[str, str | bool | StringOperator]
+    RIGHT_ATTRS: dict[str, OfficialValue]
     LEFT_ID: NotRequired[str]
     REL_OP: NotRequired[str]
 
 Attribute = Literal['text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology',
-                    'is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num']
+                    'is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num', 'length']
 FLAG_ATTRIBUTES: tuple[Attribute, ...] = ('is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num')
 
 @dataclass(frozen=True)
@@ -54,10 +61,23 @@ class Flag:
     value: bool
     kind: Literal['flag'] = 'flag'
 
+Comparison = Literal['==', '!=', '>=', '<=', '>', '<']
+
+@dataclass(frozen=True)
+class Compare:
+    operator: Comparison
+    value: int | float
+    kind: Literal['compare'] = 'compare'
+
+@dataclass(frozen=True)
+class IntegerMembership:
+    kind: Literal['in_integers', 'not_in_integers']
+    values: list[int]
+
 @dataclass(frozen=True)
 class Constraint:
     attribute: Attribute
-    predicate: Equals | Membership | Flag
+    predicate: Equals | Membership | Flag | Compare | IntegerMembership
 
 @dataclass(frozen=True)
 class Link:
@@ -109,30 +129,54 @@ class Fixture:
 
 OPERATORS = ('<', '>', '<<', '>>', '.', '.*', ';', ';*', '$+', '$-', '$++', '$--', '>+', '>-', '>++', '>--', '<+', '<-', '<++', '<--')
 ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH',
-              'is_alpha': 'IS_ALPHA', 'is_digit': 'IS_DIGIT', 'is_space': 'IS_SPACE', 'is_punct': 'IS_PUNCT', 'like_num': 'LIKE_NUM'}
+              'is_alpha': 'IS_ALPHA', 'is_digit': 'IS_DIGIT', 'is_space': 'IS_SPACE', 'is_punct': 'IS_PUNCT', 'like_num': 'LIKE_NUM',
+              'length': 'LENGTH'}
+
+
+def official_attrs(constraints: list[Constraint]) -> dict[str, OfficialValue]:
+    """Convert one item's conditions; numeric conditions on an attribute share one dict."""
+    attrs: dict[str, OfficialValue] = {}
+    numbers: dict[str, NumberOperator] = {}
+    for constraint in constraints:
+        attribute = ATTRIBUTES[constraint.attribute]
+        predicate = constraint.predicate
+        if isinstance(predicate, Compare | IntegerMembership):
+            if attribute in attrs:
+                raise ValueError('Official converter requires distinct attributes per node')
+            operators = numbers.setdefault(attribute, NumberOperator())
+            if isinstance(predicate, Compare):
+                if predicate.operator in operators:
+                    raise ValueError('Official converter requires distinct numeric operators')
+                operators[predicate.operator] = predicate.value
+            else:
+                key: Literal['IN', 'NOT_IN'] = 'IN' if predicate.kind == 'in_integers' else 'NOT_IN'
+                if key in operators:
+                    raise ValueError('Official converter requires distinct numeric operators')
+                operators[key] = predicate.values
+            continue
+        if attribute in attrs or attribute in numbers:
+            raise ValueError('Official converter requires distinct attributes per node')
+        if isinstance(predicate, Flag):
+            value: OfficialValue = predicate.value
+        elif isinstance(predicate, Equals):
+            value = predicate.value
+        elif predicate.kind == 'in':
+            value = {'IN': predicate.values}
+        elif predicate.kind == 'not_in':
+            value = {'NOT_IN': predicate.values}
+        elif predicate.kind == 'morph_superset':
+            value = {'IS_SUPERSET': predicate.values}
+        else:
+            value = {'INTERSECTS': predicate.values}
+        attrs[attribute] = value
+    attrs.update(numbers)
+    return attrs
 
 
 def official(pattern: Pattern) -> list[OfficialNode]:
     result: list[OfficialNode] = []
     for node in pattern.nodes:
-        attrs: dict[str, str | bool | StringOperator] = {}
-        for constraint in node.constraints:
-            if ATTRIBUTES[constraint.attribute] in attrs:
-                raise ValueError('Official converter requires distinct attributes per node')
-            predicate = constraint.predicate
-            if isinstance(predicate, Flag):
-                value: str | bool | StringOperator = predicate.value
-            elif isinstance(predicate, Equals):
-                value = predicate.value
-            elif predicate.kind == 'in':
-                value = {'IN': predicate.values}
-            elif predicate.kind == 'not_in':
-                value = {'NOT_IN': predicate.values}
-            elif predicate.kind == 'morph_superset':
-                value = {'IS_SUPERSET': predicate.values}
-            else:
-                value = {'INTERSECTS': predicate.values}
-            attrs[ATTRIBUTES[constraint.attribute]] = value
+        attrs = official_attrs(node.constraints)
         converted: OfficialNode = {'RIGHT_ID': node.id, 'RIGHT_ATTRS': attrs}
         if node.link is not None:
             converted['LEFT_ID'] = node.link.left
@@ -236,12 +280,58 @@ def flag_rules() -> list[Rule]:
     return result
 
 
+# LENGTH counts code points, like Python len(): decomposed accents, emoji sequences
+# and supplementary characters show the difference from bytes and graphemes.
+LENGTH_WORDS = ['a', 'ab', 'abc', 'abcd', '\u00e9', 'e\u0301', '\U0001f469\U0001f3fd\u200d\U0001f4bb', '\U00010400',
+                'stra\u00dfe', '1,000', '\u03a3', 'supercalifragilistic', '\u00a0', '\n', "n't", '  ']
+LENGTH_PIPELINE_TEXT = "The supercalifragilistic caf\u00e9 isn't 1,000 miles away \U0001f469\U0001f3fd\u200d\U0001f4bb."
+
+
+def length_constraints() -> list[tuple[str, list[Constraint]]]:
+    def compare(operator: Comparison, value: int | float) -> Constraint:
+        return Constraint('length', Compare(operator, value))
+
+    def members(kind: Literal['in_integers', 'not_in_integers'], values: list[int]) -> Constraint:
+        return Constraint('length', IntegerMembership(kind, values))
+
+    return [
+        ('equals_3', [compare('==', 3)]), ('equals_3_float', [compare('==', 3.0)]), ('equals_0', [compare('==', 0)]),
+        ('not_1', [compare('!=', 1)]), ('at_least_4', [compare('>=', 4)]), ('at_most_1', [compare('<=', 1)]),
+        ('over_2_5', [compare('>', 2.5)]), ('under_2', [compare('<', 2)]), ('under_huge', [compare('<', 10**20)]),
+        ('in_1_3', [members('in_integers', [1, 3])]), ('in_negative', [members('in_integers', [-1, 2])]),
+        ('in_empty', [members('in_integers', [])]), ('in_large', [members('in_integers', [2**53 - 1])]),
+        ('not_in_1_3', [members('not_in_integers', [1, 3])]), ('not_in_empty', [members('not_in_integers', [])]),
+        ('between_2_4', [compare('>=', 2), compare('<', 4)]),
+        ('in_not_2', [members('in_integers', [1, 2, 3]), compare('!=', 2)]),
+        ('short_lower', [compare('<=', 3), Constraint('lower', Equals('abc'))]),
+        ('not_2_5', [compare('!=', 2.5)]), ('not_3_float', [compare('!=', 3.0)]),
+        ('equals_near_3', [compare('==', 3.0000000000000004)]), ('at_least_near_3', [compare('>=', 2.9999999999999996)]),
+        ('over_negative', [compare('>', -1)]), ('in_duplicates', [members('in_integers', [3, 3])]),
+        ('in_and_not_in', [members('in_integers', [1, 2, 3]), members('not_in_integers', [2])]),
+        ('equals_2_5', [compare('==', 2.5)]), ('at_least_2_5', [compare('>=', 2.5)]),
+        ('under_2_5', [compare('<', 2.5)]), ('at_most_negative', [compare('<=', -0.5)]),
+        ('short_not_abc', [compare('<', 3), Constraint('lower', Equals('abc'))]),
+        ('long_member', [compare('>=', 4), Constraint('lower', Membership('in', ['ab', 'abcd']))]),
+    ]
+
+
+def length_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Node('a', constraints)])]) for name, constraints in length_constraints()]
+    result.append(Rule('long_head_short_child', [Pattern([
+        Node('head', [Constraint('length', Compare('>=', 4))]),
+        Node('child', [Constraint('length', Compare('<=', 2))], Link('head', '>')),
+    ])]))
+    return result
+
+
 def attribute_name(value: str) -> Attribute:
     if value in ('text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology'):
         return value
     for flag in FLAG_ATTRIBUTES:
         if value == flag:
             return flag
+    if value == 'length':
+        return value
     raise ValueError('Unsupported attribute')
 
 
@@ -255,7 +345,7 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
     return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, expected)
 
 
-def generate(regressions: bool = False, lower: bool = False, flags: bool = False) -> Fixture:
+def generate(regressions: bool = False, lower: bool = False, flags: bool = False, length: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -267,6 +357,8 @@ def generate(regressions: bool = False, lower: bool = False, flags: bool = False
         return generate_lower(nlp)
     if flags:
         return generate_flags(nlp)
+    if length:
+        return generate_length(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -333,6 +425,19 @@ def generate_flags(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def generate_length(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = length_rules()
+    count = len(LENGTH_WORDS)
+    words = make_doc(nlp.vocab, words=LENGTH_WORDS, spaces=[index + 1 < count for index in range(count)],
+                     heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases = [case(nlp, 'length-words', ' '.join(LENGTH_WORDS), words, patterns),
+             case(nlp, 'length-pipeline', LENGTH_PIPELINE_TEXT, nlp(LENGTH_PIPELINE_TEXT), patterns),
+             case(nlp, 'length-empty', '', make_doc(nlp.vocab, words=[]), patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'dependencymatcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def write_fixture(output: Path, fixture: Fixture) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x', encoding='utf-8') as stream:
@@ -346,6 +451,7 @@ def main() -> None:
     modes.add_argument('--regressions', action='store_true')
     modes.add_argument('--lower', action='store_true')
     modes.add_argument('--flags', action='store_true')
+    modes.add_argument('--length', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -361,7 +467,10 @@ def main() -> None:
     flag_mode: object = args.flags
     if not isinstance(flag_mode, bool):
         raise TypeError('Flags flag must be boolean')
-    write_fixture(output, generate(regressions, lower_mode, flag_mode))
+    length_mode: object = args.length
+    if not isinstance(length_mode, bool):
+        raise TypeError('Length flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode))
 
 
 if __name__ == '__main__':

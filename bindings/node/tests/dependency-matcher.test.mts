@@ -9,9 +9,13 @@ function constraint(value: unknown): TokenConstraint {
   const c = record(value);
   const p = record(c.predicate);
   const predicate: TokenPredicate = { kind: string(p.kind) };
-  if (typeof p.value === 'boolean') predicate.value = p.value;
+  if (p.operator !== undefined && p.operator !== null) predicate.operator = string(p.operator);
+  if (typeof p.value === 'boolean' || typeof p.value === 'number') predicate.value = p.value;
   else if (p.value !== undefined && p.value !== null) predicate.value = string(p.value);
-  if (p.values !== undefined && p.values !== null) predicate.values = array(p.values).map(string);
+  if (p.values !== undefined && p.values !== null) {
+    const values = array(p.values);
+    predicate.values = values.length > 0 && values.every(item => typeof item === 'number') ? values.map(item => { assert.ok(Number.isSafeInteger(item)); return Number(item); }) : values.map(string);
+  }
   return { attribute: string(c.attribute), predicate };
 }
 function pattern(value: unknown): DependencyPattern {
@@ -45,7 +49,9 @@ test('all dependency relations, predicates and ordering match frozen official su
   const relations = new Set<string>();
   let lowerRules = 0;
   let lowerMatches = 0;
-  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4]] as const) {
+  let lengthRules = 0;
+  let lengthMatches = 0;
+  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3]] as const) {
     const fixture = record(readJson(`${root}fixtures/${suite}.expected.json`));
     assert.deepEqual(fixture.versions, { spacy: '3.8.14', thinc: '8.3.13' });
     const cases = array(fixture.cases);
@@ -59,6 +65,10 @@ test('all dependency relations, predicates and ordering match frozen official su
       if (suite === 'dependency-match-lower-v1') {
         lowerRules += rules.length;
         lowerMatches += array(c.expected).length;
+      }
+      if (suite === 'dependency-match-length-v1') {
+        lengthRules += rules.length;
+        lengthMatches += array(c.expected).length;
       }
       for (const value of rules) {
         const rule = record(value);
@@ -83,6 +93,8 @@ test('all dependency relations, predicates and ordering match frozen official su
   assert.equal(relations.size, 20);
   assert.equal(lowerRules, 160);
   assert.equal(lowerMatches, 223);
+  assert.equal(lengthRules, 96);
+  assert.equal(lengthMatches, 321);
 });
 
 const FLAG_RULES = 42;

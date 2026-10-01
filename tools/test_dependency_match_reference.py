@@ -1,4 +1,6 @@
 """Check reference conversion and frozen dependency matcher coverage."""
+import subprocess
+import sys
 import tempfile
 from typing import Callable
 import unicodedata
@@ -8,7 +10,7 @@ import unittest
 
 import dependency_match_reference
 from dependency_match_reference import (
-    FLAG_WORDS, LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
+    FLAG_WORDS, LENGTH_WORDS, NumberOperator, LOWER_VALUES, LOWER_WORDS, Compare, Constraint, IntegerMembership, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
     Pattern, Versions, attribute_name, official, write_fixture,
 )
 from json_types import json_array, json_int, json_object, json_string, parse_json
@@ -118,7 +120,7 @@ class DependencyReferenceTests(unittest.TestCase):
                     patch.object(dependency_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, True, False)
+                generate.assert_called_once_with(False, True, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', '--regressions', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -126,7 +128,74 @@ class DependencyReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, True)
+                generate.assert_called_once_with(False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['dependency_match_reference.py', '--length', str(output)]):
+                    dependency_match_reference.main()
+                generate.assert_called_once_with(False, False, False, True)
+                with patch('sys.argv', ['dependency_match_reference.py', '--length', '--flags', str(output)]):
+                    with self.assertRaises(SystemExit):
+                        dependency_match_reference.main()
+
+    def test_numeric_conditions_merge_into_one_official_dict(self) -> None:
+        pattern = Pattern([Node('a', [Constraint('length', Compare('>=', 2)), Constraint('length', Compare('<', 4)),
+                                      Constraint('length', IntegerMembership('not_in_integers', [3])),
+                                      Constraint('lower', Equals('ab'))])])
+        self.assertEqual(official(pattern), [{'RIGHT_ID': 'a', 'RIGHT_ATTRS': {
+            'LOWER': 'ab', 'LENGTH': {'>=': 2, '<': 4, 'NOT_IN': [3]}}}])
+        for duplicate in ([Compare('>', 1), Compare('>', 2)], [IntegerMembership('in_integers', [1]), IntegerMembership('in_integers', [2])]):
+            with self.assertRaisesRegex(ValueError, 'distinct numeric operators'):
+                official(Pattern([Node('a', [Constraint('length', item) for item in duplicate])]))
+        with self.assertRaisesRegex(ValueError, 'distinct attributes'):
+            official(Pattern([Node('a', [Constraint('lower', Equals('a')), Constraint('lower', Equals('b'))])]))
+
+    def test_frozen_length_suite_matches_python_len_per_token(self) -> None:
+        path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-length-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['length-words', 'length-pipeline', 'length-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 96)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 321)
+        self.assertEqual(cases[2]['expected'], [])
+        self.assertEqual(cases[0]['text'], ' '.join(LENGTH_WORDS))
+        found: dict[str, set[str]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            tokens = json_array(match['tokens'])
+            if len(tokens) == 1:
+                found.setdefault(json_string(match['rule']), set()).add(LENGTH_WORDS[json_int(tokens[0])])
+        # Independent invariant: LENGTH is Python len() of the token text.
+        expected: dict[str, Callable[[int], bool]] = {
+            'equals_3': lambda n: n == 3, 'equals_3_float': lambda n: n == 3, 'equals_0': lambda n: n == 0,
+            'not_1': lambda n: n != 1, 'at_least_4': lambda n: n >= 4, 'at_most_1': lambda n: n <= 1,
+            'over_2_5': lambda n: n > 2.5, 'under_2': lambda n: n < 2, 'under_huge': lambda n: True,
+            'in_1_3': lambda n: n in (1, 3), 'in_negative': lambda n: n == 2, 'in_empty': lambda n: False,
+            'in_large': lambda n: False, 'not_in_1_3': lambda n: n not in (1, 3), 'not_in_empty': lambda n: True,
+            'between_2_4': lambda n: 2 <= n < 4, 'in_not_2': lambda n: n in (1, 3),
+            'not_2_5': lambda n: n != 2.5, 'not_3_float': lambda n: n != 3.0,
+            'equals_near_3': lambda n: n == 3.0000000000000004, 'at_least_near_3': lambda n: n >= 2.9999999999999996,
+            'over_negative': lambda n: n > -1, 'in_duplicates': lambda n: n == 3,
+            'in_and_not_in': lambda n: n in (1, 3),
+            'equals_2_5': lambda n: n == 2.5, 'at_least_2_5': lambda n: n >= 2.5,
+            'under_2_5': lambda n: n < 2.5, 'at_most_negative': lambda n: n <= -0.5,
+        }
+        for rule, accepts in expected.items():
+            self.assertEqual(found.get(rule, set()), {word for word in LENGTH_WORDS if accepts(len(word))}, rule)
+        self.assertEqual(found.get('short_not_abc', set()), set())
+        self.assertEqual(found.get('long_member', set()), {'abcd'})
+        # The parsed document must satisfy the same invariant token by token.
+        pipeline = json_object(cases[1])
+        text = json_string(pipeline['text']).encode()
+        tokens = [json_object(token) for token in json_array(pipeline['tokens'])]
+        words = [text[json_int(token['start']):json_int(token['end'])].decode() for token in tokens]
+        matched: dict[str, set[int]] = {}
+        for value in json_array(pipeline['expected']):
+            match = json_object(value)
+            indices = json_array(match['tokens'])
+            if len(indices) == 1:
+                matched.setdefault(json_string(match['rule']), set()).add(json_int(indices[0]))
+        for rule, accepts in expected.items():
+            self.assertEqual(matched.get(rule, set()), {i for i, word in enumerate(words) if accepts(len(word))}, rule)
 
     def test_flag_attributes_convert_to_official_boolean_values(self) -> None:
         self.assertEqual(attribute_name('like_num'), 'like_num')
@@ -178,6 +247,44 @@ class DependencyReferenceTests(unittest.TestCase):
         combined = {token_text(json_int(json_array(json_object(value)['tokens'])[0]))
                     for value in json_array(cases[0]['expected']) if json_object(value)['rule'] == 'number_word'}
         self.assertEqual(combined, {word for word in FLAG_WORDS if word.isalpha() and like_num(word)})
+
+
+    def test_pinned_spacy_length_validation_matches_documented_contract(self) -> None:
+        """Reference evidence for the rejection lists and the NaN/infinity difference."""
+        import math
+        import spacy
+        from spacy.matcher import Matcher
+        from spacy.tokens import Doc as make_doc
+        nlp = spacy.blank('en')
+        doc = make_doc(nlp.vocab, words=['a', 'abc'])
+        def accepts(value: NumberOperator) -> bool:
+            matcher = Matcher(nlp.vocab, validate=True)
+            try:
+                matcher.add('rule', [[{'LENGTH': value}]])
+            except ValueError:
+                return False
+            matcher(doc)
+            return True
+        # Deliberately malformed values run in a child interpreter, outside the typed stub.
+        script = (
+            'import json, spacy\n'
+            'from spacy.matcher import Matcher\n'
+            'nlp = spacy.blank("en")\n'
+            'rejected = []\n'
+            'for value in [{"IN": [1.5]}, {"IN": [1.0]}, {"==": True}, {"IN": [True]}, {"IN": ["1"]}]:\n'
+            '    try:\n'
+            '        Matcher(nlp.vocab, validate=True).add("rule", [[{"LENGTH": value}]])\n'
+            '    except ValueError:\n'
+            '        rejected.append(True)\n'
+            '    else:\n'
+            '        rejected.append(False)\n'
+            'print(json.dumps(rejected))\n'
+        )
+        output = subprocess.run([sys.executable, '-c', script], check=True, capture_output=True, text=True).stdout
+        self.assertEqual(json_array(parse_json(output.strip().splitlines()[-1])), [True] * 5)
+        # spaCy accepts non-finite comparison values; SpaRs rejects them (documented difference).
+        for value in [NumberOperator({'>': math.nan}), NumberOperator({'<': math.inf}), NumberOperator({'>': -math.inf})]:
+            self.assertTrue(accepts(value), value)
 
 
 if __name__ == '__main__':
