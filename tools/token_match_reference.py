@@ -12,7 +12,7 @@ import thinc
 from spacy.matcher import Matcher
 from spacy.tokens import Doc as make_doc
 
-from dependency_match_reference import ATTRIBUTES, Constraint, Equals, Membership, Versions, StringOperator, attribute_name
+from dependency_match_reference import ATTRIBUTES, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Membership, Versions, StringOperator, attribute_name, lower_constraints, require_pinned_unicode
 from reference_types import Doc, Language, SpanRecord, TokenRecord, span_records, token_records
 
 
@@ -164,6 +164,41 @@ def branching_rules() -> list[Rule]:
     return result
 
 
+def lower(value: str, repeat: Repetition | Range = Repetition()) -> Item:
+    return Item([Constraint('lower', Equals(value))], repeat)
+
+
+def lower_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Item([constraint])])]) for name, constraint in lower_constraints()]
+    articles = Membership('in', ['the', 'ritz'])
+    for name, items in [
+        ('the_ritz', [lower('the'), lower('ritz')]),
+        ('the_ritz_plus', [lower('the'), lower('ritz', Repetition('one_or_more'))]),
+        ('optional_the_ritz', [lower('the', Repetition('optional')), lower('ritz')]),
+        ('not_the_then_ritz', [lower('the', Repetition('negated')), lower('ritz')]),
+        ('articles_range', [Item([Constraint('lower', articles)], Range(1, 3))]),
+        ('conjunction', [Item([Constraint('lower', Equals('the')), Constraint('text', Equals('THE'))])]),
+        ('uppercase_value', [lower('THE'), lower('RITZ')]),
+    ]:
+        result.append(Rule(name, [Pattern(items)]))
+    return result
+
+
+def generate_lower(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = lower_rules()
+    cases: list[Case] = []
+    for case_id, words in [('lower-variants', LOWER_WORDS), ('lower-phrases', ['The', 'RITZ', 'met', 'THE', 'Ritz', 'ritz', 'hotel'])]:
+        count = len(words)
+        doc = make_doc(nlp.vocab, words=words, spaces=[index + 1 < count for index in range(count)],
+                       heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+        cases.append(case(nlp, case_id, ' '.join(words), doc, patterns))
+    cases.append(case(nlp, 'lower-pipeline', LOWER_PIPELINE_TEXT, nlp(LOWER_PIPELINE_TEXT), patterns))
+    cases.append(case(nlp, 'lower-empty', '', make_doc(nlp.vocab, words=[]), patterns))
+    source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     patterns = branching_rules() if branching else exhaustive_rules()
     cases: list[Case] = []
@@ -178,12 +213,14 @@ def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
-def generate(exhaustive: bool = False, branching: bool = False) -> Fixture:
+def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
     if nlp.meta['version'] != '3.8.0':
         raise ValueError('Use en_core_web_md 3.8.0')
+    if lower:
+        return generate_lower(nlp)
     if exhaustive or branching:
         return generate_exhaustive(nlp, branching)
     cases: list[Case] = []
@@ -209,6 +246,7 @@ def main() -> None:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--exhaustive', action='store_true')
     modes.add_argument('--branching', action='store_true')
+    modes.add_argument('--lower', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -221,7 +259,10 @@ def main() -> None:
     branching: object = args.branching
     if not isinstance(branching, bool):
         raise TypeError('Branching flag must be boolean')
-    write_fixture(output, generate(exhaustive, branching))
+    lower_mode: object = args.lower
+    if not isinstance(lower_mode, bool):
+        raise TypeError('Lower flag must be boolean')
+    write_fixture(output, generate(exhaustive, branching, lower_mode))
 
 
 if __name__ == '__main__':

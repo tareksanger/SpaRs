@@ -96,6 +96,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => patterns[(i / length) % n][i % length].clone(),
         })
         .collect();
+    // `lower-upper` capitalizes the input so every token needs a lowercase copy.
+    let words: Vec<_> = if args[0] == "lower-upper" {
+        words.iter().map(|word| word.to_uppercase()).collect()
+    } else {
+        words
+    };
     let docs: Vec<_> = patterns.iter().map(|p| doc(p)).collect();
     let input = doc(&words);
     // Resolve immutable symbol data before timing either matcher.
@@ -109,7 +115,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let label = format!("rule-{i}");
         if args[0] == "phrase" {
             phrase.add(label, &[&docs[i]])?;
-        } else if args[0] == "token" {
+        } else if matches!(args[0].as_str(), "token" | "lower" | "lower-upper") {
+            let attribute = if args[0] == "token" {
+                TokenAttribute::Text
+            } else {
+                TokenAttribute::Lower
+            };
             token.add(
                 label,
                 vec![TokenPattern {
@@ -117,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .iter()
                         .map(|s| TokenPatternItem {
                             constraints: vec![TokenConstraint {
-                                attribute: TokenAttribute::Text,
+                                attribute,
                                 predicate: Predicate::Equals { value: s.clone() },
                             }],
                             repetition: Repetition::Once,
@@ -126,7 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }],
             )?;
         } else {
-            return Err("engine must be phrase or token".into());
+            return Err("engine must be phrase, token, lower or lower-upper".into());
         }
     }
     let compile_ms = start.elapsed().as_secs_f64() * 1000.;

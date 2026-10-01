@@ -2,7 +2,7 @@
 pub(crate) mod predicates;
 mod relations;
 use crate::{Doc, Error, Result, TokenIndex};
-use predicates::CompiledConstraint;
+use predicates::{CompiledConstraint, TokenValues};
 pub use predicates::{Predicate, TokenAttribute, TokenConstraint};
 use relations::Graph;
 pub use relations::Relation;
@@ -117,6 +117,7 @@ impl DependencyMatcher {
                 }
             }
         }
+        let values = TokenValues::new(doc, checked_attributes.contains(&TokenAttribute::Lower))?;
         let mut candidates: Vec<HashMap<usize, Vec<Vec<usize>>>> =
             patterns.iter().map(|_| HashMap::new()).collect();
         let mut roots = Vec::new();
@@ -130,7 +131,7 @@ impl DependencyMatcher {
                 for (node_index, node) in pattern.nodes.iter().enumerate() {
                     let mut matches = true;
                     for constraint in &node.constraints {
-                        if !constraint.matches(token)? {
+                        if !constraint.matches(token, &values)? {
                             matches = false;
                             break;
                         }

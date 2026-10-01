@@ -40,9 +40,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 The default returns overlapping matches, so “visited New” also matches this pattern. A pattern describes token conditions; it does not verify that a name is a place. Use entity annotations separately when that distinction matters.
 
+## Match without regard to case
+
+`TokenAttribute::Lower` compares the lowercase form of each token's text, like spaCy's `LOWER`. This example finds “the Ritz” however it is capitalized.
+
+```rust
+use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
+    TokenMatcher, TokenPattern, TokenPatternItem};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let lower = |value: &str| TokenPatternItem {
+        constraints: vec![TokenConstraint {
+            attribute: TokenAttribute::Lower,
+            predicate: Predicate::Equals { value: value.into() },
+        }],
+        repetition: Default::default(),
+    };
+    let mut matcher = TokenMatcher::new();
+    matcher.add("ritz", vec![TokenPattern { tokens: vec![lower("the"), lower("ritz")] }])?;
+    let doc = model.process("THE RITZ is near the Ritz.")?;
+    let found: Vec<_> = matcher.find_matches(&doc)?.iter()
+        .map(|m| (m.start, m.end)).collect();
+    assert_eq!(found, [(TokenIndex(0), TokenIndex(2)), (TokenIndex(4), TokenIndex(6))]);
+    Ok(())
+}
+```
+
+Pattern values are compared exactly as written; they are not lowercased. A value such as `"Ritz"` therefore never matches, because lowercasing always turns `R` into `r`. Write pattern values in lowercase. Lowercase mappings follow Python's Unicode 15.0.0 `str.lower()`. This includes the Greek final sigma rule: a capital `Σ` becomes `ς` only when a cased letter comes before it and no cased letter follows it, ignoring combining marks between them; otherwise it becomes `σ`. So `ΟΣ` becomes `ος`, while a lone `Σ` becomes `σ`. This is lowercasing, not case folding or Unicode normalization: `ß` does not become `ss`, and a single-character `é` stays distinct from an `e` followed by a separate combining accent. `Lower` needs only token text, not model annotations, and it differs from `Norm`, which can replace a word such as `Gon` with `going`. It uses the same pinned lowercase data as PhraseMatcher `LOWER`. Only `Equals`, `In` and `NotIn` work with `Lower`. spaCy also accepts the set comparisons `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` on `LOWER`; here set comparisons exist only as `MorphSuperset` and `MorphIntersects` on `Morphology`, so using them with `Lower` returns a pattern error.
+
 ## Conditions and repetition
 
-All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are text, normalization, lemma, POS, tag, dependency label, and morphology. Comparisons support equality, membership, exclusion, and morphology superset or intersection. Text equality is case-sensitive.
+All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep` and `Morphology`. Comparisons support equality, membership, exclusion, and morphology superset or intersection. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
 
 | Repetition | spaCy operator | Meaning |
 |---|---|---|
@@ -62,7 +90,7 @@ Negation consumes a token; it is not a check between tokens. Zero-length results
 
 Results preserve the pinned spaCy matcher's discovery order, including optional suffixes at the end of the document. They are not sorted by start position or grouped by rule. Identical `(rule, start, end)` results appear once, even when several patterns or repetition paths produce them. Different rule names can match the same span.
 
-Requested annotations must be available throughout the document. Missing annotations return errors, including when another condition would have ruled out the token. Items with an exact zero count are discarded and do not require annotations. Text-only matching does not require dependency heads or linguistic annotations. Invalid patterns and unsupported serialized enum values return errors.
+Requested annotations must be available throughout the document. Missing annotations return errors, including when another condition would have ruled out the token. Items with an exact zero count are discarded and do not require annotations. Text-only and lowercase matching do not require dependency heads or linguistic annotations. Invalid patterns and unsupported serialized enum values return errors.
 
 ## Scope and cost
 

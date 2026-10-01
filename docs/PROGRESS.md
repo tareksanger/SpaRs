@@ -19,7 +19,7 @@ SpaRs implements native Rust inference for `en_core_web_sm`, `en_core_web_md`, a
 | Parser and entity action traces | 634 action choices, context IDs, and valid-action masks |
 | New robustness checks | 9 malformed configurations, 4 damaged tensors, 27 malformed snapshots, 3 invalid UTF-8 offsets, and 28 processing results across repeated, batched, and concurrent calls |
 | Dependency traversal | 98 documents / 5,568 tokens compared with official children, ancestors, subtree order, and sentence spans |
-| Token Matcher | 72 documents / 5,533 rule registrations / 7,253 ordered matches against official spaCy |
+| Token Matcher | 76 reference cases / 5,705 rule registrations / 7,533 ordered matches against official spaCy, including Unicode `LOWER` |
 | Additional sm/lg full-pipeline suites | 98 documents / 5,568 tokens each; separate frozen official references, exact annotations and vector tolerances in `crates/spars/tests/model_parity.rs` |
 | Model capability and order checks | Independent model identity, declared pipeline order, rejected dependencies, and independent contextual token/span vectors in `crates/spars/tests/model_loading.rs` and `crates/spars/tests/model_parity.rs` |
 | Rust Markdown examples | README and guide examples execute through `tools/check_docs.py` |
@@ -68,7 +68,7 @@ The separate [Node binding](NODE.md) exposes loading, processing, batches, order
 
 ## Implementation sequence
 
-The following deliveries are planned, not implemented or verified. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
+Delivery M1 is implemented; the remaining deliveries are planned, not implemented or verified. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
 
 ### 1. Shared matcher conditions and options
 
@@ -76,7 +76,7 @@ The three native matchers and their reference suites are described in the [match
 
 | Delivery | Scope | Acceptance |
 |---|---|---|
-| M1 | Shared Unicode LOWER for TokenMatcher and DependencyMatcher, reusing the pinned lowercase resources where semantics agree | Ordered official outputs for Unicode expansions, combining characters, empty documents, repeated calls, and malformed conditions; existing PhraseMatcher LOWER results unchanged |
+| M1 (implemented) | Shared Unicode LOWER for TokenMatcher and DependencyMatcher, reusing the pinned lowercase resources where semantics agree | Ordered official outputs for Unicode expansions, combining characters, empty documents, repeated calls, and malformed conditions; existing PhraseMatcher LOWER results unchanged. Evidence: `token-match-lower-v1` and `dependency-match-lower-v1` fixtures through Rust and Node, with predicate unit tests for malformed conditions |
 | M2 | Inventory missing attributes and predicates across all three matchers; add typed lexical flags, starting with IS_ALPHA, IS_DIGIT, IS_SPACE, IS_PUNCT and LIKE_NUM; then LENGTH and numeric comparisons | Positive and negative cases for every added attribute/operator, including Unicode length semantics and invalid value types; no implicit string conversion for flags or numbers |
 | M3 | Remaining set comparisons and annotation-based PhraseMatcher attributes, one attribute family at a time | Missing annotations, invalid attribute choices, pattern/input consistency, and lifecycle ordering match the declared upstream contract |
 | M4 | TokenMatcher greedy FIRST/LONGEST, then alignments, checked span input and labeled-span results where the corresponding spaCy matcher supports them, including PhraseMatcher labeled-span output | Overlap and repetition tie-breaking, duplicate matches, alignment lengths, unavailable annotations and option combinations agree exactly; PhraseMatcher span labels, boundaries and result ordering match the pinned reference; span-relative and document-relative indices are tested separately for each API; existing default behavior and typed Rust callers remain compatible |
@@ -135,7 +135,7 @@ Multilingual expansion follows completion of milestones 1–4 using the [model e
 
 ## Matching implementation plan
 
-Token Matcher, DependencyMatcher and [PhraseMatcher](PHRASE_MATCHER.md) have native implementations and frozen reference suites. PhraseMatcher implements ORTH/TEXT/LOWER, and Node exposes all three matchers. Steps 1–2 below retain the acceptance requirements for the implemented PhraseMatcher, step 3 records the implemented Node bindings, and step 4 describes the subsequent rule-based annotation milestone. Remaining matcher conditions and options are planned as deliveries M1–M5 in the [implementation sequence](#1-shared-matcher-conditions-and-options).
+Token Matcher, DependencyMatcher and [PhraseMatcher](PHRASE_MATCHER.md) have native implementations and frozen reference suites. PhraseMatcher implements ORTH/TEXT/LOWER, and Node exposes all three matchers. Steps 1–2 below retain the acceptance requirements for the implemented PhraseMatcher, step 3 records the implemented Node bindings, and step 4 describes the subsequent rule-based annotation milestone. Remaining matcher conditions and options are planned as deliveries M2–M5 in the [implementation sequence](#1-shared-matcher-conditions-and-options); M1 (shared `LOWER`) is implemented.
 
 ### 1. PhraseMatcher reference contract (implemented)
 
@@ -171,7 +171,7 @@ Acceptance: official comparisons verify complete documents after rule applicatio
 
 For every increment, follow `docs/QUALITY.md` and obtain reference, test, documentation, and performance reviews. Run focused cases followed by `.venv/bin/python tools/verify.py`; CI must execute new parity tests with explicit denominators. Keep generated mismatch and timing reports under ignored `target/reports/` and update the compatibility inventory only for behavior actually verified.
 
-Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded delivery is shared LOWER conditions (M1); later matcher features retain separate acceptance.
+Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded delivery is typed lexical flags (M2); later matcher features retain separate acceptance.
 
 ## Model extensibility plan
 

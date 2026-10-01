@@ -1,5 +1,6 @@
-use crate::{Doc, Error, Result, TokenView};
+use crate::{Doc, Error, Result, TokenIndex, TokenView};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 
 /// Token annotations shared by token and dependency patterns.
@@ -7,6 +8,9 @@ use std::collections::{BTreeMap, HashSet};
 #[serde(rename_all = "snake_case")]
 pub enum TokenAttribute {
     Text,
+    /// Python Unicode 15 `str.lower()` of the token text, as in spaCy's LOWER.
+    /// Pattern values are compared as written and are not lowercased.
+    Lower,
     Norm,
     Lemma,
     Pos,
@@ -46,6 +50,25 @@ enum CompiledPredicate {
 pub(crate) struct CompiledConstraint {
     attribute: TokenAttribute,
     predicate: CompiledPredicate,
+}
+
+/// Token values derived once per matching call and shared by every constraint.
+/// Lowercase text is computed only when a registered constraint needs it.
+pub(crate) struct TokenValues<'a> {
+    lower: Vec<Cow<'a, str>>,
+}
+
+impl<'a> TokenValues<'a> {
+    pub(crate) fn new(doc: &'a Doc, needs_lower: bool) -> Result<Self> {
+        let lower = if needs_lower {
+            (0..doc.tokens().len())
+                .map(|index| doc.token_text(TokenIndex(index)).map(lower))
+                .collect::<Result<_>>()?
+        } else {
+            Vec::new()
+        };
+        Ok(Self { lower })
+    }
 }
 
 impl TokenConstraint {
@@ -92,29 +115,54 @@ impl CompiledConstraint {
         self.attribute
     }
     pub(crate) fn validate_document(&self, doc: &Doc) -> Result<()> {
+        // Text-derived attributes are always available and need no document scan.
+        if matches!(
+            self.attribute,
+            TokenAttribute::Text | TokenAttribute::Lower | TokenAttribute::Norm
+        ) {
+            return Ok(());
+        }
         for i in 0..doc.tokens().len() {
-            let value = self.value(doc.token(crate::TokenIndex(i))?)?;
+            let value = self.value(doc.token(TokenIndex(i))?, None)?;
             if self.attribute == TokenAttribute::Morphology {
-                validate_canonical_morph(value)?;
+                validate_canonical_morph(&value)?;
             }
         }
         Ok(())
     }
-    fn value<'a>(&self, token: TokenView<'a>) -> Result<&'a str> {
+    fn value<'a>(
+        &self,
+        token: TokenView<'a>,
+        values: Option<&'a TokenValues<'a>>,
+    ) -> Result<Cow<'a, str>> {
         let t = token.annotations();
         let (value, name) = match self.attribute {
-            TokenAttribute::Text => return Ok(token.text()),
-            TokenAttribute::Norm => return Ok(&t.norm),
+            TokenAttribute::Text => return Ok(Cow::Borrowed(token.text())),
+            TokenAttribute::Lower => {
+                let cached = values.and_then(|values| values.lower.get(token.index().0));
+                return Ok(match cached {
+                    Some(value) => Cow::Borrowed(value.as_ref()),
+                    None => lower(token.text()),
+                });
+            }
+            TokenAttribute::Norm => return Ok(Cow::Borrowed(&t.norm)),
             TokenAttribute::Lemma => (t.lemma.as_deref(), "lemma"),
             TokenAttribute::Pos => (t.pos.as_deref(), "POS"),
             TokenAttribute::Tag => (t.tag.as_deref(), "tag"),
             TokenAttribute::Dep => (t.dep.as_deref(), "dependency label"),
             TokenAttribute::Morphology => (t.morphology.as_deref(), "morphology"),
         };
-        value.ok_or(Error::MissingAnnotation(name))
+        value
+            .map(Cow::Borrowed)
+            .ok_or(Error::MissingAnnotation(name))
     }
-    pub(crate) fn matches(&self, token: TokenView<'_>) -> Result<bool> {
-        let value = self.value(token)?;
+    pub(crate) fn matches<'a>(
+        &self,
+        token: TokenView<'a>,
+        values: &'a TokenValues<'a>,
+    ) -> Result<bool> {
+        let value = self.value(token, Some(values))?;
+        let value = value.as_ref();
         let feature = |wanted: &String| -> bool {
             let Some((key, val)) = wanted.split_once('=') else {
                 return false;
@@ -139,6 +187,15 @@ impl CompiledConstraint {
             CompiledPredicate::Superset(expected) => expected.iter().all(feature),
             CompiledPredicate::Intersects(expected) => expected.iter().any(feature),
         })
+    }
+}
+
+// Most tokens are lowercase ASCII already; avoid allocating for them.
+fn lower(text: &str) -> Cow<'_, str> {
+    if text.is_ascii() && !text.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        Cow::Borrowed(text)
+    } else {
+        Cow::Owned(crate::unicode_lower::lower(text))
     }
 }
 

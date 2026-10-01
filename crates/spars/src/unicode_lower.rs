@@ -1,6 +1,7 @@
-//! Python Unicode 15 LOWER, including context-sensitive Greek final sigma.
-//! Regenerate with tools/phrase_lower_reference.py; provenance is retained in
-//! the independent reference fixture and the repository's Unicode notices.
+//! Model-independent Python Unicode 15 `str.lower()`, shared by matcher LOWER
+//! conditions and including context-sensitive Greek final sigma. Regenerate with
+//! tools/phrase_lower_reference.py; provenance is retained in the independent
+//! reference fixture and the repository's Unicode notices.
 use serde::Deserialize;
 use std::{collections::HashMap, sync::OnceLock};
 
@@ -15,7 +16,7 @@ struct Resources {
 fn resources() -> &'static Resources {
     static RESOURCES: OnceLock<Resources> = OnceLock::new();
     RESOURCES.get_or_init(|| {
-        let data: Resources = serde_json::from_str(include_str!("lower.json"))
+        let data: Resources = serde_json::from_str(include_str!("unicode_lower.json"))
             .expect("verified pinned Unicode lower resource");
         assert_eq!(data.unicode_version, "15.0.0");
         data
@@ -26,7 +27,7 @@ fn contains(ranges: &[[u32; 2]], character: char) -> bool {
     let index = ranges.partition_point(|range| range[1] < point);
     ranges.get(index).is_some_and(|range| range[0] <= point)
 }
-pub(super) fn lower(text: &str) -> String {
+pub(crate) fn lower(text: &str) -> String {
     if text.is_ascii() {
         return text.to_ascii_lowercase();
     }
@@ -58,3 +59,5 @@ pub(super) fn lower(text: &str) -> String {
     }
     output
 }
+#[cfg(test)]
+mod tests;

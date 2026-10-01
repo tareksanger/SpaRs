@@ -50,6 +50,16 @@ fn official_dependency_pattern_order_and_annotations() {
         None,
     );
 }
+#[test]
+fn official_unicode_lower_conditions() {
+    let path = "../../fixtures/dependency-match-lower-v1.expected.json";
+    let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let total = |count: fn(&Case) -> usize| fixture.cases.iter().map(count).sum::<usize>();
+    assert_eq!(total(|c| c.tokens.len()), 43);
+    assert_eq!(total(|c| c.rules.len()), 160);
+    assert_eq!(total(|c| c.expected.len()), 223);
+    check(path, 4, None);
+}
 fn check(path: &str, cases: usize, additions: Option<usize>) {
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(fixture.versions["spacy"], "3.8.14");

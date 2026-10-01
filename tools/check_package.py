@@ -16,7 +16,7 @@ def validate_inventory(files: set[str], sources: set[str]) -> None:
         'Cargo.toml', 'Cargo.toml.orig', 'Cargo.lock', 'README.md', 'LICENSE',
         'THIRD_PARTY_NOTICES.md', 'licenses/spacy-MIT.txt', 'licenses/thinc-MIT.txt',
             'licenses/preshed-MIT.txt', 'licenses/flashtext-MIT.txt', 'src/phrase_matcher/symbols.json',
-            'licenses/Unicode.txt', 'src/phrase_matcher/lower.json',
+            'licenses/Unicode.txt', 'src/unicode_lower.json',
     }
     missing = required - files
     unexpected = files - required - {'.cargo_vcs_info.json'}

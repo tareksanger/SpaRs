@@ -47,6 +47,7 @@ mod pipeline;
 pub use phrase_matcher::*;
 mod token_matcher;
 mod tokenizer;
+mod unicode_lower;
 pub use token_matcher::*;
 mod validation;
 pub use document::*;

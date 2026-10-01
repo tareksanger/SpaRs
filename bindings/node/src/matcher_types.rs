@@ -24,6 +24,7 @@ impl TokenConstraint {
     pub(crate) fn into_native(self) -> errors::Result<spars::TokenConstraint> {
         let attribute = match errors::text(&self.attribute)?.as_str() {
             "text" => spars::TokenAttribute::Text,
+            "lower" => spars::TokenAttribute::Lower,
             "norm" => spars::TokenAttribute::Norm,
             "lemma" => spars::TokenAttribute::Lemma,
             "pos" => spars::TokenAttribute::Pos,
@@ -72,6 +73,7 @@ impl TokenConstraint {
     pub(crate) fn from_native(value: &spars::TokenConstraint) -> Self {
         let attribute = match value.attribute {
             spars::TokenAttribute::Text => "text",
+            spars::TokenAttribute::Lower => "lower",
             spars::TokenAttribute::Norm => "norm",
             spars::TokenAttribute::Lemma => "lemma",
             spars::TokenAttribute::Pos => "pos",

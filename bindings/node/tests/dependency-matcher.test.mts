@@ -42,7 +42,9 @@ function tiny(): NativeDocument {
 
 test('all dependency relations, predicates and ordering match frozen official suites', async () => {
   const relations = new Set<string>();
-  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2]] as const) {
+  let lowerRules = 0;
+  let lowerMatches = 0;
+  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4]] as const) {
     const fixture = record(readJson(`${root}fixtures/${suite}.expected.json`));
     assert.deepEqual(fixture.versions, { spacy: '3.8.14', thinc: '8.3.13' });
     const cases = array(fixture.cases);
@@ -53,6 +55,10 @@ test('all dependency relations, predicates and ordering match frozen official su
       const rules = array(c.rules);
       const registered = new Map<string, DependencyPattern[]>();
       if (suite === 'dependency-match-v1') assert.equal(rules.length, 52);
+      if (suite === 'dependency-match-lower-v1') {
+        lowerRules += rules.length;
+        lowerMatches += array(c.expected).length;
+      }
       for (const value of rules) {
         const rule = record(value);
         const patterns = array(rule.patterns).map(pattern);
@@ -74,6 +80,8 @@ test('all dependency relations, predicates and ordering match frozen official su
     }
   }
   assert.equal(relations.size, 20);
+  assert.equal(lowerRules, 160);
+  assert.equal(lowerMatches, 223);
 });
 
 test('rule lifecycle appends patterns and isolates returned objects', async () => {
@@ -111,6 +119,8 @@ test('invalid patterns and predicates fail atomically', () => {
     { nodes: [{ id: 'a', constraints: [] }, { id: 'b', constraints: [], link: { left: 'missing', relation: '>' } }] },
     { nodes: [{ id: 'a', constraints: [] }, { id: 'b', constraints: [], link: { left: 'a', relation: 'unknown' } }] },
     { nodes: [{ id: 'a', constraints: [{ attribute: 'unknown', predicate: { kind: 'equals', value: 'a' } }] }] },
+    { nodes: [{ id: 'a', constraints: [{ attribute: 'LOWER', predicate: { kind: 'equals', value: 'a' } }] }] },
+    { nodes: [{ id: 'a', constraints: [{ attribute: 'lower', predicate: { kind: 'morph_superset', values: ['a'] } }] }] },
     { nodes: [{ id: 'a', constraints: [{ attribute: 'text', predicate: { kind: 'regex', value: 'a' } }] }] },
     { nodes: [{ id: 'a', constraints: [{ attribute: 'text', predicate: { kind: 'equals' } }] }] },
     { nodes: [{ id: 'a', constraints: [{ attribute: 'text', predicate: { kind: 'equals', value: 'a', values: ['a'] } }] }] },
