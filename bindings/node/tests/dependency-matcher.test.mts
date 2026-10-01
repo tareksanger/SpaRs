@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DependencyMatcher, NativeDocument } from '../index.js';
-import type { DependencyPattern, DependencyNode, TokenConstraint, TokenPredicate } from '../index.js';
-import { array, readJson, record, root } from './fixtures.mts';
+import { DependencyMatcher, loadModel, NativeDocument } from '../index.js';
+import type { DependencyPattern, DependencyNode, Model, TokenConstraint, TokenPredicate } from '../index.js';
+import { array, modelPath, readJson, record, root } from './fixtures.mts';
 
 function string(value: unknown): string { assert.ok(typeof value === 'string'); return value; }
 function constraint(value: unknown): TokenConstraint {
   const c = record(value);
   const p = record(c.predicate);
   const predicate: TokenPredicate = { kind: string(p.kind) };
-  if (p.value !== undefined && p.value !== null) predicate.value = string(p.value);
+  if (typeof p.value === 'boolean') predicate.value = p.value;
+  else if (p.value !== undefined && p.value !== null) predicate.value = string(p.value);
   if (p.values !== undefined && p.values !== null) predicate.values = array(p.values).map(string);
   return { attribute: string(c.attribute), predicate };
 }
@@ -82,6 +83,39 @@ test('all dependency relations, predicates and ordering match frozen official su
   assert.equal(relations.size, 20);
   assert.equal(lowerRules, 160);
   assert.equal(lowerMatches, 223);
+});
+
+const FLAG_RULES = 42;
+const FLAG_MATCHES = 376;
+test('lexical flags match the frozen official suite with a model lexicon', async () => {
+  const model = await loadModel(modelPath);
+  const fixture = record(readJson(`${root}fixtures/dependency-match-flags-v1.expected.json`));
+  const cases = array(fixture.cases);
+  assert.equal(cases.length, 3);
+  let rules = 0;
+  let matches = 0;
+  for (const value of cases) {
+    const c = record(value);
+    const matcher = new DependencyMatcher(model);
+    for (const raw of array(c.rules)) {
+      const rule = record(raw);
+      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      rules++;
+    }
+    matches += array(c.expected).length;
+    const doc = document(c);
+    assert.deepEqual(await matcher.findMatches(doc), c.expected, string(c.id));
+  }
+  assert.equal(rules, FLAG_RULES);
+  assert.equal(matches, FLAG_MATCHES);
+  const flag: DependencyPattern = { nodes: [{ id: 'a', constraints: [{ attribute: 'like_num', predicate: { kind: 'flag', value: true } }] }] };
+  const plain = new DependencyMatcher();
+  assert.throws(() => plain.add('number', [flag]), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'SPARS_INVALID_PATTERN');
+  assert.equal(plain.size, 0);
+  const withModel = new DependencyMatcher(model);
+  withModel.add('number', [flag]);
+  assert.deepStrictEqual(withModel.get('number'), [flag]);
+  assert.throws(() => new DependencyMatcher({} as unknown as Model));
 });
 
 test('rule lifecycle appends patterns and isolates returned objects', async () => {

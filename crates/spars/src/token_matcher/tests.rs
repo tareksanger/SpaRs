@@ -225,3 +225,38 @@ fn discarded_items_still_validate_predicates() {
     assert!(matcher.add("bad", vec![invalid]).is_err());
     assert!(matcher.is_empty());
 }
+#[test]
+fn lexical_flags_require_a_lexicon_and_registration_stays_atomic() {
+    let flag = |attribute| TokenPatternItem {
+        constraints: vec![TokenConstraint {
+            attribute,
+            predicate: crate::Predicate::Flag { value: true },
+        }],
+        repetition: Repetition::Once,
+    };
+    let mut matcher = TokenMatcher::new();
+    matcher
+        .add("text", vec![pattern(&[Repetition::Once])])
+        .unwrap();
+    let result = matcher.add(
+        "text",
+        vec![
+            pattern(&[Repetition::Once]),
+            TokenPattern {
+                tokens: vec![flag(crate::TokenAttribute::LikeNum)],
+            },
+        ],
+    );
+    assert!(matches!(result, Err(Error::Pattern(_))));
+    assert!(matcher
+        .add(
+            "number",
+            vec![TokenPattern {
+                tokens: vec![flag(crate::TokenAttribute::IsDigit)],
+            }],
+        )
+        .is_err());
+    assert_eq!(matcher.get("text").unwrap().len(), 1);
+    assert!(!matcher.contains("number"));
+    assert_eq!(spans(&matcher, "x"), vec![("text".into(), 0, 1)]);
+}

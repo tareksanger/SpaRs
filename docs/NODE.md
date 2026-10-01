@@ -364,7 +364,28 @@ matcher.add('place', [{ tokens: [{
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'place', start: 2, end: 3 }]);
 ```
 
-Supported token attributes are `text`, `lower`, `norm`, `lemma`, `pos`, `tag`, `dep`, and `morphology`. `lower` compares the token's pinned Unicode 15.0.0 lowercase text, as in spaCy's `LOWER`, and needs no model annotations; pattern values are compared as written, so write them in lowercase. Predicates are `equals` with `value`, or `in`, `not_in`, `morph_superset`, and `morph_intersects` with `values`. The last two require morphology. Repetition kinds are `once`, `optional`, `zero_or_more`, `one_or_more`, `negated`, and `range`; a range requires `min` and accepts an optional inclusive `max`. Missing required document annotations fail explicitly. See the [token matcher guide](TOKEN_MATCHER.md) for native semantics and unsupported options.
+Supported token attributes are `text`, `lower`, `norm`, `lemma`, `pos`, `tag`, `dep`, `morphology`, and the lexical flags `is_alpha`, `is_digit`, `is_space`, `is_punct` and `like_num`. `lower` compares the token's pinned Unicode 15.0.0 lowercase text, as in spaCy's `LOWER`, and needs no model annotations; pattern values are compared as written, so write them in lowercase. Predicates are `equals` with a string `value`, `flag` with a boolean `value`, or `in`, `not_in`, `morph_superset`, and `morph_intersects` with `values`. `morph_superset` and `morph_intersects` require morphology; `flag` is the only predicate for lexical flags. Repetition kinds are `once`, `optional`, `zero_or_more`, `one_or_more`, `negated`, and `range`; a range requires `min` and accepts an optional inclusive `max`. Missing required document annotations fail explicitly. See the [token matcher guide](TOKEN_MATCHER.md) for native semantics and unsupported options.
+
+Lexical flag conditions use the model's language rules, so create the matcher with a model: `new TokenMatcher(model)` or `new DependencyMatcher(model)`. A matcher created without a model rejects flag conditions with `SPARS_INVALID_PATTERN`. This example finds a number followed by a word:
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from './index.js';
+import type { TokenPatternItem } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const matcher = new TokenMatcher(model);
+const flag = (attribute: string): TokenPatternItem => ({
+  constraints: [{ attribute, predicate: { kind: 'flag', value: true } }],
+  repetition: { kind: 'once' },
+});
+matcher.add('quantity', [{ tokens: [flag('like_num'), flag('is_alpha')] }]);
+const doc = await model.processDocument('Ten people paid 1,000 dollars.', 'Tokenizer');
+assert.deepEqual(await matcher.findMatches(doc), [
+  { rule: 'quantity', start: 0, end: 2 },
+  { rule: 'quantity', start: 3, end: 5 },
+]);
+```
 
 Matcher instances support `size`, `contains(rule)`, `get(rule)`, `add(rule, patterns)`, and `remove(rule)`. Repeated additions append to an existing rule; `get` returns independent pattern copies or `null`. Matching runs on the worker pool using the retained native document, without rerunning inference or copying compiled rules. Searches share the inference admission queue and optional `maxTextLength` policy. Rule mutation is rejected with `SPARS_BUSY` while any search on that matcher is queued or active; after the returned promise settles, mutation is available again. Registration and inspection are synchronous and are not limited by inference input policies. Large match arrays still require JavaScript-thread allocation.
 

@@ -145,6 +145,7 @@ fn lexical_and_vectors() {
         .unwrap(),
     )
     .unwrap();
+    assert_eq!(cases.as_array().unwrap().len(), 4374);
     assert!(failures.is_empty(), "{} lexical mismatches", failures.len());
     let vectors: Value = serde_json::from_str(
         &std::fs::read_to_string("../../fixtures/vectors.expected.json").unwrap(),
@@ -202,4 +203,34 @@ fn regex_span_semantics() {
         "{} regex span mismatches",
         failures.len()
     );
+}
+#[test]
+#[ignore = "requires official export; mandatory CI"]
+fn model_and_matcher_lowercase_agree() {
+    // Matcher LOWER uses the bundled Unicode table; LIKE_NUM and lemmas use the
+    // model's exported table. Both must reproduce the same Python str.lower().
+    let m = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let mut samples: Vec<String> = m.config.lexical.lower.keys().cloned().collect();
+    samples.extend(
+        [
+            "ΟΣ",
+            "Σ",
+            "AΣ\u{301}",
+            "AΣ\u{301}A",
+            "İ",
+            "TEN",
+            "Twelfth",
+            "ẞ",
+            "\u{212a}",
+        ]
+        .map(String::from),
+    );
+    assert!(samples.len() > 1000);
+    for sample in samples {
+        assert_eq!(
+            m.lower(&sample),
+            crate::unicode_lower::lower(&sample),
+            "{sample:?}"
+        );
+    }
 }

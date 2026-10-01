@@ -75,6 +75,53 @@ fn official_unicode_lower_conditions() {
     );
 }
 #[test]
+#[ignore = "requires official export; mandatory CI"]
+fn official_lexical_flag_conditions() {
+    // Flags depend only on token text, so every supported English size shares the
+    // same expectations. Each lexicon stays valid after its model is dropped.
+    for size in ["sm", "md", "lg"] {
+        let lexicon = spars::Model::load(format!("../../assets/en_core_web_{size}-3.8.0"))
+            .unwrap()
+            .lexicon();
+        check_with(
+            "../../fixtures/token-match-flags-v1.expected.json",
+            FLAG_CASES,
+            FLAG_TOKENS,
+            FLAG_RULES,
+            FLAG_MATCHES,
+            Some(&lexicon),
+        );
+    }
+}
+const FLAG_CASES: usize = 3;
+const FLAG_TOKENS: usize = 65;
+const FLAG_RULES: usize = 51;
+const FLAG_MATCHES: usize = 442;
+#[test]
+#[ignore = "requires official export; mandatory CI"]
+fn reused_flag_matcher_keeps_documents_independent() {
+    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let pattern: TokenPattern = serde_json::from_str(
+        r#"{"tokens":[{"constraints":[{"attribute":"like_num","predicate":{"kind":"flag","value":true}}],"repetition":{"kind":"once"}}]}"#,
+    )
+    .unwrap();
+    let mut matcher = TokenMatcher::with_lexicon(model.lexicon());
+    matcher.add("number", vec![pattern]).unwrap();
+    let found = |text: &str| {
+        let doc = model.process(text).unwrap();
+        matcher
+            .find_matches(&doc)
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.start.0, m.end.0))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(found("ten apples"), [(0, 1)]);
+    assert_eq!(found("I ate 5 of ten"), [(2, 3), (4, 5)]);
+    assert_eq!(found("no numbers"), []);
+    assert_eq!(found("ten apples"), [(0, 1)]);
+}
+#[test]
 fn reused_lower_matcher_keeps_documents_independent() {
     let snapshot = |words: &[&str]| {
         let text = words.join(" ");
@@ -120,6 +167,16 @@ fn reused_lower_matcher_keeps_documents_independent() {
     assert_eq!(found(&first), [(1, 2)]);
 }
 fn check(path: &str, cases: usize, tokens: usize, rules: usize, matches: usize) {
+    check_with(path, cases, tokens, rules, matches, None);
+}
+fn check_with(
+    path: &str,
+    cases: usize,
+    tokens: usize,
+    rules: usize,
+    matches: usize,
+    lexicon: Option<&spars::Lexicon>,
+) {
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(fixture.versions["spacy"], "3.8.14");
     assert_eq!(fixture.versions["thinc"], "8.3.13");
@@ -155,7 +212,9 @@ fn check(path: &str, cases: usize, tokens: usize, rules: usize, matches: usize) 
             .unwrap(),
         )
         .unwrap();
-        let mut matcher = TokenMatcher::new();
+        let mut matcher = lexicon.map_or_else(TokenMatcher::new, |lexicon| {
+            TokenMatcher::with_lexicon(lexicon.clone())
+        });
         for rule in case.rules {
             matcher.add(rule.name, rule.patterns).unwrap();
         }

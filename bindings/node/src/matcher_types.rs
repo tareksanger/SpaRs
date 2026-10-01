@@ -1,12 +1,13 @@
 //! Concrete shared matcher inputs; external strings are validated before compilation.
 use crate::errors;
-use napi::bindgen_prelude::Utf16String;
+use napi::bindgen_prelude::{Either, Utf16String};
 use napi_derive::napi;
 
 #[napi(object)]
 pub struct TokenPredicate {
     pub kind: Utf16String,
-    pub value: Option<Utf16String>,
+    /// A string for `equals`; a boolean for `flag`.
+    pub value: Option<Either<Utf16String, bool>>,
     pub values: Option<Vec<Utf16String>>,
 }
 
@@ -31,19 +32,25 @@ impl TokenConstraint {
             "tag" => spars::TokenAttribute::Tag,
             "dep" => spars::TokenAttribute::Dep,
             "morphology" => spars::TokenAttribute::Morphology,
+            "is_alpha" => spars::TokenAttribute::IsAlpha,
+            "is_digit" => spars::TokenAttribute::IsDigit,
+            "is_space" => spars::TokenAttribute::IsSpace,
+            "is_punct" => spars::TokenAttribute::IsPunct,
+            "like_num" => spars::TokenAttribute::LikeNum,
             _ => return Err(invalid("unknown token attribute")),
         };
         let kind = errors::text(&self.predicate.kind)?;
-        let predicate = if kind == "equals" {
+        let predicate = if kind == "equals" || kind == "flag" {
             if self.predicate.values.is_some() {
-                return Err(invalid("equals requires value and forbids values"));
+                return Err(invalid("equals and flag require value and forbid values"));
             }
-            let value = self
-                .predicate
-                .value
-                .ok_or_else(|| invalid("equals requires value"))?;
-            spars::Predicate::Equals {
-                value: errors::text(&value)?,
+            match (kind.as_str(), self.predicate.value) {
+                ("equals", Some(Either::A(value))) => spars::Predicate::Equals {
+                    value: errors::text(&value)?,
+                },
+                ("flag", Some(Either::B(value))) => spars::Predicate::Flag { value },
+                ("equals", _) => return Err(invalid("equals requires a string value")),
+                _ => return Err(invalid("flag requires a boolean value")),
             }
         } else {
             if self.predicate.value.is_some() {
@@ -80,9 +87,17 @@ impl TokenConstraint {
             spars::TokenAttribute::Tag => "tag",
             spars::TokenAttribute::Dep => "dep",
             spars::TokenAttribute::Morphology => "morphology",
+            spars::TokenAttribute::IsAlpha => "is_alpha",
+            spars::TokenAttribute::IsDigit => "is_digit",
+            spars::TokenAttribute::IsSpace => "is_space",
+            spars::TokenAttribute::IsPunct => "is_punct",
+            spars::TokenAttribute::LikeNum => "like_num",
         };
         let (kind, value, values) = match &value.predicate {
-            spars::Predicate::Equals { value } => ("equals", Some(value.clone().into()), None),
+            spars::Predicate::Equals { value } => {
+                ("equals", Some(Either::A(value.clone().into())), None)
+            }
+            spars::Predicate::Flag { value } => ("flag", Some(Either::B(*value)), None),
             spars::Predicate::In { values } => ("in", None, Some(values)),
             spars::Predicate::NotIn { values } => ("not_in", None, Some(values)),
             spars::Predicate::MorphSuperset { values } => ("morph_superset", None, Some(values)),

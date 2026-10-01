@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { NativeDocument, TokenMatcher } from '../index.js';
+import { loadModel, NativeDocument, TokenMatcher } from '../index.js';
+import type { Model } from '../index.js';
+import { modelPath } from './fixtures.mts';
 import type { TokenPattern, TokenConstraint, TokenPredicate, TokenRepetition } from '../index.js';
 function record(value: unknown): Record<string, unknown> {
   assert.ok(value !== null && typeof value === 'object' && !Array.isArray(value));
@@ -12,7 +14,7 @@ function string(value: unknown): string { assert.equal(typeof value, 'string'); 
 function number(value: unknown): number { assert.ok(typeof value === 'number' && Number.isSafeInteger(value)); return value; }
 function predicate(value: unknown): TokenPredicate {
   const data = record(value);
-  return { kind: string(data.kind), ...(data.value === undefined ? {} : { value: string(data.value) }), ...(data.values === undefined ? {} : { values: array(data.values).map(string) }) };
+  return { kind: string(data.kind), ...(data.value === undefined ? {} : { value: typeof data.value === 'boolean' ? data.value : string(data.value) }), ...(data.values === undefined ? {} : { values: array(data.values).map(string) }) };
 }
 function constraint(value: unknown): TokenConstraint {
   const data = record(value);
@@ -77,6 +79,52 @@ for (const [filename, cases, rules, matches] of [
     assert.equal(matchCount, matches);
   });
 }
+
+const FLAG_RULES = 51;
+const FLAG_MATCHES = 442;
+test('TokenMatcher lexical flags match the frozen official suite with a model lexicon', async () => {
+  const model = await loadModel(modelPath);
+  const parsed: unknown = JSON.parse(readFileSync(new URL('../../../fixtures/token-match-flags-v1.expected.json', import.meta.url), 'utf8'));
+  const items = array(record(parsed).cases).map(record);
+  assert.equal(items.length, 3);
+  let ruleCount = 0;
+  let matchCount = 0;
+  for (const item of items) {
+    const matcher = new TokenMatcher(model);
+    const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: item }));
+    for (const raw of array(item.rules)) {
+      const rule = record(raw);
+      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      ruleCount++;
+    }
+    const expected = array(item.expected).map(value => {
+      const match = record(value);
+      return { rule: string(match.rule), start: number(match.start), end: number(match.end) };
+    });
+    matchCount += expected.length;
+    assert.deepEqual(await matcher.findMatches(doc), expected, string(item.id));
+  }
+  assert.equal(ruleCount, FLAG_RULES);
+  assert.equal(matchCount, FLAG_MATCHES);
+  const plain = new TokenMatcher();
+  const flag = (predicate: TokenPredicate): TokenPattern => ({ tokens: [{ constraints: [{ attribute: 'is_digit', predicate }], repetition: { kind: 'once' } }] });
+  assert.throws(() => plain.add('digit', [flag({ kind: 'flag', value: true })]), hasCode('SPARS_INVALID_PATTERN'));
+  const withModel = new TokenMatcher(model);
+  for (const predicate of [{ kind: 'flag', value: 'true' }, { kind: 'flag' }, { kind: 'equals', value: true }, { kind: 'flag', value: true, values: [] }] as TokenPredicate[]) {
+    assert.throws(() => withModel.add('bad', [flag(predicate)]), hasCode('SPARS_INVALID_PATTERN'));
+  }
+  // napi rejects a value that is neither a string nor a boolean before conversion.
+  for (const value of [1, null]) {
+    assert.throws(() => withModel.add('bad', [flag({ kind: 'flag', value } as unknown as TokenPredicate)]), /none of these types/);
+  }
+  assert.throws(() => withModel.add('bad', [{ tokens: [{ constraints: [{ attribute: 'text', predicate: { kind: 'flag', value: true } }], repetition: { kind: 'once' } }] }]), hasCode('SPARS_INVALID_PATTERN'));
+  assert.throws(() => new TokenMatcher({} as unknown as Model));
+  assert.equal(plain.size, 0);
+  assert.equal(withModel.size, 0);
+  const falseFlag = flag({ kind: 'flag', value: false });
+  withModel.add('not_digit', [falseFlag]);
+  assert.deepStrictEqual(withModel.get('not_digit'), [falseFlag]);
+});
 
 test('TokenMatcher lifecycle, ownership, and pending mutation', async () => {
   const matcher = new TokenMatcher();

@@ -316,3 +316,22 @@ fn selective_membership_equals_enumeration_for_every_relation_and_candidate_subs
         }
     }
 }
+#[test]
+fn lexical_flags_require_a_lexicon() {
+    let mut matcher = DependencyMatcher::new();
+    let flagged = DependencyPattern {
+        nodes: vec![DependencyNode {
+            id: "a".into(),
+            constraints: vec![TokenConstraint {
+                attribute: TokenAttribute::IsPunct,
+                predicate: Predicate::Flag { value: false },
+            }],
+            link: None,
+        }],
+    };
+    assert!(matches!(
+        matcher.add("flag", vec![flagged]),
+        Err(Error::Pattern(_))
+    ));
+    assert!(matcher.is_empty());
+}

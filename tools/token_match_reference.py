@@ -12,7 +12,10 @@ import thinc
 from spacy.matcher import Matcher
 from spacy.tokens import Doc as make_doc
 
-from dependency_match_reference import ATTRIBUTES, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Membership, Versions, StringOperator, attribute_name, lower_constraints, require_pinned_unicode
+from dependency_match_reference import (
+    ATTRIBUTES, FLAG_PIPELINE_TEXT, FLAG_WORDS, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Flag,
+    Membership, StringOperator, Versions, attribute_name, flag_constraints, lower_constraints, require_pinned_unicode,
+)
 from reference_types import Doc, Language, SpanRecord, TokenRecord, span_records, token_records
 
 
@@ -72,17 +75,19 @@ class Fixture:
     cases: list[Case]
 
 
-def official(pattern: Pattern) -> list[dict[str, str | StringOperator]]:
-    result: list[dict[str, str | StringOperator]] = []
+def official(pattern: Pattern) -> list[dict[str, str | bool | StringOperator]]:
+    result: list[dict[str, str | bool | StringOperator]] = []
     for item in pattern.tokens:
-        attrs: dict[str, str | StringOperator] = {}
+        attrs: dict[str, str | bool | StringOperator] = {}
         for constraint in item.constraints:
             attribute = ATTRIBUTES[constraint.attribute]
             if attribute in attrs:
                 raise ValueError('Official converter requires distinct attributes per item')
             predicate = constraint.predicate
-            if isinstance(predicate, Equals):
-                value: str | StringOperator = predicate.value
+            if isinstance(predicate, Flag):
+                value: str | bool | StringOperator = predicate.value
+            elif isinstance(predicate, Equals):
+                value = predicate.value
             elif predicate.kind == 'in':
                 value = {'IN': predicate.values}
             elif predicate.kind == 'not_in':
@@ -199,6 +204,38 @@ def generate_lower(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def flag(attribute: str, value: bool, repeat: Repetition | Range = Repetition()) -> Item:
+    return Item([Constraint(attribute_name(attribute), Flag(value))], repeat)
+
+
+def flag_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Item([constraint])])]) for name, constraint in flag_constraints()]
+    for name, items in [
+        ('numbers', [flag('like_num', True, Repetition('one_or_more'))]),
+        ('punct_then_word', [flag('is_punct', True), flag('is_punct', False)]),
+        ('not_number_then_number', [flag('like_num', True, Repetition('negated')), flag('like_num', True)]),
+        ('space_optional_digit', [flag('is_space', True, Repetition('optional')), flag('is_digit', True)]),
+        ('alpha_hello', [Item([Constraint('is_alpha', Flag(True)), Constraint('lower', Equals('hello'))])]),
+        ('number_not_alpha', [Item([Constraint('is_alpha', Flag(False)), Constraint('like_num', Flag(True))])]),
+        ('number_word', [Item([Constraint('is_alpha', Flag(True)), Constraint('like_num', Flag(True))])]),
+    ]:
+        result.append(Rule(name, [Pattern(items)]))
+    return result
+
+
+def generate_flags(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = flag_rules()
+    count = len(FLAG_WORDS)
+    words = make_doc(nlp.vocab, words=FLAG_WORDS, spaces=[index + 1 < count for index in range(count)],
+                     heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases = [case(nlp, 'flag-words', ' '.join(FLAG_WORDS), words, patterns),
+             case(nlp, 'flag-pipeline', FLAG_PIPELINE_TEXT, nlp(FLAG_PIPELINE_TEXT), patterns),
+             case(nlp, 'flag-empty', '', make_doc(nlp.vocab, words=[]), patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     patterns = branching_rules() if branching else exhaustive_rules()
     cases: list[Case] = []
@@ -213,7 +250,7 @@ def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
-def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False) -> Fixture:
+def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False, flags: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -221,6 +258,8 @@ def generate(exhaustive: bool = False, branching: bool = False, lower: bool = Fa
         raise ValueError('Use en_core_web_md 3.8.0')
     if lower:
         return generate_lower(nlp)
+    if flags:
+        return generate_flags(nlp)
     if exhaustive or branching:
         return generate_exhaustive(nlp, branching)
     cases: list[Case] = []
@@ -247,6 +286,7 @@ def main() -> None:
     modes.add_argument('--exhaustive', action='store_true')
     modes.add_argument('--branching', action='store_true')
     modes.add_argument('--lower', action='store_true')
+    modes.add_argument('--flags', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -262,7 +302,10 @@ def main() -> None:
     lower_mode: object = args.lower
     if not isinstance(lower_mode, bool):
         raise TypeError('Lower flag must be boolean')
-    write_fixture(output, generate(exhaustive, branching, lower_mode))
+    flag_mode: object = args.flags
+    if not isinstance(flag_mode, bool):
+        raise TypeError('Flags flag must be boolean')
+    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode))
 
 
 if __name__ == '__main__':

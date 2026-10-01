@@ -1,8 +1,8 @@
 //! Reusable patterns over dependency relationships, evaluated without model access.
 pub(crate) mod predicates;
 mod relations;
-use crate::{Doc, Error, Result, TokenIndex};
-use predicates::{CompiledConstraint, TokenValues};
+use crate::{Doc, Error, Lexicon, Result, TokenIndex};
+use predicates::{compile_conditions, CompiledConstraint, FlagTest, TokenValues};
 pub use predicates::{Predicate, TokenAttribute, TokenConstraint};
 use relations::Graph;
 pub use relations::Relation;
@@ -39,6 +39,7 @@ pub struct DependencyMatch {
 }
 struct CompiledNode {
     constraints: Vec<CompiledConstraint>,
+    flags: FlagTest,
     link: Option<(usize, Relation)>,
 }
 struct CompiledPattern {
@@ -53,10 +54,19 @@ struct Rule {
 #[derive(Default)]
 pub struct DependencyMatcher {
     rules: Vec<Rule>,
+    lexicon: Option<Lexicon>,
 }
 impl DependencyMatcher {
     pub fn new() -> Self {
         Self::default()
+    }
+    /// A matcher that can also evaluate lexical flags, such as `LikeNum`, with a
+    /// model's language rules. Obtain the lexicon with [`crate::Model::lexicon`].
+    pub fn with_lexicon(lexicon: Lexicon) -> Self {
+        Self {
+            lexicon: Some(lexicon),
+            ..Self::default()
+        }
     }
     pub fn len(&self) -> usize {
         self.rules.len()
@@ -76,6 +86,17 @@ impl DependencyMatcher {
     /// Validate all patterns before registering any of them. Existing rules append patterns.
     pub fn add(&mut self, name: impl Into<String>, patterns: Vec<DependencyPattern>) -> Result<()> {
         let name = name.into();
+        if self.lexicon.is_none()
+            && patterns
+                .iter()
+                .flat_map(|pattern| &pattern.nodes)
+                .flat_map(|node| &node.constraints)
+                .any(|constraint| constraint.attribute.needs_lexicon())
+        {
+            return Err(Error::Pattern(
+                "lexical flag conditions require a matcher created with a lexicon".into(),
+            ));
+        }
         let compiled = patterns.iter().map(compile).collect::<Result<Vec<_>>>()?;
         if let Some(rule) = self.rules.iter_mut().find(|r| r.name == name) {
             rule.patterns.extend(patterns);
@@ -117,7 +138,11 @@ impl DependencyMatcher {
                 }
             }
         }
-        let values = TokenValues::new(doc, checked_attributes.contains(&TokenAttribute::Lower))?;
+        let mask = patterns
+            .iter()
+            .flat_map(|pattern| &pattern.nodes)
+            .fold(0, |mask, node| mask | node.flags.mask());
+        let values = TokenValues::new(doc, &checked_attributes, mask, self.lexicon.as_ref())?;
         let mut candidates: Vec<HashMap<usize, Vec<Vec<usize>>>> =
             patterns.iter().map(|_| HashMap::new()).collect();
         let mut roots = Vec::new();
@@ -129,11 +154,13 @@ impl DependencyMatcher {
             let root = graph.roots[index];
             for (pattern, positions) in patterns.iter().zip(&mut candidates) {
                 for (node_index, node) in pattern.nodes.iter().enumerate() {
-                    let mut matches = true;
-                    for constraint in &node.constraints {
-                        if !constraint.matches(token, &values)? {
-                            matches = false;
-                            break;
+                    let mut matches = node.flags.matches(&values, index)?;
+                    if matches {
+                        for constraint in &node.constraints {
+                            if !constraint.matches(token, &values)? {
+                                matches = false;
+                                break;
+                            }
                         }
                     }
                     if matches {
@@ -192,13 +219,13 @@ fn compile(pattern: &DependencyPattern) -> Result<CompiledPattern> {
                 link.relation,
             )),
         };
-        let constraints = node
-            .constraints
-            .iter()
-            .map(TokenConstraint::compile)
-            .collect::<Result<Vec<_>>>()?;
+        let compiled = compile_conditions(&node.constraints)?;
         ids.insert(&node.id, index);
-        nodes.push(CompiledNode { constraints, link });
+        nodes.push(CompiledNode {
+            constraints: compiled.constraints,
+            flags: compiled.flags,
+            link,
+        });
     }
     Ok(CompiledPattern { nodes })
 }

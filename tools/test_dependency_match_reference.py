@@ -1,5 +1,6 @@
 """Check reference conversion and frozen dependency matcher coverage."""
 import tempfile
+from typing import Callable
 import unicodedata
 from unittest.mock import patch
 from pathlib import Path
@@ -7,7 +8,7 @@ import unittest
 
 import dependency_match_reference
 from dependency_match_reference import (
-    LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Fixture, Link, Membership, Node, OPERATORS,
+    FLAG_WORDS, LOWER_VALUES, LOWER_WORDS, Constraint, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
     Pattern, Versions, attribute_name, official, write_fixture,
 )
 from json_types import json_array, json_int, json_object, json_string, parse_json
@@ -117,11 +118,66 @@ class DependencyReferenceTests(unittest.TestCase):
                     patch.object(dependency_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, True)
+                generate.assert_called_once_with(False, True, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', '--regressions', str(output)]):
                     with self.assertRaises(SystemExit):
                         dependency_match_reference.main()
+                generate.reset_mock()
+                with patch('sys.argv', ['dependency_match_reference.py', '--flags', str(output)]):
+                    dependency_match_reference.main()
+                generate.assert_called_once_with(False, False, True)
+
+    def test_flag_attributes_convert_to_official_boolean_values(self) -> None:
+        self.assertEqual(attribute_name('like_num'), 'like_num')
+        pattern = Pattern([Node('a', [Constraint('is_alpha', Flag(True)), Constraint('lower', Equals('hello'))])])
+        self.assertEqual(official(pattern), [{'RIGHT_ID': 'a', 'RIGHT_ATTRS': {'IS_ALPHA': True, 'LOWER': 'hello'}}])
+        with self.assertRaises(ValueError):
+            attribute_name('is_upper')
+
+    def test_frozen_flag_suite_counts_and_link(self) -> None:
+        path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-flags-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 42)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 376)
+        self.assertEqual(cases[2]['expected'], [])
+        self.assertEqual(cases[0]['text'], ' '.join(FLAG_WORDS))
+        self.assertEqual(len(json_array(cases[0]['tokens'])), len(FLAG_WORDS))
+        from spacy.lang.en.lex_attrs import like_num
+        def is_punct(text: str) -> bool:
+            return all(unicodedata.category(char).startswith('P') for char in text)
+        checks: dict[str, Callable[[str], bool]] = {
+            'is_alpha': str.isalpha, 'is_digit': str.isdigit, 'is_space': str.isspace,
+            'is_punct': is_punct, 'like_num': like_num,
+        }
+        found: dict[int, set[str]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            rule = json_string(match['rule'])
+            if rule.endswith(('_true', '_false')):
+                found.setdefault(json_int(json_array(match['tokens'])[0]), set()).add(rule)
+        for index, text in enumerate(FLAG_WORDS):
+            expected = {f'{name}_{str(bool(check(text))).lower()}' for name, check in checks.items()}
+            self.assertEqual(found.get(index, set()), expected, text)
+        words = json_object(cases[0])
+        text = json_string(words['text']).encode()
+        tokens = [json_object(token) for token in json_array(words['tokens'])]
+        def token_text(index: int) -> str:
+            return text[json_int(tokens[index]['start']):json_int(tokens[index]['end'])].decode()
+        linked = [json_array(json_object(value)['tokens']) for value in json_array(cases[1]['expected'])
+                  if json_object(value)['rule'] == 'word_with_number_child']
+        pipeline = json_string(cases[1]['text']).encode()
+        pipeline_tokens = [json_object(token) for token in json_array(cases[1]['tokens'])]
+        def pipeline_text(index: int) -> str:
+            return pipeline[json_int(pipeline_tokens[index]['start']):json_int(pipeline_tokens[index]['end'])].decode()
+        pairs = [(pipeline_text(json_int(pair[0])), pipeline_text(json_int(pair[1]))) for pair in linked]
+        self.assertTrue(pairs, 'the parsed document links a word to a numeric child')
+        for head, child in pairs:
+            self.assertTrue(head.isalpha() and like_num(child), (head, child))
+        combined = {token_text(json_int(json_array(json_object(value)['tokens'])[0]))
+                    for value in json_array(cases[0]['expected']) if json_object(value)['rule'] == 'number_word'}
+        self.assertEqual(combined, {word for word in FLAG_WORDS if word.isalpha() and like_num(word)})
 
 
 if __name__ == '__main__':
