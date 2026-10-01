@@ -7,9 +7,14 @@ class StringOperator(TypedDict, total=False):
     IS_SUPERSET: list[str]
     INTERSECTS: list[str]
 
+NumberOperator = TypedDict('NumberOperator', {
+    '==': float, '!=': float, '>=': float, '<=': float, '>': float, '<': float,
+    'IN': list[int], 'NOT_IN': list[int],
+}, total=False)
+
 class DependencyNode(TypedDict):
     RIGHT_ID: str
-    RIGHT_ATTRS: dict[str, str | bool | StringOperator]
+    RIGHT_ATTRS: dict[str, str | bool | StringOperator | NumberOperator]
     LEFT_ID: NotRequired[str]
     REL_OP: NotRequired[str]
 
@@ -20,7 +25,7 @@ class DependencyMatcher:
 
 class Matcher:
     def __init__(self, vocab: Vocab, *, validate: bool = False) -> None: ...
-    def add(self, key: str, patterns: list[list[dict[str, str | bool | StringOperator]]]) -> None: ...
+    def add(self, key: str, patterns: list[list[dict[str, str | bool | StringOperator | NumberOperator]]]) -> None: ...
     def __call__(self, doc: Doc) -> list[tuple[int, int, int]]: ...
 
 class PhraseMatcher:

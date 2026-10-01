@@ -124,7 +124,7 @@ class TokenReferenceTests(unittest.TestCase):
                     patch.object(token_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['token_match_reference.py', '--lower', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False)
+                generate.assert_called_once_with(False, False, True, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['token_match_reference.py', '--lower', '--exhaustive', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -132,7 +132,11 @@ class TokenReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--flags', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True)
+                generate.assert_called_once_with(False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['token_match_reference.py', '--length', str(output)]):
+                    token_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, True)
                 with patch('sys.argv', ['token_match_reference.py', '--flags', '--lower', str(output)]):
                     with self.assertRaises(SystemExit):
                         token_match_reference.main()
@@ -170,6 +174,21 @@ class TokenReferenceTests(unittest.TestCase):
         for index, text in enumerate(FLAG_WORDS):
             expected = {f'{name}_{str(bool(check(text))).lower()}' for name, check in checks.items()}
             self.assertEqual(found.get(index, set()), expected, text)
+
+
+    def test_frozen_length_suite_spans_satisfy_python_len(self) -> None:
+        path = Path(__file__).resolve().parent.parent / 'fixtures/token-match-length-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['length-words', 'length-pipeline', 'length-empty'])
+        for case in cases[:2]:
+            text = json_string(case['text']).encode()
+            tokens = [json_object(token) for token in json_array(case['tokens'])]
+            words = [text[json_int(token['start']):json_int(token['end'])].decode() for token in tokens]
+            runs = [json_object(value) for value in json_array(case['expected']) if json_object(value)['rule'] == 'long_run']
+            self.assertTrue(runs)
+            for run in runs:
+                self.assertTrue(all(len(word) >= 3 for word in words[json_int(run['start']):json_int(run['end'])]))
 
 
 if __name__ == '__main__':

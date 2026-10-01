@@ -97,11 +97,53 @@ It finds “Ten people” (tokens 0–2) and “1,000 dollars” (tokens 3–5).
 
 `IsAlpha`, `IsDigit` and `IsSpace` match Python's `str.isalpha()`, `str.isdigit()` and `str.isspace()`. So the superscript `²` counts as a digit but the fraction `½` does not, and the Roman numeral `Ⅻ` and a decomposed `é` (an `e` followed by a combining accent) are not alphabetic. `IsPunct` follows spaCy: every character must be in a Unicode punctuation category, so `@` and `_` are punctuation but `$` and `+` are not. English `LikeNum` removes one leading `+`, `-`, `±` or `~` and all `,` and `.` characters, then accepts digits, two digit strings joined by one `/` such as `1/2`, number and ordinal words in any capitalization such as `ten` and `Tenth`, and digits followed by `st`, `nd`, `rd` or `th`, even `3th`. It rejects `1.5e3`, `1/2/3` and hyphenated words such as `twenty-one`.
 
-Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. In JSON the predicate is `{"kind": "flag", "value": true}`; strings, numbers and `null` are rejected. spaCy's pattern validation (`validate=True`) rejects strings and numbers for these attributes, and spaCy raises an error for `null` when the pattern is added. Flags are computed from token text, so they need no model annotations. `TokenMatcher::new()` still works for all other conditions; registering a flag condition on it returns a pattern error. The lexicon handle is cheap to clone and stays valid after the model is dropped. Other lexical attributes, such as `IS_UPPER`, `IS_STOP`, `LIKE_URL` and `LENGTH`, are not supported yet.
+Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. In JSON the predicate is `{"kind": "flag", "value": true}`; strings, numbers and `null` are rejected. spaCy's pattern validation (`validate=True`) rejects strings and numbers for these attributes, and spaCy raises an error for `null` when the pattern is added. Flags are computed from token text, so they need no model annotations. `TokenMatcher::new()` still works for all other conditions; registering a flag condition on it returns a pattern error. The lexicon handle is cheap to clone and stays valid after the model is dropped. Other lexical flags, such as `IS_UPPER`, `IS_STOP` and `LIKE_URL`, are not supported yet.
+
+## Match by token length
+
+`TokenAttribute::Length` compares the number of characters (Unicode code points) in a token, like spaCy's `LENGTH`. This example finds words of at least seven characters.
+
+```rust
+use spars::{Comparison, FiniteNumber, Model, Predicate, TokenAttribute, TokenConstraint,
+    TokenIndex, TokenMatcher, TokenPattern, TokenPatternItem};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let mut matcher = TokenMatcher::new();
+    matcher.add("long_word", vec![TokenPattern { tokens: vec![TokenPatternItem {
+        constraints: vec![TokenConstraint {
+            attribute: TokenAttribute::Length,
+            predicate: Predicate::Compare {
+                operator: Comparison::GreaterOrEqual,
+                value: FiniteNumber::new(7.0).ok_or("not finite")?,
+            },
+        }],
+        repetition: Default::default(),
+    }] }])?;
+    let doc = model.process("Internationalization is complicated.")?;
+    let found: Vec<_> = matcher.find_matches(&doc)?.iter()
+        .map(|m| (m.start, m.end)).collect();
+    assert_eq!(found, [(TokenIndex(0), TokenIndex(1)), (TokenIndex(2), TokenIndex(3))]);
+    Ok(())
+}
+```
+
+It finds “Internationalization” (20 characters) and “complicated” (11), but not “is” or the final period.
+
+Length counts Unicode code points, like Python's `len()`, not bytes or user-perceived characters. A single-character `é` has length 1, but an `e` followed by a combining accent has length 2, and the emoji `👩🏽‍💻` has length 4 because it combines four code points. `Length` needs only the token text, so it works without model annotations or a lexicon.
+
+`Length` accepts three predicates:
+
+| Predicate | JSON | spaCy form |
+|---|---|---|
+| `Compare { operator, value }` | `{"kind": "compare", "operator": ">=", "value": 7}` | `{"LENGTH": {">=": 7}}` |
+| `InIntegers { values }` | `{"kind": "in_integers", "values": [1, 3]}` | `{"LENGTH": {"IN": [1, 3]}}` |
+| `NotInIntegers { values }` | `{"kind": "not_in_integers", "values": [1, 3]}` | `{"LENGTH": {"NOT_IN": [1, 3]}}` |
+
+The operators are `==`, `!=`, `>=`, `<=`, `>` and `<`. The value may be a whole or fractional number, so `> 2.5` matches lengths of 3 and more, as in spaCy. `Compare` corresponds to spaCy's dictionary form, which also accepts negative and fractional values. SpaRs has no shorthand for spaCy's exact form `{"LENGTH": 3}`; write it as `Compare` with `==`, for example `{"kind": "compare", "operator": "==", "value": 3}`. Several conditions on one item must all match, so `>= 2` together with `< 4` selects lengths 2 and 3. `FiniteNumber` rejects NaN and infinities; spaCy accepts them in Python patterns, where NaN matches nothing and infinities compare as expected, but JSON patterns cannot express them. `InIntegers` and `NotInIntegers` take whole numbers; as with spaCy's pattern validation, fractional values such as `3.0` are rejected. Values must fit in a 64-bit signed integer (`i64`). spaCy accepts larger Python integers, which never equal a token length, but SpaRs rejects them with a pattern error, so a spaCy `NOT_IN` pattern containing such a value (which matches every token) cannot be written here. Node accepts only safe JavaScript integers, up to 2^53−1 in magnitude. Strings, booleans and `null` are rejected, and other predicates on `Length` return a pattern error. spaCy's `IS_SUBSET`, `IS_SUPERSET`, `INTERSECTS` and `REGEX` on `LENGTH` are not supported yet.
 
 ## Conditions and repetition
 
-All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, and the lexical flags `IsAlpha`, `IsDigit`, `IsSpace`, `IsPunct` and `LikeNum`. Comparisons support equality, membership, exclusion, morphology superset or intersection, and true/false flags. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
+All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the lexical flags `IsAlpha`, `IsDigit`, `IsSpace`, `IsPunct` and `LikeNum`, and `Length`. Comparisons support equality, membership, exclusion, morphology superset or intersection, true/false flags, and numeric comparisons and integer sets for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
 
 | Repetition | spaCy operator | Meaning |
 |---|---|---|
@@ -121,11 +163,11 @@ Negation consumes a token; it is not a check between tokens. Zero-length results
 
 Results preserve the pinned spaCy matcher's discovery order, including optional suffixes at the end of the document. They are not sorted by start position or grouped by rule. Identical `(rule, start, end)` results appear once, even when several patterns or repetition paths produce them. Different rule names can match the same span.
 
-Requested annotations must be available throughout the document. Missing annotations return errors, including when another condition would have ruled out the token. Items with an exact zero count are discarded and do not require annotations. Text-only, lowercase and lexical flag matching do not require dependency heads or linguistic annotations. Invalid patterns and unsupported serialized enum values return errors.
+Requested annotations must be available throughout the document. Missing annotations return errors, including when another condition would have ruled out the token. Items with an exact zero count are discarded and do not require annotations. Text, lowercase, lexical flag and length conditions do not require dependency heads or linguistic annotations. Invalid patterns and unsupported serialized enum values return errors.
 
 ## Scope and cost
 
-This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, lexical attributes other than the five flags, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) supports exact or Unicode-lowercase token phrase patterns.
+This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, lexical attributes other than the five flags and `Length`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) supports exact or Unicode-lowercase token phrase patterns.
 
 Patterns are limited to 4,096 expanded nodes to keep registration bounded. `OneOrMore` uses two nodes; a bounded range uses its maximum count, and an unbounded range uses its minimum plus one. Larger patterns return an error.
 

@@ -281,7 +281,7 @@ function validatePatterns(value, kind) {
       const item = patternRecord(valueItem, kind === 'token' ? ['constraints', 'repetition'] : ['id', 'constraints', 'link']);
       for (const valueConstraint of patternArray(item.constraints)) {
         const constraint = patternRecord(valueConstraint, ['attribute', 'predicate']);
-        patternRecord(constraint.predicate, ['kind', 'value', 'values']);
+        patternRecord(constraint.predicate, ['kind', 'operator', 'value', 'values']);
       }
       if (kind === 'token') patternRecord(item.repetition, ['kind', 'min', 'max']);
       else if (item.link != null) patternRecord(item.link, ['left', 'relation']);

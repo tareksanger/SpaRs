@@ -1,14 +1,18 @@
 //! Concrete shared matcher inputs; external strings are validated before compilation.
 use crate::errors;
-use napi::bindgen_prelude::{Either, Utf16String};
+use napi::bindgen_prelude::{Either, Either3, Utf16String};
 use napi_derive::napi;
 
 #[napi(object)]
 pub struct TokenPredicate {
     pub kind: Utf16String,
-    /// A string for `equals`; a boolean for `flag`.
-    pub value: Option<Either<Utf16String, bool>>,
-    pub values: Option<Vec<Utf16String>>,
+    /// `==`, `!=`, `>=`, `<=`, `>` or `<` for `compare`.
+    pub operator: Option<Utf16String>,
+    /// A string for `equals`; a boolean for `flag`; a finite number for `compare`.
+    pub value: Option<Either3<Utf16String, bool, f64>>,
+    /// Strings for `in`, `not_in` and the morphology predicates; safe integers for
+    /// `in_integers` and `not_in_integers`.
+    pub values: Option<Either<Vec<Utf16String>, Vec<f64>>>,
 }
 
 #[napi(object)]
@@ -19,6 +23,38 @@ pub struct TokenConstraint {
 
 pub(crate) fn invalid(message: &str) -> errors::BindingError {
     spars::Error::Pattern(message.into()).into()
+}
+
+// JavaScript numbers are doubles; accept only exact integers that round-trip.
+fn integer(value: f64) -> errors::Result<i64> {
+    const SAFE: f64 = 9_007_199_254_740_991.0;
+    if !value.is_finite() || value.fract() != 0.0 || value.abs() > SAFE {
+        return Err(invalid("integer predicates require safe integers"));
+    }
+    Ok(value as i64)
+}
+
+fn comparison(operator: &str) -> errors::Result<spars::Comparison> {
+    Ok(match operator {
+        "==" => spars::Comparison::Equal,
+        "!=" => spars::Comparison::NotEqual,
+        ">=" => spars::Comparison::GreaterOrEqual,
+        "<=" => spars::Comparison::LessOrEqual,
+        ">" => spars::Comparison::Greater,
+        "<" => spars::Comparison::Less,
+        _ => return Err(invalid("unknown comparison operator")),
+    })
+}
+
+fn operator_text(operator: spars::Comparison) -> &'static str {
+    match operator {
+        spars::Comparison::Equal => "==",
+        spars::Comparison::NotEqual => "!=",
+        spars::Comparison::GreaterOrEqual => ">=",
+        spars::Comparison::LessOrEqual => "<=",
+        spars::Comparison::Greater => ">",
+        spars::Comparison::Less => "<",
+    }
 }
 
 impl TokenConstraint {
@@ -37,38 +73,84 @@ impl TokenConstraint {
             "is_space" => spars::TokenAttribute::IsSpace,
             "is_punct" => spars::TokenAttribute::IsPunct,
             "like_num" => spars::TokenAttribute::LikeNum,
+            "length" => spars::TokenAttribute::Length,
             _ => return Err(invalid("unknown token attribute")),
         };
-        let kind = errors::text(&self.predicate.kind)?;
-        let predicate = if kind == "equals" || kind == "flag" {
-            if self.predicate.values.is_some() {
-                return Err(invalid("equals and flag require value and forbid values"));
+        let predicate = self.predicate;
+        let kind = errors::text(&predicate.kind)?;
+        if kind != "compare" && predicate.operator.is_some() {
+            return Err(invalid("only compare accepts operator"));
+        }
+        let predicate = match kind.as_str() {
+            "equals" | "flag" | "compare" => {
+                if predicate.values.is_some() {
+                    return Err(invalid(
+                        "equals, flag and compare require value and forbid values",
+                    ));
+                }
+                match (kind.as_str(), predicate.value) {
+                    ("equals", Some(Either3::A(value))) => spars::Predicate::Equals {
+                        value: errors::text(&value)?,
+                    },
+                    ("flag", Some(Either3::B(value))) => spars::Predicate::Flag { value },
+                    ("compare", Some(Either3::C(value))) => spars::Predicate::Compare {
+                        operator: comparison(&errors::text(
+                            &predicate
+                                .operator
+                                .ok_or_else(|| invalid("compare requires operator"))?,
+                        )?)?,
+                        value: spars::FiniteNumber::new(value)
+                            .ok_or_else(|| invalid("compare requires a finite number"))?,
+                    },
+                    ("equals", _) => return Err(invalid("equals requires a string value")),
+                    ("flag", _) => return Err(invalid("flag requires a boolean value")),
+                    _ => return Err(invalid("compare requires a number value")),
+                }
             }
-            match (kind.as_str(), self.predicate.value) {
-                ("equals", Some(Either::A(value))) => spars::Predicate::Equals {
-                    value: errors::text(&value)?,
-                },
-                ("flag", Some(Either::B(value))) => spars::Predicate::Flag { value },
-                ("equals", _) => return Err(invalid("equals requires a string value")),
-                _ => return Err(invalid("flag requires a boolean value")),
+            "in_integers" | "not_in_integers" => {
+                if predicate.value.is_some() {
+                    return Err(invalid("set predicates require values and forbid value"));
+                }
+                let values = match predicate.values {
+                    Some(Either::B(values)) => values
+                        .into_iter()
+                        .map(integer)
+                        .collect::<errors::Result<Vec<_>>>()?,
+                    // An empty array is indistinguishable from an empty string list.
+                    Some(Either::A(values)) if values.is_empty() => Vec::new(),
+                    Some(Either::A(_)) => {
+                        return Err(invalid("integer predicates require number values"))
+                    }
+                    None => return Err(invalid("set predicates require values")),
+                };
+                if kind == "in_integers" {
+                    spars::Predicate::InIntegers { values }
+                } else {
+                    spars::Predicate::NotInIntegers { values }
+                }
             }
-        } else {
-            if self.predicate.value.is_some() {
-                return Err(invalid("set predicates require values and forbid value"));
-            }
-            let values = self
-                .predicate
-                .values
-                .ok_or_else(|| invalid("set predicates require values"))?
-                .iter()
-                .map(|value| errors::text(value))
-                .collect::<errors::Result<Vec<_>>>()?;
-            match kind.as_str() {
-                "in" => spars::Predicate::In { values },
-                "not_in" => spars::Predicate::NotIn { values },
-                "morph_superset" => spars::Predicate::MorphSuperset { values },
-                "morph_intersects" => spars::Predicate::MorphIntersects { values },
-                _ => return Err(invalid("unknown token predicate kind")),
+            _ => {
+                if predicate.value.is_some() {
+                    return Err(invalid("set predicates require values and forbid value"));
+                }
+                let values = match predicate.values {
+                    Some(Either::A(values)) => values
+                        .iter()
+                        .map(|value| errors::text(value))
+                        .collect::<errors::Result<Vec<_>>>()?,
+                    Some(Either::B(values)) if values.is_empty() => Vec::new(),
+                    Some(Either::B(_)) => {
+                        return Err(invalid("string set predicates require string values"))
+                    }
+                    None => return Err(invalid("set predicates require values")),
+                };
+                match kind.as_str() {
+                    "in" => spars::Predicate::In { values },
+                    "not_in" => spars::Predicate::NotIn { values },
+                    "morph_superset" => spars::Predicate::MorphSuperset { values },
+                    "morph_intersects" => spars::Predicate::MorphIntersects { values },
+                    _ => return Err(invalid("unknown token predicate kind")),
+                }
             }
         };
         Ok(spars::TokenConstraint {
@@ -92,25 +174,50 @@ impl TokenConstraint {
             spars::TokenAttribute::IsSpace => "is_space",
             spars::TokenAttribute::IsPunct => "is_punct",
             spars::TokenAttribute::LikeNum => "like_num",
+            spars::TokenAttribute::Length => "length",
         };
-        let (kind, value, values) = match &value.predicate {
+        let strings = |values: &Vec<String>| {
+            Some(Either::A(
+                values.iter().cloned().map(Into::into).collect::<Vec<_>>(),
+            ))
+        };
+        // Accepted integers are safe integers, so the conversion is exact.
+        let numbers = |values: &Vec<i64>| {
+            Some(Either::B(
+                values.iter().map(|value| *value as f64).collect::<Vec<_>>(),
+            ))
+        };
+        let (kind, operator, value, values) = match &value.predicate {
             spars::Predicate::Equals { value } => {
-                ("equals", Some(Either::A(value.clone().into())), None)
+                ("equals", None, Some(Either3::A(value.clone().into())), None)
             }
-            spars::Predicate::Flag { value } => ("flag", Some(Either::B(*value)), None),
-            spars::Predicate::In { values } => ("in", None, Some(values)),
-            spars::Predicate::NotIn { values } => ("not_in", None, Some(values)),
-            spars::Predicate::MorphSuperset { values } => ("morph_superset", None, Some(values)),
+            spars::Predicate::Flag { value } => ("flag", None, Some(Either3::B(*value)), None),
+            spars::Predicate::Compare { operator, value } => (
+                "compare",
+                Some(operator_text(*operator).to_owned().into()),
+                Some(Either3::C(value.get())),
+                None,
+            ),
+            spars::Predicate::In { values } => ("in", None, None, strings(values)),
+            spars::Predicate::NotIn { values } => ("not_in", None, None, strings(values)),
+            spars::Predicate::MorphSuperset { values } => {
+                ("morph_superset", None, None, strings(values))
+            }
             spars::Predicate::MorphIntersects { values } => {
-                ("morph_intersects", None, Some(values))
+                ("morph_intersects", None, None, strings(values))
+            }
+            spars::Predicate::InIntegers { values } => ("in_integers", None, None, numbers(values)),
+            spars::Predicate::NotInIntegers { values } => {
+                ("not_in_integers", None, None, numbers(values))
             }
         };
         Self {
             attribute: attribute.to_owned().into(),
             predicate: TokenPredicate {
                 kind: kind.to_owned().into(),
+                operator,
                 value,
-                values: values.map(|values| values.iter().cloned().map(Into::into).collect()),
+                values,
             },
         }
     }

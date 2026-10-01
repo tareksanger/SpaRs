@@ -2,8 +2,10 @@
 pub(crate) mod predicates;
 mod relations;
 use crate::{Doc, Error, Lexicon, Result, TokenIndex};
-use predicates::{compile_conditions, CompiledConstraint, FlagTest, TokenValues};
-pub use predicates::{Predicate, TokenAttribute, TokenConstraint};
+use predicates::{
+    compile_conditions, CompiledConstraint, LengthChecks, LexicalTest, Needs, TokenValues,
+};
+pub use predicates::{Comparison, FiniteNumber, Predicate, TokenAttribute, TokenConstraint};
 use relations::Graph;
 pub use relations::Relation;
 use serde::{Deserialize, Serialize};
@@ -39,11 +41,12 @@ pub struct DependencyMatch {
 }
 struct CompiledNode {
     constraints: Vec<CompiledConstraint>,
-    flags: FlagTest,
+    lexical: LexicalTest,
     link: Option<(usize, Relation)>,
 }
 struct CompiledPattern {
     nodes: Vec<CompiledNode>,
+    lengths: Vec<LengthChecks>,
 }
 struct Rule {
     name: String,
@@ -138,11 +141,14 @@ impl DependencyMatcher {
                 }
             }
         }
-        let mask = patterns
-            .iter()
-            .flat_map(|pattern| &pattern.nodes)
-            .fold(0, |mask, node| mask | node.flags.mask());
-        let values = TokenValues::new(doc, &checked_attributes, mask, self.lexicon.as_ref())?;
+        let mut needs = Needs {
+            lower: checked_attributes.contains(&TokenAttribute::Lower),
+            ..Needs::default()
+        };
+        for node in patterns.iter().flat_map(|pattern| &pattern.nodes) {
+            needs.add(&node.lexical);
+        }
+        let values = TokenValues::new(doc, needs, self.lexicon.as_ref())?;
         let mut candidates: Vec<HashMap<usize, Vec<Vec<usize>>>> =
             patterns.iter().map(|_| HashMap::new()).collect();
         let mut roots = Vec::new();
@@ -154,7 +160,7 @@ impl DependencyMatcher {
             let root = graph.roots[index];
             for (pattern, positions) in patterns.iter().zip(&mut candidates) {
                 for (node_index, node) in pattern.nodes.iter().enumerate() {
-                    let mut matches = node.flags.matches(&values, index)?;
+                    let mut matches = node.lexical.matches(&values, index, &pattern.lengths)?;
                     if matches {
                         for constraint in &node.constraints {
                             if !constraint.matches(token, &values)? {
@@ -199,6 +205,7 @@ fn compile(pattern: &DependencyPattern) -> Result<CompiledPattern> {
     }
     let mut ids = HashMap::new();
     let mut nodes = Vec::with_capacity(pattern.nodes.len());
+    let mut lengths = Vec::new();
     for (index, node) in pattern.nodes.iter().enumerate() {
         if ids.contains_key(&node.id) {
             return Err(Error::Pattern(format!("duplicate node ID {:?}", node.id)));
@@ -219,15 +226,15 @@ fn compile(pattern: &DependencyPattern) -> Result<CompiledPattern> {
                 link.relation,
             )),
         };
-        let compiled = compile_conditions(&node.constraints)?;
+        let compiled = compile_conditions(&node.constraints, &mut lengths)?;
         ids.insert(&node.id, index);
         nodes.push(CompiledNode {
             constraints: compiled.constraints,
-            flags: compiled.flags,
+            lexical: compiled.lexical,
             link,
         });
     }
-    Ok(CompiledPattern { nodes })
+    Ok(CompiledPattern { nodes, lengths })
 }
 fn search(
     pattern: &CompiledPattern,

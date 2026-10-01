@@ -1,6 +1,8 @@
 //! Reusable patterns over contiguous tokens, with explicit repetition.
 mod engine;
-use crate::dependency_matcher::predicates::{compile_conditions, CompiledConditions, FlagTest};
+use crate::dependency_matcher::predicates::{
+    compile_conditions, CompiledConditions, LengthChecks, LexicalTest,
+};
 use crate::{Doc, Error, Lexicon, Result, TokenConstraint, TokenIndex};
 use serde::{Deserialize, Serialize};
 
@@ -55,6 +57,7 @@ struct Node {
 struct CompiledPattern {
     name: String,
     items: Vec<CompiledConditions>,
+    lengths: Vec<LengthChecks>,
     nodes: Vec<Node>,
 }
 struct Rule {
@@ -144,6 +147,7 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
     }
     let mut nodes = Vec::new();
     let mut items = Vec::new();
+    let mut lengths = Vec::new();
     for (item, spec) in pattern.tokens.iter().enumerate() {
         let (required, optional, star, negated) = match spec.repetition {
             Repetition::Once => (1, 0, false, false),
@@ -170,11 +174,11 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
                 "token pattern exceeds {MAX_NODES} expanded nodes"
             )));
         }
-        let compiled = compile_conditions(&spec.constraints)?;
+        let compiled = compile_conditions(&spec.constraints, &mut lengths)?;
         items.push(if required == 0 && optional == 0 && !star {
             CompiledConditions {
                 constraints: Vec::new(),
-                flags: FlagTest::default(),
+                lexical: LexicalTest::default(),
             }
         } else {
             compiled
@@ -201,6 +205,7 @@ fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {
     Ok(CompiledPattern {
         name: name.into(),
         items,
+        lengths,
         nodes,
     })
 }
