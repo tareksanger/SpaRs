@@ -51,7 +51,9 @@ test('all dependency relations, predicates and ordering match frozen official su
   let lowerMatches = 0;
   let lengthRules = 0;
   let lengthMatches = 0;
-  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3]] as const) {
+  let setRules = 0;
+  let setMatches = 0;
+  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3], ['dependency-match-sets-v1', 3]] as const) {
     const fixture = record(readJson(`${root}fixtures/${suite}.expected.json`));
     assert.deepEqual(fixture.versions, { spacy: '3.8.14', thinc: '8.3.13' });
     const cases = array(fixture.cases);
@@ -69,6 +71,10 @@ test('all dependency relations, predicates and ordering match frozen official su
       if (suite === 'dependency-match-length-v1') {
         lengthRules += rules.length;
         lengthMatches += array(c.expected).length;
+      }
+      if (suite === 'dependency-match-sets-v1') {
+        setRules += rules.length;
+        setMatches += array(c.expected).length;
       }
       for (const value of rules) {
         const rule = record(value);
@@ -95,6 +101,8 @@ test('all dependency relations, predicates and ordering match frozen official su
   assert.equal(lowerMatches, 223);
   assert.equal(lengthRules, 96);
   assert.equal(lengthMatches, 321);
+  assert.equal(setRules, 546);
+  assert.equal(setMatches, 587);
 });
 
 const FLAG_RULES = 42;

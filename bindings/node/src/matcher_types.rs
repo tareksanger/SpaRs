@@ -10,8 +10,8 @@ pub struct TokenPredicate {
     pub operator: Option<Utf16String>,
     /// A string for `equals`; a boolean for `flag`; a finite number for `compare`.
     pub value: Option<Either3<Utf16String, bool, f64>>,
-    /// Strings for `in`, `not_in` and the morphology predicates; safe integers for
-    /// `in_integers` and `not_in_integers`.
+    /// Strings for `in`, `not_in`, `is_subset`, `is_superset`, `intersects` and the
+    /// morphology predicates; safe integers for the `*_integers` predicates.
     pub values: Option<Either<Vec<Utf16String>, Vec<f64>>>,
 }
 
@@ -119,7 +119,11 @@ impl TokenConstraint {
                     _ => return Err(invalid("compare requires a number value")),
                 }
             }
-            "in_integers" | "not_in_integers" => {
+            "in_integers"
+            | "not_in_integers"
+            | "is_subset_integers"
+            | "is_superset_integers"
+            | "intersects_integers" => {
                 if predicate.value.is_some() {
                     return Err(invalid("set predicates require values and forbid value"));
                 }
@@ -135,10 +139,12 @@ impl TokenConstraint {
                     }
                     None => return Err(invalid("set predicates require values")),
                 };
-                if kind == "in_integers" {
-                    spars::Predicate::InIntegers { values }
-                } else {
-                    spars::Predicate::NotInIntegers { values }
+                match kind.as_str() {
+                    "in_integers" => spars::Predicate::InIntegers { values },
+                    "not_in_integers" => spars::Predicate::NotInIntegers { values },
+                    "is_subset_integers" => spars::Predicate::IsSubsetIntegers { values },
+                    "is_superset_integers" => spars::Predicate::IsSupersetIntegers { values },
+                    _ => spars::Predicate::IntersectsIntegers { values },
                 }
             }
             _ => {
@@ -161,6 +167,9 @@ impl TokenConstraint {
                     "not_in" => spars::Predicate::NotIn { values },
                     "morph_superset" => spars::Predicate::MorphSuperset { values },
                     "morph_intersects" => spars::Predicate::MorphIntersects { values },
+                    "is_subset" => spars::Predicate::IsSubset { values },
+                    "is_superset" => spars::Predicate::IsSuperset { values },
+                    "intersects" => spars::Predicate::Intersects { values },
                     _ => return Err(invalid("unknown token predicate kind")),
                 }
             }
@@ -230,7 +239,19 @@ impl TokenConstraint {
             spars::Predicate::MorphIntersects { values } => {
                 ("morph_intersects", None, None, strings(values))
             }
+            spars::Predicate::IsSubset { values } => ("is_subset", None, None, strings(values)),
+            spars::Predicate::IsSuperset { values } => ("is_superset", None, None, strings(values)),
+            spars::Predicate::Intersects { values } => ("intersects", None, None, strings(values)),
             spars::Predicate::InIntegers { values } => ("in_integers", None, None, numbers(values)),
+            spars::Predicate::IsSubsetIntegers { values } => {
+                ("is_subset_integers", None, None, numbers(values))
+            }
+            spars::Predicate::IsSupersetIntegers { values } => {
+                ("is_superset_integers", None, None, numbers(values))
+            }
+            spars::Predicate::IntersectsIntegers { values } => {
+                ("intersects_integers", None, None, numbers(values))
+            }
             spars::Predicate::NotInIntegers { values } => {
                 ("not_in_integers", None, None, numbers(values))
             }

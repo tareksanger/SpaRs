@@ -25,8 +25,8 @@ pub enum TokenAttribute {
     IsPunct,
     LikeNum,
     /// The number of Unicode code points in the token text, like spaCy's `LENGTH`.
-    /// Compared with [`Predicate::Compare`], [`Predicate::InIntegers`] and
-    /// [`Predicate::NotInIntegers`].
+    /// Compared with [`Predicate::Compare`] and the integer membership and set predicates
+    /// such as [`Predicate::InIntegers`] and [`Predicate::IsSubsetIntegers`].
     Length,
     /// More lexical flags from the matcher's [`Lexicon`], compared with
     /// [`Predicate::Flag`]: spaCy's `IS_LOWER`, `IS_UPPER`, `IS_TITLE`, `IS_ASCII`,
@@ -105,9 +105,15 @@ impl From<FiniteNumber> for f64 {
     }
 }
 
-/// A comparison applied to one token attribute. Set predicates apply to morphology;
-/// `Flag` applies only to lexical flag attributes; `Compare`, `InIntegers` and
-/// `NotInIntegers` apply only to `Length`.
+/// A comparison applied to one token attribute. String predicates apply to string
+/// attributes; `Flag` applies only to lexical flag attributes; `Compare` and the
+/// `*Integers` predicates apply only to `Length`.
+///
+/// The set predicates follow spaCy's `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS`. A
+/// token's value is treated as a one-element set, except morphology, which is the set
+/// of its individual `Field=Value` features. So on a string attribute `IsSubset` and
+/// `Intersects` hold when the value is listed, and `IsSuperset` holds when every
+/// listed value equals it, including for an empty list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Predicate {
@@ -120,10 +126,21 @@ pub enum Predicate {
     NotIn {
         values: Vec<String>,
     },
+    /// The same as [`Predicate::IsSuperset`] on morphology, and valid only there.
     MorphSuperset {
         values: Vec<String>,
     },
+    /// The same as [`Predicate::Intersects`] on morphology, and valid only there.
     MorphIntersects {
+        values: Vec<String>,
+    },
+    IsSubset {
+        values: Vec<String>,
+    },
+    IsSuperset {
+        values: Vec<String>,
+    },
+    Intersects {
         values: Vec<String>,
     },
     Flag {
@@ -137,6 +154,15 @@ pub enum Predicate {
         values: Vec<i64>,
     },
     NotInIntegers {
+        values: Vec<i64>,
+    },
+    IsSubsetIntegers {
+        values: Vec<i64>,
+    },
+    IsSupersetIntegers {
+        values: Vec<i64>,
+    },
+    IntersectsIntegers {
         values: Vec<i64>,
     },
 }
@@ -154,12 +180,19 @@ enum CompiledPredicate {
     Equals(String),
     In(HashSet<String>),
     NotIn(HashSet<String>),
+    // Morphology, compared with its individual `Field=Value` features. Set predicates
+    // on one-valued attributes compile to the variants above.
     Superset(HashSet<String>),
     Intersects(HashSet<String>),
 }
 #[derive(Debug, Clone)]
 pub(crate) struct CompiledConstraint {
     attribute: TokenAttribute,
+    // Set for morphology `IsSubset`, which reuses the `Superset` list: every feature of
+    // the token must be listed. A flag rather than another `CompiledPredicate` variant
+    // keeps the per-token comparison compiled as for the other predicates; extra
+    // variants measurably slowed every text comparison.
+    subset: bool,
     predicate: CompiledPredicate,
 }
 
@@ -168,6 +201,8 @@ enum LengthCheck {
     Compare(Comparison, f64),
     In(HashSet<i64>),
     NotIn(HashSet<i64>),
+    // `IsSubsetIntegers` and `IntersectsIntegers` on one value are `In`.
+    Superset(HashSet<i64>),
 }
 
 impl LengthCheck {
@@ -182,6 +217,11 @@ impl LengthCheck {
             LengthCheck::Compare(Comparison::Less, expected) => value < *expected,
             LengthCheck::In(expected) => expected.contains(&i64::from(length)),
             LengthCheck::NotIn(expected) => !expected.contains(&i64::from(length)),
+            // spaCy's `IS_SUPERSET` with one actual value: every listed value equals it.
+            LengthCheck::Superset(expected) => {
+                expected.is_empty()
+                    || (expected.len() == 1 && expected.contains(&i64::from(length)))
+            }
         }
     }
 }
@@ -272,6 +312,8 @@ pub(crate) struct CompiledConditions {
 
 // Pattern items are scanned for every token; keep them two per 64-byte cache line.
 const _: () = assert!(std::mem::size_of::<CompiledConditions>() == 32);
+// Constraints are also scanned per token; the subset flag fits in existing padding.
+const _: () = assert!(std::mem::size_of::<CompiledConstraint>() == 64);
 
 /// Compile one item's conditions. Its `LENGTH` checks are appended to the pattern's
 /// `lengths` table, which therefore has one entry per item, in item order.
@@ -288,11 +330,10 @@ pub(crate) fn compile_conditions(
             Predicate::Compare { .. }
                 | Predicate::InIntegers { .. }
                 | Predicate::NotInIntegers { .. }
+                | Predicate::IsSubsetIntegers { .. }
+                | Predicate::IsSupersetIntegers { .. }
+                | Predicate::IntersectsIntegers { .. }
         );
-        // TODO(M3): spaCy also accepts IS_SUBSET, IS_SUPERSET and INTERSECTS on LENGTH.
-        // They are rejected here until the remaining set comparisons are implemented;
-        // tracked in docs/PROGRESS.md#1-shared-matcher-conditions-and-options (M3) and
-        // docs/COMPATIBILITY.md.
         if (constraint.attribute == TokenAttribute::Length) != numeric {
             return Err(Error::Pattern(
                 "LENGTH requires numeric predicates, and numeric predicates require LENGTH".into(),
@@ -303,8 +344,13 @@ pub(crate) fn compile_conditions(
             (_, Predicate::Compare { operator, value }) => {
                 checks.push(LengthCheck::Compare(*operator, value.get()))
             }
-            (_, Predicate::InIntegers { values }) => {
+            (_, Predicate::InIntegers { values })
+            | (_, Predicate::IsSubsetIntegers { values })
+            | (_, Predicate::IntersectsIntegers { values }) => {
                 checks.push(LengthCheck::In(values.iter().copied().collect()))
+            }
+            (_, Predicate::IsSupersetIntegers { values }) => {
+                checks.push(LengthCheck::Superset(values.iter().copied().collect()))
             }
             (_, Predicate::NotInIntegers { values }) => {
                 checks.push(LengthCheck::NotIn(values.iter().copied().collect()))
@@ -480,18 +526,22 @@ impl TokenConstraint {
         if self.attribute.needs_lexicon() || self.attribute == TokenAttribute::Length {
             return Err(mismatched_flag());
         }
+        let mut subset = false;
         let predicate = match &self.predicate {
             Predicate::Flag { .. }
             | Predicate::Compare { .. }
             | Predicate::InIntegers { .. }
-            | Predicate::NotInIntegers { .. } => return Err(mismatched_flag()),
+            | Predicate::NotInIntegers { .. }
+            | Predicate::IsSubsetIntegers { .. }
+            | Predicate::IsSupersetIntegers { .. }
+            | Predicate::IntersectsIntegers { .. } => return Err(mismatched_flag()),
             Predicate::Equals { value } => CompiledPredicate::Equals(value.clone()),
             Predicate::In { values } => CompiledPredicate::In(set(values)?),
             Predicate::NotIn { values } => CompiledPredicate::NotIn(set(values)?),
             Predicate::MorphSuperset { values } | Predicate::MorphIntersects { values } => {
                 if !is_morph {
                     return Err(Error::Pattern(
-                        "morphology set predicates require the morphology attribute".into(),
+                        "morph_superset and morph_intersects require the morphology attribute; use is_superset or intersects for other attributes".into(),
                     ));
                 }
                 if matches!(self.predicate, Predicate::MorphSuperset { .. }) {
@@ -500,9 +550,36 @@ impl TokenConstraint {
                     CompiledPredicate::Intersects(set(values)?)
                 }
             }
+            Predicate::IsSubset { values } if is_morph => {
+                subset = true;
+                CompiledPredicate::Superset(set(values)?)
+            }
+            Predicate::IsSuperset { values } if is_morph => {
+                CompiledPredicate::Superset(set(values)?)
+            }
+            Predicate::Intersects { values } if is_morph => {
+                CompiledPredicate::Intersects(set(values)?)
+            }
+            // A one-element set is a subset of, or intersects, the list exactly when
+            // its value is listed.
+            Predicate::IsSubset { values } | Predicate::Intersects { values } => {
+                CompiledPredicate::In(set(values)?)
+            }
+            // A one-element set is a superset of the list when every listed value
+            // equals its value: always for an empty list, never for two distinct values.
+            Predicate::IsSuperset { values } => {
+                let values = set(values)?;
+                let mut distinct = values.iter();
+                match (distinct.next(), distinct.next()) {
+                    (None, _) => CompiledPredicate::NotIn(HashSet::new()),
+                    (Some(value), None) => CompiledPredicate::Equals(value.clone()),
+                    (Some(_), Some(_)) => CompiledPredicate::In(HashSet::new()),
+                }
+            }
         };
         Ok(CompiledConstraint {
             attribute: self.attribute,
+            subset,
             predicate,
         })
     }
@@ -594,10 +671,43 @@ impl CompiledConstraint {
             }
             CompiledPredicate::In(expected) => expected.contains(value),
             CompiledPredicate::NotIn(expected) => !expected.contains(value),
+            CompiledPredicate::Superset(expected) if self.subset => morph_subset(value, expected),
             CompiledPredicate::Superset(expected) => expected.iter().all(feature),
             CompiledPredicate::Intersects(expected) => expected.iter().any(feature),
         })
     }
+}
+
+/// spaCy's `IS_SUBSET` on morphology: every individual `Field=Value` feature of the
+/// token is listed. Listed entries with several values or fields never equal one
+/// feature, as in spaCy, and an empty analysis is a subset of any list.
+fn morph_subset(value: &str, expected: &HashSet<String>) -> bool {
+    if value.is_empty() {
+        return true;
+    }
+    // Multi-valued fields are rebuilt one feature at a time in one reused buffer.
+    let mut feature = String::new();
+    for field in value.split('|') {
+        let Some((key, values)) = field.split_once('=') else {
+            return false;
+        };
+        if !values.contains(',') {
+            if !expected.contains(field) {
+                return false;
+            }
+            continue;
+        }
+        for val in values.split(',') {
+            feature.clear();
+            feature.push_str(key);
+            feature.push('=');
+            feature.push_str(val);
+            if !expected.contains(feature.as_str()) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 #[cold]
@@ -616,6 +726,9 @@ fn lower(text: &str) -> Cow<'_, str> {
 
 // spaCy's set predicates normalize complete morphology strings; direct equality
 // instead compares the supplied string. Feature-set matching uses atomic values.
+// TODO(morph-validation): spaCy accepts entries with an empty field or value, such
+// as `Number=`, `=Sing` or `PronType=Int,`, and entries with spaces, and they never
+// match; SpaRs rejects them as pattern errors. Tracked in docs/COMPATIBILITY.md.
 fn normalize_morph(value: &str) -> Result<String> {
     if value.is_empty() || value == "_" {
         return Ok(String::new());

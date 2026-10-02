@@ -15,6 +15,7 @@ from spacy.tokens import Doc as make_doc
 from dependency_match_reference import (
     Comparison, FLAG_PIPELINE_TEXT, FLAG_WORDS, MORE_FLAG_PIPELINE_TEXT, MORE_FLAG_WORDS, more_flag_constraints, LENGTH_PIPELINE_TEXT, LENGTH_WORDS, Compare, length_constraints, LOWER_PIPELINE_TEXT, LOWER_WORDS, Constraint, Equals, Flag,
     Membership, OfficialValue, Versions, attribute_name, official_attrs, flag_constraints, lower_constraints, require_pinned_unicode,
+    IntegerMembership, SET_PIPELINE_TEXT, SET_WORDS, set_constraints, set_document,
 )
 from reference_types import Doc, Language, SpanRecord, TokenRecord, span_records, token_records
 
@@ -272,6 +273,35 @@ def generate_more_flags(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def set_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Item(constraints)])]) for name, constraints in set_constraints()]
+    plural = Constraint('morphology', Membership('is_superset', ['Number=Plur']))
+    short = Constraint('length', IntegerMembership('is_subset_integers', [1, 2, 3]))
+    for name, items in [
+        ('determiner_then_plural', [Item([Constraint('pos', Membership('is_subset', ['DET']))]), Item([plural])]),
+        ('short_run', [Item([short], Repetition('one_or_more'))]),
+        ('not_plural_then_adverb', [Item([plural], Repetition('negated')),
+                                    Item([Constraint('tag', Membership('intersects', ['RB']))])]),
+        ('optional_lower_then_noun', [Item([Constraint('lower', Membership('intersects', ['the', 'who']))], Repetition('optional')),
+                                      Item([Constraint('pos', Membership('is_superset', ['NOUN']))])]),
+        ('bounded_any_superset', [Item([Constraint('lemma', Membership('is_superset', []))], Range(2, 3))]),
+    ]:
+        result.append(Rule(name, [Pattern(items)]))
+    return result
+
+
+def generate_sets(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = set_rules()
+    # Documents first; see generate_sets in dependency_match_reference.
+    annotated, pipeline, empty = set_document(nlp), nlp(SET_PIPELINE_TEXT), make_doc(nlp.vocab, words=[])
+    cases = [case(nlp, 'set-annotated', ' '.join(SET_WORDS), annotated, patterns),
+             case(nlp, 'set-pipeline', SET_PIPELINE_TEXT, pipeline, patterns),
+             case(nlp, 'set-empty', '', empty, patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     patterns = branching_rules() if branching else exhaustive_rules()
     cases: list[Case] = []
@@ -287,7 +317,7 @@ def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
 
 
 def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False, flags: bool = False,
-             length: bool = False, more_flags: bool = False) -> Fixture:
+             length: bool = False, more_flags: bool = False, sets: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -301,6 +331,8 @@ def generate(exhaustive: bool = False, branching: bool = False, lower: bool = Fa
         return generate_length(nlp)
     if more_flags:
         return generate_more_flags(nlp)
+    if sets:
+        return generate_sets(nlp)
     if exhaustive or branching:
         return generate_exhaustive(nlp, branching)
     cases: list[Case] = []
@@ -330,6 +362,7 @@ def main() -> None:
     modes.add_argument('--flags', action='store_true')
     modes.add_argument('--length', action='store_true')
     modes.add_argument('--more-flags', action='store_true')
+    modes.add_argument('--sets', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -354,7 +387,10 @@ def main() -> None:
     more_flag_mode: object = args.more_flags
     if not isinstance(more_flag_mode, bool):
         raise TypeError('More-flags flag must be boolean')
-    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode, length_mode, more_flag_mode))
+    set_mode: object = args.sets
+    if not isinstance(set_mode, bool):
+        raise TypeError('Sets flag must be boolean')
+    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode))
 
 
 if __name__ == '__main__':

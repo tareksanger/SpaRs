@@ -116,6 +116,16 @@ fn official_length_conditions() {
     check(path, 3, None);
 }
 #[test]
+fn official_set_comparisons() {
+    let path = "../../fixtures/dependency-match-sets-v1.expected.json";
+    let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let total = |count: fn(&Case) -> usize| fixture.cases.iter().map(count).sum::<usize>();
+    assert_eq!(total(|c| c.tokens.len()), 21);
+    assert_eq!(total(|c| c.rules.len()), 546);
+    assert_eq!(total(|c| c.expected.len()), 587);
+    check(path, 3, None);
+}
+#[test]
 fn reused_length_matcher_checks_child_nodes_per_document() {
     // Every token attaches to token 0, the root.
     let snapshot = |words: &[&str]| {

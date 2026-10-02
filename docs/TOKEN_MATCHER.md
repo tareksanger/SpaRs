@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Pattern values are compared exactly as written; they are not lowercased. A value such as `"Ritz"` therefore never matches, because lowercasing always turns `R` into `r`. Write pattern values in lowercase. Lowercase mappings follow Python's Unicode 15.0.0 `str.lower()`. This includes the Greek final sigma rule: a capital `Σ` becomes `ς` only when a cased letter comes before it and no cased letter follows it, ignoring combining marks between them; otherwise it becomes `σ`. So `ΟΣ` becomes `ος`, while a lone `Σ` becomes `σ`. This is lowercasing, not case folding or Unicode normalization: `ß` does not become `ss`, and a single-character `é` stays distinct from an `e` followed by a separate combining accent. `Lower` needs only token text, not model annotations, and it differs from `Norm`, which can replace a word such as `Gon` with `going`. It uses the same pinned lowercase data as PhraseMatcher `LOWER`. Only `Equals`, `In` and `NotIn` work with `Lower`. spaCy also accepts the set comparisons `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` on `LOWER`; here set comparisons exist only as `MorphSuperset` and `MorphIntersects` on `Morphology`, so using them with `Lower` returns a pattern error.
+Pattern values are compared exactly as written; they are not lowercased. A value such as `"Ritz"` therefore never matches, because lowercasing always turns `R` into `r`. Write pattern values in lowercase. Lowercase mappings follow Python's Unicode 15.0.0 `str.lower()`. This includes the Greek final sigma rule: a capital `Σ` becomes `ς` only when a cased letter comes before it and no cased letter follows it, ignoring combining marks between them; otherwise it becomes `σ`. So `ΟΣ` becomes `ος`, while a lone `Σ` becomes `σ`. This is lowercasing, not case folding or Unicode normalization: `ß` does not become `ss`, and a single-character `é` stays distinct from an `e` followed by a separate combining accent. `Lower` needs only token text, not model annotations, and it differs from `Norm`, which can replace a word such as `Gon` with `going`. It uses the same pinned lowercase data as PhraseMatcher `LOWER`. `Lower` accepts `Equals`, `In`, `NotIn` and the set comparisons described in [Compare with a set of values](#compare-with-a-set-of-values); `MorphSuperset` and `MorphIntersects` apply only to `Morphology`.
 
 ## Match lexical flags
 
@@ -155,7 +155,7 @@ It finds “Internationalization” (20 characters) and “complicated” (11), 
 
 Length counts Unicode code points, like Python's `len()`, not bytes or user-perceived characters. A single-character `é` has length 1, but an `e` followed by a combining accent has length 2, and the emoji `👩🏽‍💻` has length 4 because it combines four code points. `Length` needs only the token text, so it works without model annotations or a lexicon.
 
-`Length` accepts three predicates:
+`Length` accepts these predicates, plus the integer set predicates described in [Compare with a set of values](#compare-with-a-set-of-values):
 
 | Predicate | JSON | spaCy form |
 |---|---|---|
@@ -163,11 +163,57 @@ Length counts Unicode code points, like Python's `len()`, not bytes or user-perc
 | `InIntegers { values }` | `{"kind": "in_integers", "values": [1, 3]}` | `{"LENGTH": {"IN": [1, 3]}}` |
 | `NotInIntegers { values }` | `{"kind": "not_in_integers", "values": [1, 3]}` | `{"LENGTH": {"NOT_IN": [1, 3]}}` |
 
-The operators are `==`, `!=`, `>=`, `<=`, `>` and `<`. The value may be a whole or fractional number, so `> 2.5` matches lengths of 3 and more, as in spaCy. `Compare` corresponds to spaCy's dictionary form, which also accepts negative and fractional values. SpaRs has no shorthand for spaCy's exact form `{"LENGTH": 3}`; write it as `Compare` with `==`, for example `{"kind": "compare", "operator": "==", "value": 3}`. Several conditions on one item must all match, so `>= 2` together with `< 4` selects lengths 2 and 3. `FiniteNumber` rejects NaN and infinities; spaCy accepts them in Python patterns, where NaN matches nothing and infinities compare as expected, but JSON patterns cannot express them. `InIntegers` and `NotInIntegers` take whole numbers; as with spaCy's pattern validation, fractional values such as `3.0` are rejected. Values must fit in a 64-bit signed integer (`i64`). spaCy accepts larger Python integers, which never equal a token length, but SpaRs rejects them with a pattern error, so a spaCy `NOT_IN` pattern containing such a value (which matches every token) cannot be written here. Node accepts only safe JavaScript integers, up to 2^53−1 in magnitude. Strings, booleans and `null` are rejected, and other predicates on `Length` return a pattern error. spaCy's `IS_SUBSET`, `IS_SUPERSET`, `INTERSECTS` and `REGEX` on `LENGTH` are not supported yet.
+The operators are `==`, `!=`, `>=`, `<=`, `>` and `<`. The value may be a whole or fractional number, so `> 2.5` matches lengths of 3 and more, as in spaCy. `Compare` corresponds to spaCy's dictionary form, which also accepts negative and fractional values. SpaRs has no shorthand for spaCy's exact form `{"LENGTH": 3}`; write it as `Compare` with `==`, for example `{"kind": "compare", "operator": "==", "value": 3}`. Several conditions on one item must all match, so `>= 2` together with `< 4` selects lengths 2 and 3. `FiniteNumber` rejects NaN and infinities; spaCy accepts them in Python patterns, where NaN matches nothing and infinities compare as expected, but JSON patterns cannot express them. `InIntegers` and `NotInIntegers` take whole numbers; as with spaCy's pattern validation, fractional values such as `3.0` are rejected. Values must fit in a 64-bit signed integer (`i64`). spaCy accepts larger Python integers, which never equal a token length, but SpaRs rejects them with a pattern error, so a spaCy `NOT_IN` pattern containing such a value (which matches every token) cannot be written here. Node accepts only safe JavaScript integers, up to 2^53−1 in magnitude. Strings, booleans and `null` are rejected, and other predicates on `Length` return a pattern error. `Length` also accepts the integer set predicates described in [Compare with a set of values](#compare-with-a-set-of-values). spaCy's `REGEX` on `LENGTH` is not supported.
+
+## Compare with a set of values
+
+spaCy's `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` compare a token with a list of values. SpaRs supports them on every string attribute (`Text`, `Lower`, `Norm`, `Lemma`, `Pos`, `Tag`, `Dep` and `Morphology`) and on `Length`. Annotation attributes such as `Morphology` need a document with those annotations, for example one processed by the model; `Length` needs only the token text. This example finds plural words of three or four characters.
+
+```rust
+use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex, TokenMatcher,
+    TokenPattern, TokenPatternItem};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let mut matcher = TokenMatcher::new();
+    matcher.add("short_plural", vec![TokenPattern { tokens: vec![TokenPatternItem {
+        constraints: vec![
+            TokenConstraint {
+                attribute: TokenAttribute::Morphology,
+                predicate: Predicate::IsSuperset { values: vec!["Number=Plur".into()] },
+            },
+            TokenConstraint {
+                attribute: TokenAttribute::Length,
+                predicate: Predicate::IsSubsetIntegers { values: vec![3, 4] },
+            },
+        ],
+        repetition: Default::default(),
+    }] }])?;
+    let doc = model.process("Two cats and three dogs were here.")?;
+    let found: Vec<_> = matcher.find_matches(&doc)?.iter()
+        .map(|m| (m.start, m.end)).collect();
+    assert_eq!(found, [(TokenIndex(1), TokenIndex(2)), (TokenIndex(4), TokenIndex(5))]);
+    Ok(())
+}
+```
+
+It finds “cats” and “dogs”, whose morphology includes `Number=Plur`, but not the numbers or “were”.
+
+As in spaCy, a token's value is treated as a set with one element, except morphology, which is the set of its individual features such as `Number=Plur` and `Tense=Past`:
+
+| Predicate | JSON | spaCy form | Holds when |
+|---|---|---|---|
+| `IsSubset { values }` | `{"kind": "is_subset", "values": ["a", "b"]}` | `{"LOWER": {"IS_SUBSET": ["a", "b"]}}` | the token's value is listed (morphology: every feature of the token is listed) |
+| `IsSuperset { values }` | `{"kind": "is_superset", "values": ["a"]}` | `{"LOWER": {"IS_SUPERSET": ["a"]}}` | every listed value equals the token's value (morphology: every listed value is a feature of the token) |
+| `Intersects { values }` | `{"kind": "intersects", "values": ["a", "b"]}` | `{"LOWER": {"INTERSECTS": ["a", "b"]}}` | at least one listed value equals the token's value (morphology: is a feature of the token) |
+| `IsSubsetIntegers { values }`, `IsSupersetIntegers { values }`, `IntersectsIntegers { values }` | `{"kind": "is_subset_integers", "values": [3, 4]}` | `{"LENGTH": {"IS_SUBSET": [3, 4]}}` | the same rules for `Length` |
+
+So on a single-valued attribute, `IsSubset` and `Intersects` behave like `In`, and `IsSuperset` holds when the list is empty or contains only the token's value. An empty list makes `Intersects` fail and `IsSuperset` succeed. It makes `IsSubset` fail too, except on morphology for a token with no features, because an empty analysis is a subset of every list. This matches spaCy. Listed morphology entries are normalized like the other morphology predicates. An entry with several values or fields, such as `Case=Acc,Nom` or `Number=Sing|Person=3`, never equals a single feature, and neither do `_` or the empty string; such entries never satisfy `IsSuperset` or `Intersects` and add nothing to `IsSubset`. The older `MorphSuperset` and `MorphIntersects` remain valid on morphology and behave like `IsSuperset` and `Intersects`.
+
+String sets take strings and integer sets take whole numbers, as spaCy's pattern validation requires; SpaRs also limits integers to `i64` (see [Match by token length](#match-by-token-length)). Set predicates on lexical flags, string sets on `Length` and integer sets on string attributes return pattern errors. Apart from morphology normalization, values are compared as written; `Lower` values are not lowercased.
 
 ## Conditions and repetition
 
-All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the seventeen lexical flags, and `Length`. Comparisons support equality, membership, exclusion, morphology superset or intersection, true/false flags, and numeric comparisons and integer sets for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
+All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the seventeen lexical flags, and `Length`. Comparisons support equality, membership, exclusion, the set predicates subset, superset and intersection, true/false flags, and numeric comparisons, integer membership and integer set predicates for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
 
 | Repetition | spaCy operator | Meaning |
 |---|---|---|
