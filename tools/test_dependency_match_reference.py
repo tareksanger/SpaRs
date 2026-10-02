@@ -10,7 +10,7 @@ import unittest
 
 import dependency_match_reference
 from dependency_match_reference import (
-    FLAG_WORDS, LENGTH_WORDS, NumberOperator, LOWER_VALUES, LOWER_WORDS, Compare, Constraint, IntegerMembership, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
+    FLAG_WORDS, LENGTH_WORDS, MORE_FLAG_ATTRIBUTES, MORE_FLAG_WORDS, NumberOperator, lexeme_flag, LOWER_VALUES, LOWER_WORDS, Compare, Constraint, IntegerMembership, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
     Pattern, Versions, attribute_name, official, write_fixture,
 )
 from json_types import json_array, json_int, json_object, json_string, parse_json
@@ -120,7 +120,7 @@ class DependencyReferenceTests(unittest.TestCase):
                     patch.object(dependency_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, True, False, False)
+                generate.assert_called_once_with(False, True, False, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', '--regressions', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -128,11 +128,15 @@ class DependencyReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False)
+                generate.assert_called_once_with(False, False, True, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True)
+                generate.assert_called_once_with(False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['dependency_match_reference.py', '--more-flags', str(output)]):
+                    dependency_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, True)
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', '--flags', str(output)]):
                     with self.assertRaises(SystemExit):
                         dependency_match_reference.main()
@@ -202,7 +206,7 @@ class DependencyReferenceTests(unittest.TestCase):
         pattern = Pattern([Node('a', [Constraint('is_alpha', Flag(True)), Constraint('lower', Equals('hello'))])])
         self.assertEqual(official(pattern), [{'RIGHT_ID': 'a', 'RIGHT_ATTRS': {'IS_ALPHA': True, 'LOWER': 'hello'}}])
         with self.assertRaises(ValueError):
-            attribute_name('is_upper')
+            attribute_name('is_oov')
 
     def test_frozen_flag_suite_counts_and_link(self) -> None:
         path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-flags-v1.expected.json'
@@ -285,6 +289,53 @@ class DependencyReferenceTests(unittest.TestCase):
         # spaCy accepts non-finite comparison values; SpaRs rejects them (documented difference).
         for value in [NumberOperator({'>': math.nan}), NumberOperator({'<': math.inf}), NumberOperator({'>': -math.inf})]:
             self.assertTrue(accepts(value), value)
+
+
+    def test_frozen_more_flag_suite_matches_spacy_lexical_attributes(self) -> None:
+        """Each single-flag rule matches exactly the words whose lexeme has that flag."""
+        import spacy
+        nlp = spacy.blank('en')
+        path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-more-flags-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['more-flag-words', 'more-flag-pipeline', 'more-flag-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 90)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 1209)
+        self.assertEqual(cases[2]['expected'], [])
+        self.assertEqual(cases[0]['text'], ' '.join(MORE_FLAG_WORDS))
+        found: dict[str, set[int]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            tokens = json_array(match['tokens'])
+            if len(tokens) == 1:
+                found.setdefault(json_string(match['rule']), set()).add(json_int(tokens[0]))
+        # Independent of the matcher: the blank English vocabulary's lexeme flags.
+        for attribute in MORE_FLAG_ATTRIBUTES:
+            for value in (True, False):
+                expected = {index for index, word in enumerate(MORE_FLAG_WORDS)
+                            if lexeme_flag(nlp, word, attribute) == value}
+                self.assertTrue(expected, f'{attribute} is {value} for no test word')
+                self.assertEqual(found.get(f'{attribute}_{str(value).lower()}', set()), expected, (attribute, value))
+        # Case and ASCII flags checked against Python's string methods, independent of spaCy.
+        self.assertEqual(unicodedata.unidata_version, '15.0.0')
+        methods: dict[str, Callable[[str], bool]] = {
+            'is_lower': str.islower, 'is_upper': str.isupper, 'is_title': str.istitle, 'is_ascii': str.isascii,
+        }
+        for attribute, method in methods.items():
+            self.assertEqual(found.get(f'{attribute}_true', set()),
+                             {index for index, word in enumerate(MORE_FLAG_WORDS) if method(word)}, attribute)
+
+    def test_exported_url_pattern_is_the_one_like_url_uses(self) -> None:
+        # spaCy's like_url uses spacy.lang.tokenizer_exceptions.URL_MATCH; SpaRs uses the
+        # model's tokenizer URL pattern. Probed in a child interpreter, outside the stubs.
+        script = (
+            'import spacy\n'
+            'from spacy.lang.tokenizer_exceptions import URL_MATCH\n'
+            'nlp = spacy.load("en_core_web_md")\n'
+            'print(nlp.tokenizer.url_match.__self__.pattern == URL_MATCH.__self__.pattern)\n'
+        )
+        output = subprocess.run([sys.executable, '-c', script], check=True, capture_output=True, text=True).stdout
+        self.assertEqual(output.strip().splitlines()[-1], 'True')
 
 
 if __name__ == '__main__':

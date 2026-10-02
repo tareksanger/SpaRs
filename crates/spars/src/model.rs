@@ -13,7 +13,7 @@ pub struct Model {
     pub(crate) tokenizer: Tokenizer,
     pub(crate) vector_keys: HashMap<u64, usize>,
     pub(crate) norms: HashMap<u64, String>,
-    pub(crate) email_regex: fancy_regex::Regex,
+    pub(crate) lexicon: crate::Lexicon,
     pub(crate) symbols: HashMap<String, u64>,
 }
 impl Model {
@@ -101,9 +101,9 @@ impl Model {
         let vector_keys = config.vector_keys.clone();
         let norms = config.norms.clone();
         let symbols = config.symbols.clone();
-        let email_regex = fancy_regex::Regex::new(&config.lexical.email_regex)?;
+        let lexicon = crate::Lexicon::new(std::sync::Arc::clone(&config.lexical), tokenizer.url())?;
         let model = Self {
-            email_regex,
+            lexicon,
             config,
             tensors,
             tokenizer,

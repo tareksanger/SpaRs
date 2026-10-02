@@ -124,7 +124,7 @@ class TokenReferenceTests(unittest.TestCase):
                     patch.object(token_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['token_match_reference.py', '--lower', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False, False)
+                generate.assert_called_once_with(False, False, True, False, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['token_match_reference.py', '--lower', '--exhaustive', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -132,11 +132,15 @@ class TokenReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--flags', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True, False)
+                generate.assert_called_once_with(False, False, False, True, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--length', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, True)
+                generate.assert_called_once_with(False, False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['token_match_reference.py', '--more-flags', str(output)]):
+                    token_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, False, True)
                 with patch('sys.argv', ['token_match_reference.py', '--flags', '--lower', str(output)]):
                     with self.assertRaises(SystemExit):
                         token_match_reference.main()
@@ -189,6 +193,25 @@ class TokenReferenceTests(unittest.TestCase):
             self.assertTrue(runs)
             for run in runs:
                 self.assertTrue(all(len(word) >= 3 for word in words[json_int(run['start']):json_int(run['end'])]))
+
+
+    def test_frozen_more_flag_suite_single_items_match_the_word_flags(self) -> None:
+        import spacy
+        from dependency_match_reference import MORE_FLAG_ATTRIBUTES, MORE_FLAG_WORDS, lexeme_flag
+        nlp = spacy.blank('en')
+        path = Path(__file__).resolve().parent.parent / 'fixtures/token-match-more-flags-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        case = json_object(json_array(fixture['cases'])[0])
+        self.assertEqual(case['text'], ' '.join(MORE_FLAG_WORDS))
+        found: dict[str, set[int]] = {}
+        for value in json_array(case['expected']):
+            match = json_object(value)
+            if json_int(match['end']) - json_int(match['start']) == 1:
+                found.setdefault(json_string(match['rule']), set()).add(json_int(match['start']))
+        for attribute in MORE_FLAG_ATTRIBUTES:
+            for flag_value in (True, False):
+                expected = {i for i, word in enumerate(MORE_FLAG_WORDS) if lexeme_flag(nlp, word, attribute) == flag_value}
+                self.assertEqual(found.get(f'{attribute}_{str(flag_value).lower()}', set()), expected, (attribute, flag_value))
 
 
 if __name__ == '__main__':

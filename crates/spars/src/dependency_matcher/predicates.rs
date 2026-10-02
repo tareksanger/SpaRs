@@ -28,19 +28,31 @@ pub enum TokenAttribute {
     /// Compared with [`Predicate::Compare`], [`Predicate::InIntegers`] and
     /// [`Predicate::NotInIntegers`].
     Length,
+    /// More lexical flags from the matcher's [`Lexicon`], compared with
+    /// [`Predicate::Flag`]: spaCy's `IS_LOWER`, `IS_UPPER`, `IS_TITLE`, `IS_ASCII`,
+    /// `IS_CURRENCY`, `IS_STOP`, `IS_BRACKET`, `IS_QUOTE`, `IS_LEFT_PUNCT`,
+    /// `IS_RIGHT_PUNCT`, `LIKE_URL` and `LIKE_EMAIL`.
+    IsLower,
+    IsUpper,
+    IsTitle,
+    IsAscii,
+    IsCurrency,
+    IsStop,
+    IsBracket,
+    IsQuote,
+    IsLeftPunct,
+    IsRightPunct,
+    LikeUrl,
+    LikeEmail,
 }
 
 impl TokenAttribute {
     /// The bit for a lexical flag attribute in per-token flag masks.
-    fn flag_bit(self) -> Option<u8> {
-        match self {
-            TokenAttribute::IsAlpha => Some(1),
-            TokenAttribute::IsDigit => Some(1 << 1),
-            TokenAttribute::IsSpace => Some(1 << 2),
-            TokenAttribute::IsPunct => Some(1 << 3),
-            TokenAttribute::LikeNum => Some(1 << 4),
-            _ => None,
-        }
+    fn flag_bit(self) -> Option<u32> {
+        FLAG_ATTRIBUTES
+            .iter()
+            .position(|attribute| *attribute == self)
+            .map(|index| 1 << index)
     }
     /// Whether this attribute needs a matcher created with a [`Lexicon`].
     pub(crate) fn needs_lexicon(self) -> bool {
@@ -175,29 +187,29 @@ impl LengthCheck {
 }
 
 /// The text-derived conditions of one pattern item or node: lexical flags compiled
-/// into one mask comparison, and an index into the pattern's `LENGTH` check table.
-/// It stays 8 bytes so pattern items keep the size they had before `LENGTH`; the
-/// matcher hot path visits every item for every token.
+/// into one mask comparison, and a marker for `LENGTH` checks, which live in the
+/// pattern's table at the item's position. It stays 8 bytes so pattern items keep
+/// two per cache line; the matcher hot path visits every item for every token.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct LexicalTest {
-    mask: u8,
-    expected: u8,
-    // Requiring a flag to be both true and false can never match.
-    contradictory: bool,
-    length: u32,
+    mask: u32,
+    expected: u32,
 }
 
-/// The `LENGTH` checks of one item, stored once per compiled pattern.
-#[derive(Debug, Clone)]
+/// The `LENGTH` checks of one item, stored per compiled pattern at the item's position.
+#[derive(Debug, Clone, Default)]
 pub(crate) struct LengthChecks(Vec<LengthCheck>);
 
-// Set in `LexicalTest::mask` when the item has LENGTH checks. Flag bits use 0..=4.
-const LENGTH_BIT: u8 = 1 << 7;
+// Set in `LexicalTest::mask` when the item has LENGTH checks. Flag bits use 0..=16.
+const LENGTH_BIT: u32 = 1 << 31;
+// Set in `expected`, never in `mask`, when a flag must be both true and false, so the
+// comparison `flags & mask == expected` can never succeed.
+const CONTRADICTION_BIT: u32 = 1 << 30;
 
 impl LexicalTest {
-    fn require(&mut self, bit: u8, value: bool) {
+    fn require(&mut self, bit: u32, value: bool) {
         if self.mask & bit != 0 && (self.expected & bit != 0) != value {
-            self.contradictory = true;
+            self.expected |= CONTRADICTION_BIT;
         }
         self.mask |= bit;
         if value {
@@ -205,29 +217,30 @@ impl LexicalTest {
         }
     }
     /// Lexical flag bits only; `LENGTH_BIT` marks length checks, not a flag.
-    pub(crate) fn mask(&self) -> u8 {
+    pub(crate) fn mask(&self) -> u32 {
         self.mask & !LENGTH_BIT
     }
     pub(crate) fn needs_length(&self) -> bool {
         self.mask & LENGTH_BIT != 0
     }
+    /// `item` is the position of this item in its pattern, which indexes `lengths`.
     #[inline]
     pub(crate) fn matches(
         &self,
         values: &TokenValues<'_>,
         index: usize,
         lengths: &[LengthChecks],
+        item: usize,
     ) -> Result<bool> {
-        // Most items have no flag or LENGTH conditions: one byte comparison.
+        // Most items have no flag or LENGTH conditions: one comparison.
         if self.mask == 0 {
             return Ok(true);
         }
-        // Flag-only items take the same steps as before LENGTH existed.
         if self.mask & LENGTH_BIT == 0 {
             let actual = values.flags.get(index).ok_or_else(missing_lexicon)?;
-            return Ok(!self.contradictory && actual & self.mask == self.expected);
+            return Ok(actual & self.mask == self.expected);
         }
-        self.matches_lengths(values, index, lengths)
+        self.matches_lengths(values, index, lengths, item)
     }
     // Items with LENGTH checks, and any flags they also have, are handled out of line.
     #[inline(never)]
@@ -236,17 +249,16 @@ impl LexicalTest {
         values: &TokenValues<'_>,
         index: usize,
         lengths: &[LengthChecks],
+        item: usize,
     ) -> Result<bool> {
         let flags = self.mask & !LENGTH_BIT;
         if flags != 0 {
             let actual = values.flags.get(index).ok_or_else(missing_lexicon)?;
-            if self.contradictory || actual & flags != self.expected {
+            if actual & flags != self.expected {
                 return Ok(false);
             }
         }
-        let checks = lengths
-            .get(self.length as usize)
-            .ok_or_else(missing_lengths)?;
+        let checks = lengths.get(item).ok_or_else(missing_lengths)?;
         let length = *values.lengths.get(index).ok_or_else(missing_lengths)?;
         Ok(checks.0.iter().all(|check| check.matches(length)))
     }
@@ -261,8 +273,8 @@ pub(crate) struct CompiledConditions {
 // Pattern items are scanned for every token; keep them two per 64-byte cache line.
 const _: () = assert!(std::mem::size_of::<CompiledConditions>() == 32);
 
-/// Compile one item's conditions. `LENGTH` checks are appended to the pattern's
-/// shared `lengths` table and referenced by index.
+/// Compile one item's conditions. Its `LENGTH` checks are appended to the pattern's
+/// `lengths` table, which therefore has one entry per item, in item order.
 pub(crate) fn compile_conditions(
     constraints: &[TokenConstraint],
     lengths: &mut Vec<LengthChecks>,
@@ -301,11 +313,9 @@ pub(crate) fn compile_conditions(
         }
     }
     if !checks.is_empty() {
-        lexical.length = u32::try_from(lengths.len())
-            .map_err(|_| Error::Pattern("too many LENGTH conditions in one pattern".into()))?;
         lexical.mask |= LENGTH_BIT;
-        lengths.push(LengthChecks(checks));
     }
+    lengths.push(LengthChecks(checks));
     Ok(CompiledConditions {
         constraints: compiled,
         lexical,
@@ -326,7 +336,7 @@ fn missing_lexicon() -> Error {
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Needs {
     pub(crate) lower: bool,
-    pub(crate) flags: u8,
+    pub(crate) flags: u32,
     pub(crate) length: bool,
 }
 
@@ -341,7 +351,7 @@ impl Needs {
 /// Lowercase text, lexical flags and lengths are computed only when in use.
 pub(crate) struct TokenValues<'a> {
     lower: Vec<Cow<'a, str>>,
-    flags: Vec<u8>,
+    flags: Vec<u32>,
     lengths: Vec<u32>,
 }
 
@@ -358,18 +368,17 @@ impl<'a> TokenValues<'a> {
             Vec::new()
         } else {
             let lexicon = lexicon.ok_or_else(missing_lexicon)?;
-            let r = lexicon.resources();
             texts()
                 .map(|text| {
                     let text = text?;
-                    Ok(FLAG_ATTRIBUTES.iter().fold(0, |flags, &attribute| {
-                        let bit = attribute.flag_bit().unwrap_or(0);
-                        if mask & bit != 0 && lexical_flag(r, attribute, text) {
-                            flags | bit
-                        } else {
-                            flags
+                    let mut flags = 0;
+                    for (position, attribute) in FLAG_ATTRIBUTES.iter().enumerate() {
+                        let bit = 1 << position;
+                        if mask & bit != 0 && lexical_flag(lexicon, *attribute, text)? {
+                            flags |= bit;
                         }
-                    }))
+                    }
+                    Ok(flags)
                 })
                 .collect::<Result<_>>()?
         };
@@ -391,24 +400,59 @@ impl<'a> TokenValues<'a> {
     }
 }
 
-const FLAG_ATTRIBUTES: [TokenAttribute; 5] = [
+// Bit positions in per-token flag masks. Bits 30 and 31 are reserved by `LexicalTest`.
+const FLAG_ATTRIBUTES: [TokenAttribute; 17] = [
     TokenAttribute::IsAlpha,
     TokenAttribute::IsDigit,
     TokenAttribute::IsSpace,
     TokenAttribute::IsPunct,
     TokenAttribute::LikeNum,
+    TokenAttribute::IsLower,
+    TokenAttribute::IsUpper,
+    TokenAttribute::IsTitle,
+    TokenAttribute::IsAscii,
+    TokenAttribute::IsCurrency,
+    TokenAttribute::IsStop,
+    TokenAttribute::IsBracket,
+    TokenAttribute::IsQuote,
+    TokenAttribute::IsLeftPunct,
+    TokenAttribute::IsRightPunct,
+    TokenAttribute::LikeUrl,
+    TokenAttribute::LikeEmail,
 ];
 
 // The same functions compute these fields in `Model::lexeme`.
-fn lexical_flag(r: &crate::config::Lexical, attribute: TokenAttribute, text: &str) -> bool {
-    match attribute {
+fn lexical_flag(lexicon: &Lexicon, attribute: TokenAttribute, text: &str) -> Result<bool> {
+    let r = lexicon.resources();
+    Ok(match attribute {
         TokenAttribute::IsAlpha => r.is_alpha(text),
         TokenAttribute::IsDigit => r.is_digit(text),
         TokenAttribute::IsSpace => r.is_space(text),
         TokenAttribute::IsPunct => r.is_punct(text),
         TokenAttribute::LikeNum => r.like_num(text),
-        _ => false,
-    }
+        TokenAttribute::IsLower => r.is_lower(text),
+        TokenAttribute::IsUpper => r.is_upper(text),
+        TokenAttribute::IsTitle => r.is_title(text),
+        TokenAttribute::IsAscii => r.is_ascii(text),
+        TokenAttribute::IsCurrency => r.is_currency(text),
+        TokenAttribute::IsStop => r.is_stop(text),
+        TokenAttribute::IsBracket => r.is_bracket(text),
+        TokenAttribute::IsQuote => r.is_quote(text),
+        TokenAttribute::IsLeftPunct => r.is_left_punct(text),
+        TokenAttribute::IsRightPunct => r.is_right_punct(text),
+        TokenAttribute::LikeUrl => lexicon.like_url(text)?,
+        TokenAttribute::LikeEmail => lexicon.like_email(text)?,
+        // Listed explicitly so a new flag attribute must add its own arm above.
+        TokenAttribute::Text
+        | TokenAttribute::Lower
+        | TokenAttribute::Norm
+        | TokenAttribute::Lemma
+        | TokenAttribute::Pos
+        | TokenAttribute::Tag
+        | TokenAttribute::Dep
+        | TokenAttribute::Morphology
+        | TokenAttribute::Length => false,
+    })
 }
 
 impl TokenConstraint {
@@ -515,12 +559,8 @@ impl CompiledConstraint {
             TokenAttribute::Tag => (t.tag.as_deref(), "tag"),
             TokenAttribute::Dep => (t.dep.as_deref(), "dependency label"),
             TokenAttribute::Morphology => (t.morphology.as_deref(), "morphology"),
-            TokenAttribute::IsAlpha
-            | TokenAttribute::IsDigit
-            | TokenAttribute::IsSpace
-            | TokenAttribute::IsPunct
-            | TokenAttribute::LikeNum
-            | TokenAttribute::Length => return Err(no_string_value()),
+            // Flags and LENGTH compile into `LexicalTest`, never into string constraints.
+            _ => return Err(no_string_value()),
         };
         value
             .map(Cow::Borrowed)

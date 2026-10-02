@@ -9,7 +9,7 @@ impl Compiled {
     fn matches(&self, values: &TokenValues<'_>, index: usize) -> Result<bool> {
         self.conditions
             .lexical
-            .matches(values, index, &self.lengths)
+            .matches(values, index, &self.lengths, 0)
     }
 }
 fn compile(constraints: &[TokenConstraint]) -> Result<Compiled> {
@@ -342,7 +342,7 @@ fn malformed_lexical_flag_conditions_are_rejected() {
         r#"{"attribute":"is_alpha","predicate":{"kind":"flag","value":null}}"#,
         r#"{"attribute":"is_alpha","predicate":{"kind":"flag"}}"#,
         r#"{"attribute":"IS_ALPHA","predicate":{"kind":"flag","value":true}}"#,
-        r#"{"attribute":"is_upper","predicate":{"kind":"flag","value":true}}"#,
+        r#"{"attribute":"is_oov","predicate":{"kind":"flag","value":true}}"#,
     ] {
         assert!(
             serde_json::from_str::<TokenConstraint>(raw).is_err(),
@@ -656,4 +656,109 @@ fn malformed_length_conditions_are_rejected() {
             Err(Error::Pattern(_))
         ));
     }
+}
+#[test]
+fn flag_masks_use_distinct_bits_and_mark_contradictions() {
+    let email = TokenAttribute::LikeEmail.flag_bit().unwrap();
+    let alpha = TokenAttribute::IsAlpha.flag_bit().unwrap();
+    assert_eq!(email, 1 << 16);
+    assert!(email & (LENGTH_BIT | CONTRADICTION_BIT) == 0);
+    // Token 0 is an email; token 1 is alphabetic; token 2 is both.
+    let values = TokenValues {
+        lower: Vec::new(),
+        flags: vec![email, alpha, email | alpha],
+        lengths: Vec::new(),
+    };
+    let flag = |attribute: TokenAttribute, value: bool| TokenConstraint {
+        attribute,
+        predicate: Predicate::Flag { value },
+    };
+    let check = |constraints: &[TokenConstraint]| {
+        let compiled = compile(constraints).unwrap();
+        (0..3)
+            .map(|index| compiled.matches(&values, index).unwrap())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        check(&[flag(TokenAttribute::LikeEmail, true)]),
+        [true, false, true]
+    );
+    assert_eq!(
+        check(&[
+            flag(TokenAttribute::LikeEmail, true),
+            flag(TokenAttribute::IsAlpha, false)
+        ]),
+        [true, false, false]
+    );
+    assert_eq!(
+        check(&[
+            flag(TokenAttribute::LikeEmail, true),
+            flag(TokenAttribute::LikeEmail, false)
+        ]),
+        [false; 3]
+    );
+    for attribute in FLAG_ATTRIBUTES {
+        let bit = attribute.flag_bit().unwrap();
+        assert_eq!(bit.count_ones(), 1);
+        assert!(bit & (LENGTH_BIT | CONTRADICTION_BIT) == 0);
+    }
+}
+#[test]
+fn every_named_flag_attribute_has_a_distinct_bit() {
+    let names = [
+        "is_alpha",
+        "is_digit",
+        "is_space",
+        "is_punct",
+        "like_num",
+        "is_lower",
+        "is_upper",
+        "is_title",
+        "is_ascii",
+        "is_currency",
+        "is_stop",
+        "is_bracket",
+        "is_quote",
+        "is_left_punct",
+        "is_right_punct",
+        "like_url",
+        "like_email",
+    ];
+    let mut all = 0u32;
+    for name in names {
+        let attribute: TokenAttribute = serde_json::from_value(serde_json::json!(name)).unwrap();
+        let bit = attribute
+            .flag_bit()
+            .unwrap_or_else(|| panic!("{name} has no flag bit"));
+        assert_eq!(all & bit, 0, "{name} shares a bit");
+        all |= bit;
+    }
+    assert_eq!(all.count_ones(), 17);
+}
+#[test]
+fn contradictory_flags_fail_even_with_length_checks() {
+    let email = TokenAttribute::LikeEmail.flag_bit().unwrap();
+    let values = TokenValues {
+        lower: Vec::new(),
+        flags: vec![email, 0],
+        lengths: vec![3, 3],
+    };
+    let flag = |value| TokenConstraint {
+        attribute: TokenAttribute::LikeEmail,
+        predicate: Predicate::Flag { value },
+    };
+    let compiled = compile(&[
+        flag(true),
+        flag(false),
+        TokenConstraint {
+            attribute: TokenAttribute::Length,
+            predicate: Predicate::Compare {
+                operator: Comparison::GreaterOrEqual,
+                value: FiniteNumber::new(0.0).unwrap(),
+            },
+        },
+    ])
+    .unwrap();
+    assert!(!compiled.matches(&values, 0).unwrap());
+    assert!(!compiled.matches(&values, 1).unwrap());
 }

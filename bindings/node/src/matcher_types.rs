@@ -74,6 +74,18 @@ impl TokenConstraint {
             "is_punct" => spars::TokenAttribute::IsPunct,
             "like_num" => spars::TokenAttribute::LikeNum,
             "length" => spars::TokenAttribute::Length,
+            "is_lower" => spars::TokenAttribute::IsLower,
+            "is_upper" => spars::TokenAttribute::IsUpper,
+            "is_title" => spars::TokenAttribute::IsTitle,
+            "is_ascii" => spars::TokenAttribute::IsAscii,
+            "is_currency" => spars::TokenAttribute::IsCurrency,
+            "is_stop" => spars::TokenAttribute::IsStop,
+            "is_bracket" => spars::TokenAttribute::IsBracket,
+            "is_quote" => spars::TokenAttribute::IsQuote,
+            "is_left_punct" => spars::TokenAttribute::IsLeftPunct,
+            "is_right_punct" => spars::TokenAttribute::IsRightPunct,
+            "like_url" => spars::TokenAttribute::LikeUrl,
+            "like_email" => spars::TokenAttribute::LikeEmail,
             _ => return Err(invalid("unknown token attribute")),
         };
         let predicate = self.predicate;
@@ -175,6 +187,18 @@ impl TokenConstraint {
             spars::TokenAttribute::IsPunct => "is_punct",
             spars::TokenAttribute::LikeNum => "like_num",
             spars::TokenAttribute::Length => "length",
+            spars::TokenAttribute::IsLower => "is_lower",
+            spars::TokenAttribute::IsUpper => "is_upper",
+            spars::TokenAttribute::IsTitle => "is_title",
+            spars::TokenAttribute::IsAscii => "is_ascii",
+            spars::TokenAttribute::IsCurrency => "is_currency",
+            spars::TokenAttribute::IsStop => "is_stop",
+            spars::TokenAttribute::IsBracket => "is_bracket",
+            spars::TokenAttribute::IsQuote => "is_quote",
+            spars::TokenAttribute::IsLeftPunct => "is_left_punct",
+            spars::TokenAttribute::IsRightPunct => "is_right_punct",
+            spars::TokenAttribute::LikeUrl => "like_url",
+            spars::TokenAttribute::LikeEmail => "like_email",
         };
         let strings = |values: &Vec<String>| {
             Some(Either::A(

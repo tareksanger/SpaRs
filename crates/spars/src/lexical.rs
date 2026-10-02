@@ -35,7 +35,7 @@ impl Model {
     }
     /// A shared handle to this model's language lexical resources, for matchers.
     pub fn lexicon(&self) -> crate::Lexicon {
-        crate::Lexicon::new(std::sync::Arc::clone(&self.config.lexical))
+        self.lexicon.clone()
     }
     pub(crate) fn shape(&self, s: &str) -> String {
         if s.chars().count() >= 100 {
@@ -71,53 +71,6 @@ impl Model {
     /// Lexical properties use the Unicode classifications exported by the pinned reference.
     pub fn lexeme(&self, s: &str) -> crate::Result<Lexeme> {
         let r = &*self.config.lexical;
-        let member = |values: &[String], text: &str| values.iter().any(|v| v == text);
-        let cased: Vec<char> = s
-            .chars()
-            .filter(|c| {
-                self.char_flag(*c, CharFlag::Lower)
-                    || self.char_flag(*c, CharFlag::Upper)
-                    || self.char_flag(*c, CharFlag::Title)
-            })
-            .collect();
-        let is_lower =
-            !cased.is_empty() && cased.iter().all(|c| self.char_flag(*c, CharFlag::Lower));
-        let is_upper =
-            !cased.is_empty() && cased.iter().all(|c| self.char_flag(*c, CharFlag::Upper));
-        let mut prev = false;
-        let mut is_title = !cased.is_empty();
-        for c in s.chars() {
-            if self.char_flag(c, CharFlag::Upper) || self.char_flag(c, CharFlag::Title) {
-                if prev {
-                    is_title = false
-                }
-                prev = true
-            } else if self.char_flag(c, CharFlag::Lower) {
-                if !prev {
-                    is_title = false
-                }
-                prev = true
-            } else {
-                prev = false
-            }
-        }
-        let tld = s
-            .rsplit_once('.')
-            .map(|(_, v)| v.split(':').next().unwrap());
-        let like_url = if s.starts_with("http://")
-            || s.starts_with("https://")
-            || (s.starts_with("www.") && s.len() >= 5)
-        {
-            true
-        } else if s.starts_with('.') || s.ends_with('.') || s.contains('@') {
-            false
-        } else if let Some(tld) = tld {
-            tld.ends_with('/')
-                || (tld.chars().all(|c| self.char_flag(c, CharFlag::Alpha)) && member(&r.tlds, tld))
-                || self.tokenizer.url_match(s)?
-        } else {
-            false
-        };
         Ok(Lexeme {
             orth: self.string_id(s),
             norm: self.norm(s),
@@ -129,21 +82,21 @@ impl Model {
                 .collect(),
             is_alpha: r.is_alpha(s),
             is_digit: r.is_digit(s),
-            is_lower,
-            is_upper,
-            is_title,
+            is_lower: r.is_lower(s),
+            is_upper: r.is_upper(s),
+            is_title: r.is_title(s),
             is_space: r.is_space(s),
-            is_ascii: !s.is_empty() && s.is_ascii(),
+            is_ascii: r.is_ascii(s),
             is_punct: r.is_punct(s),
-            is_currency: !s.is_empty() && s.chars().all(|c| self.char_flag(c, CharFlag::Currency)),
-            is_stop: member(&r.stops, &self.lower(s)),
-            is_bracket: member(&r.is_bracket, s),
-            is_quote: member(&r.is_quote, s),
-            is_left_punct: member(&r.is_left_punct, s),
-            is_right_punct: member(&r.is_right_punct, s),
+            is_currency: r.is_currency(s),
+            is_stop: r.is_stop(s),
+            is_bracket: r.is_bracket(s),
+            is_quote: r.is_quote(s),
+            is_left_punct: r.is_left_punct(s),
+            is_right_punct: r.is_right_punct(s),
             like_num: r.like_num(s),
-            like_email: self.email_regex.find(s)?.is_some_and(|m| m.start() == 0),
-            like_url,
+            like_email: self.lexicon.like_email(s)?,
+            like_url: self.lexicon.like_url(s)?,
             has_vector: self.vector(s).is_some(),
         })
     }

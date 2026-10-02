@@ -142,6 +142,18 @@ class Lexeme(Protocol):
     suffix_: str
     vector: FloatArray
     has_vector: bool
+    is_lower: bool
+    is_upper: bool
+    is_title: bool
+    is_ascii: bool
+    is_currency: bool
+    is_stop: bool
+    is_bracket: bool
+    is_quote: bool
+    is_left_punct: bool
+    is_right_punct: bool
+    like_url: bool
+    like_email: bool
 
 class Vocab(Protocol):
     strings: Strings

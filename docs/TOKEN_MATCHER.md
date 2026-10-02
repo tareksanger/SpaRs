@@ -70,7 +70,7 @@ Pattern values are compared exactly as written; they are not lowercased. A value
 
 ## Match lexical flags
 
-Lexical flags describe the form of a token's text, like spaCy's `IS_ALPHA`, `IS_DIGIT`, `IS_SPACE`, `IS_PUNCT` and `LIKE_NUM`. Some depend on the language: English `LIKE_NUM` accepts number words such as “ten” and ordinals such as “3rd”. A matcher therefore needs the model's lexicon, its language data such as Unicode character tables and number words, just as spaCy creates a matcher from the model's vocabulary. The supported models are English, and `LikeNum` implements spaCy's English rule. This example finds a number followed by a word.
+Lexical flags are true/false properties computed from a token's text, such as whether it is alphabetic or a stop word, like spaCy's `IS_ALPHA` or `LIKE_URL`. All seventeen of spaCy's lexical flag attributes are supported: `IsAlpha`, `IsDigit`, `IsSpace`, `IsPunct`, `LikeNum`, `IsLower`, `IsUpper`, `IsTitle`, `IsAscii`, `IsCurrency`, `IsStop`, `IsBracket`, `IsQuote`, `IsLeftPunct`, `IsRightPunct`, `LikeUrl` and `LikeEmail`. Some depend on the language: English `LIKE_NUM` accepts number words such as “ten” and ordinals such as “3rd”. A matcher therefore needs the model's lexicon, its language data such as Unicode character tables and number words, just as spaCy creates a matcher from the model's vocabulary. The supported models are English, and `LikeNum` implements spaCy's English rule. This example finds a number followed by a word.
 
 ```rust
 use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
@@ -97,7 +97,31 @@ It finds “Ten people” (tokens 0–2) and “1,000 dollars” (tokens 3–5).
 
 `IsAlpha`, `IsDigit` and `IsSpace` match Python's `str.isalpha()`, `str.isdigit()` and `str.isspace()`. So the superscript `²` counts as a digit but the fraction `½` does not, and the Roman numeral `Ⅻ` and a decomposed `é` (an `e` followed by a combining accent) are not alphabetic. `IsPunct` follows spaCy: every character must be in a Unicode punctuation category, so `@` and `_` are punctuation but `$` and `+` are not. English `LikeNum` removes one leading `+`, `-`, `±` or `~` and all `,` and `.` characters, then accepts digits, two digit strings joined by one `/` such as `1/2`, number and ordinal words in any capitalization such as `ten` and `Tenth`, and digits followed by `st`, `nd`, `rd` or `th`, even `3th`. It rejects `1.5e3`, `1/2/3` and hyphenated words such as `twenty-one`.
 
-Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. In JSON the predicate is `{"kind": "flag", "value": true}`; strings, numbers and `null` are rejected. spaCy's pattern validation (`validate=True`) rejects strings and numbers for these attributes, and spaCy raises an error for `null` when the pattern is added. Flags are computed from token text, so they need no model annotations. `TokenMatcher::new()` still works for all other conditions; registering a flag condition on it returns a pattern error. The lexicon handle is cheap to clone and stays valid after the model is dropped. Other lexical flags, such as `IS_UPPER`, `IS_STOP` and `LIKE_URL`, are not supported yet.
+The case flags follow Python's string methods: `IsLower`, `IsUpper` and `IsTitle` need at least one cased letter, so `123` is none of them, while `A1` counts as both uppercase and titlecase and the titlecase letter `ǅ` counts as titlecase. `IsAscii` requires every character to be ASCII. `IsCurrency` requires every character to be a currency symbol, so `$`, `€` and `¥` match but `USD` and `$5` do not. `IsStop` compares the lowercase text with the language's stop words, so `the`, `The` and `THE` all match. `IsBracket`, `IsQuote`, `IsLeftPunct` and `IsRightPunct` use spaCy's fixed lists of punctuation strings, which include the two-character quotes ` `` ` (left only) and `''` (right only); the straight quotes `"` and `'` count as both left and right punctuation. `LikeUrl` follows spaCy's heuristic rather than validating a URL. Text starting with `http://` or `https://`, or with `www.` and at least one more character, always matches. Otherwise, text that starts or ends with `.` or contains `@` never matches. The rest matches when the part after its last `.` (ignoring any `:port`) is a known top-level domain or ends with `/`, or when it matches the model's URL pattern. So `example.org`, `example.com/` and even `file.txt` match, while `localhost:8080`, `www.`, `.com` and `a@b.com` do not. `LikeEmail` matches text that begins with an email address, such as `a@b.com`, but not `@handle`.
+
+This example finds email addresses and links with two of these flags:
+
+```rust
+use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
+    TokenMatcher, TokenPattern, TokenPatternItem};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    let flag = |attribute| TokenPattern { tokens: vec![TokenPatternItem {
+        constraints: vec![TokenConstraint { attribute, predicate: Predicate::Flag { value: true } }],
+        repetition: Default::default(),
+    }] };
+    let mut matcher = TokenMatcher::with_lexicon(model.lexicon());
+    matcher.add("email", vec![flag(TokenAttribute::LikeEmail)])?;
+    matcher.add("link", vec![flag(TokenAttribute::LikeUrl)])?;
+    let doc = model.process("Email a@b.com or visit https://spacy.io")?;
+    let found: Vec<_> = matcher.find_matches(&doc)?.iter()
+        .map(|m| (m.rule.as_str().to_owned(), m.start)).collect();
+    assert_eq!(found, [("email".to_owned(), TokenIndex(1)), ("link".to_owned(), TokenIndex(4))]);
+    Ok(())
+}
+```
+
+Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. In JSON the predicate is `{"kind": "flag", "value": true}`; strings, numbers and `null` are rejected. spaCy's pattern validation (`validate=True`) rejects strings and numbers for these attributes, and spaCy raises an error for `null` when the pattern is added. Flags are computed from token text, so they need no model annotations. `TokenMatcher::new()` still works for all other conditions; registering a flag condition on it returns a pattern error. The lexicon handle is cheap to clone and stays valid after the model is dropped. Token-level attributes such as `IS_SENT_START` and `SPACY` are not lexical flags and are not supported.
 
 ## Match by token length
 
@@ -143,7 +167,7 @@ The operators are `==`, `!=`, `>=`, `<=`, `>` and `<`. The value may be a whole 
 
 ## Conditions and repetition
 
-All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the lexical flags `IsAlpha`, `IsDigit`, `IsSpace`, `IsPunct` and `LikeNum`, and `Length`. Comparisons support equality, membership, exclusion, morphology superset or intersection, true/false flags, and numeric comparisons and integer sets for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
+All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the seventeen lexical flags, and `Length`. Comparisons support equality, membership, exclusion, morphology superset or intersection, true/false flags, and numeric comparisons and integer sets for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
 
 | Repetition | spaCy operator | Meaning |
 |---|---|---|
@@ -167,8 +191,8 @@ Requested annotations must be available throughout the document. Missing annotat
 
 ## Scope and cost
 
-This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, lexical attributes other than the five flags and `Length`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) supports exact or Unicode-lowercase token phrase patterns.
+This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, token-level attributes such as `IS_SENT_START`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) supports exact or Unicode-lowercase token phrase patterns.
 
 Patterns are limited to 4,096 expanded nodes to keep registration bounded. `OneOrMore` uses two nodes; a bounded range uses its maximum count, and an unbounded range uses its minimum plus one. Larger patterns return an error.
 
-Broad repetition can produce a quadratic number of spans. Several optional items can also reach the same state by different paths. Prefer specific conditions and bounded repetition when they express the intended pattern. Performance measurements must include both the input length and the number of returned matches.
+Broad repetition can produce a quadratic number of spans. Several optional items can also reach the same state by different paths. Prefer specific conditions and bounded repetition when they express the intended pattern. Performance measurements must include both the input length and the number of returned matches. Lexical flags are computed once per call for each token, and only for the flags that registered patterns use; spaCy instead stores them on each vocabulary entry, so repeated calls in SpaRs repeat this work.
