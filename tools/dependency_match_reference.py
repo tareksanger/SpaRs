@@ -449,6 +449,37 @@ def set_document(nlp: Language) -> Doc:
                     deps=SET_DEPS, pos=SET_POS, tags=SET_TAGS, lemmas=SET_LEMMAS, morphs=SET_MORPHS)
 
 
+# Morphology normalization: spaCy sorts whole `Field=Value` strings, so `Case2=Acc`
+# sorts before `Case=Nom` ('2' < '='), and folds the POS alias with Unicode
+# `str.upper()`, so `poſ=ſym` (long s) becomes `POS=SYM`.
+NORMALIZATION_WORDS = ['prefix', 'symbol', 'possessor', 'underscore', 'plain']
+NORMALIZATION_MORPHS = ['Case2=Acc|Case=Nom', 'POS=SYM', 'Number=Plur|Number[psor]=Sing', 'A=y|A_B=x', 'Case=Nom']
+NORMALIZATION_ENTRIES = ['Case=Nom|Case2=Acc', 'Case2=Acc|Case=Nom', 'Case2=Acc', 'Case=Nom', 'poſ=ſym', 'POS=ſym',
+                         'Poſ=SYM', 'pos=sym', 'POS=SYM', 'Number[psor]=Sing|Number=Plur', 'A_B=x|A=y']
+
+
+def normalization_rules() -> list[Rule]:
+    kinds: tuple[Literal['in', 'not_in', 'is_subset', 'is_superset', 'intersects'], ...] = (
+        'in', 'not_in', 'is_subset', 'is_superset', 'intersects')
+    result = [Rule(f'{kind}_{index}', [Pattern([Node('a', [Constraint('morphology', Membership(kind, [entry]))])])])
+              for kind in kinds for index, entry in enumerate(NORMALIZATION_ENTRIES)]
+    # Exact equality compares the supplied spelling without normalization.
+    result.extend(Rule(f'equals_{index}', [Pattern([Node('a', [Constraint('morphology', Equals(entry))])])])
+                  for index, entry in enumerate(NORMALIZATION_ENTRIES))
+    return result
+
+
+def generate_morph_normalization(nlp: Language) -> Fixture:
+    count = len(NORMALIZATION_WORDS)
+    # Documents first, as in generate_sets: spaCy records a new analysis as first spelled.
+    doc = make_doc(nlp.vocab, words=NORMALIZATION_WORDS, spaces=[index + 1 < count for index in range(count)],
+                   heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1), pos=['NOUN'] * count, tags=['NN'] * count,
+                   lemmas=NORMALIZATION_WORDS, morphs=NORMALIZATION_MORPHS)
+    cases = [case(nlp, 'morph-normalization', ' '.join(NORMALIZATION_WORDS), doc, normalization_rules())]
+    source = Path(spacy.__file__).parent / 'morphology.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def lexeme_flag(nlp: Language, word: str, attribute: Attribute) -> bool:
     """Read a remaining lexical flag from the vocabulary, for independent checks."""
     lexeme = nlp.vocab[word]
@@ -483,7 +514,7 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
 
 
 def generate(regressions: bool = False, lower: bool = False, flags: bool = False, length: bool = False,
-             more_flags: bool = False, sets: bool = False) -> Fixture:
+             more_flags: bool = False, sets: bool = False, morph_normalization: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -501,6 +532,8 @@ def generate(regressions: bool = False, lower: bool = False, flags: bool = False
         return generate_more_flags(nlp)
     if sets:
         return generate_sets(nlp)
+    if morph_normalization:
+        return generate_morph_normalization(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -623,6 +656,7 @@ def main() -> None:
     modes.add_argument('--length', action='store_true')
     modes.add_argument('--more-flags', action='store_true')
     modes.add_argument('--sets', action='store_true')
+    modes.add_argument('--morph-normalization', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -647,7 +681,11 @@ def main() -> None:
     set_mode: object = args.sets
     if not isinstance(set_mode, bool):
         raise TypeError('Sets flag must be boolean')
-    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode))
+    normalization_mode: object = args.morph_normalization
+    if not isinstance(normalization_mode, bool):
+        raise TypeError('Morph-normalization flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode,
+                                   normalization_mode))
 
 
 if __name__ == '__main__':

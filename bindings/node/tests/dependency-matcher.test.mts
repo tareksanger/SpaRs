@@ -53,7 +53,9 @@ test('all dependency relations, predicates and ordering match frozen official su
   let lengthMatches = 0;
   let setRules = 0;
   let setMatches = 0;
-  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3], ['dependency-match-sets-v1', 3]] as const) {
+  let normalizationRules = 0;
+  let normalizationMatches = 0;
+  for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3], ['dependency-match-sets-v1', 3], ['dependency-match-morph-normalization-v1', 1]] as const) {
     const fixture = record(readJson(`${root}fixtures/${suite}.expected.json`));
     assert.deepEqual(fixture.versions, { spacy: '3.8.14', thinc: '8.3.13' });
     const cases = array(fixture.cases);
@@ -75,6 +77,10 @@ test('all dependency relations, predicates and ordering match frozen official su
       if (suite === 'dependency-match-sets-v1') {
         setRules += rules.length;
         setMatches += array(c.expected).length;
+      }
+      if (suite === 'dependency-match-morph-normalization-v1') {
+        normalizationRules += rules.length;
+        normalizationMatches += array(c.expected).length;
       }
       for (const value of rules) {
         const rule = record(value);
@@ -103,6 +109,8 @@ test('all dependency relations, predicates and ordering match frozen official su
   assert.equal(lengthMatches, 321);
   assert.equal(setRules, 546);
   assert.equal(setMatches, 587);
+  assert.equal(normalizationRules, 66);
+  assert.equal(normalizationMatches, 80);
 });
 
 const FLAG_RULES = 42;
@@ -220,6 +228,17 @@ test('pending searches retain documents and block rule mutation until resolution
   global.gc?.();
   assert.deepEqual(await pending, [{ rule: 'rule', tokens: [0] }, { rule: 'rule', tokens: [1] }]);
   matcher.remove('rule');
+});
+
+test('noncanonical document morphology rejects asynchronously', async () => {
+  const doc = (morphology: string): NativeDocument => NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: {
+    text: 'a', tokens: [{ start: 0, end: 1, idx: 0, whitespace: false, norm: 'a', head: 0, dep: 'ROOT', morphology }],
+    sentences: null, entities: null, noun_chunks: null,
+  } }));
+  const matcher = new DependencyMatcher();
+  matcher.add('rule', [{ nodes: [{ id: 'a', constraints: [{ attribute: 'morphology', predicate: { kind: 'intersects', values: ['Case=Nom'] } }] }] }]);
+  await assert.rejects(matcher.findMatches(doc('Case=Nom|Case2=Acc')), { code: 'SPARS_UNSUPPORTED' });
+  assert.deepEqual(await matcher.findMatches(doc('Case2=Acc|Case=Nom')), [{ rule: 'rule', tokens: [0] }]);
 });
 
 test('missing dependency heads and unavailable constrained annotations reject asynchronously', async () => {

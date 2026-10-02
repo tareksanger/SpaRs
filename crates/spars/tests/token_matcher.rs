@@ -380,3 +380,43 @@ fn check_with(
         });
     }
 }
+#[test]
+fn noncanonical_document_morphology_is_rejected_by_find_matches() {
+    let doc = |morphology: &str| {
+        Doc::from_json(
+            &serde_json::json!({"format_version": 1, "document": {"text": "a", "tokens": [{
+                "start": 0, "end": 1, "idx": 0, "whitespace": false, "norm": "a",
+                "morphology": morphology,
+            }]}})
+            .to_string(),
+        )
+        .unwrap()
+    };
+    let pattern: TokenPattern = serde_json::from_str(
+        r#"{"tokens":[{"constraints":[{"attribute":"morphology","predicate":{"kind":"intersects","values":["Case=Nom"]}}],"repetition":{"kind":"once"}}]}"#,
+    )
+    .unwrap();
+    let mut matcher = TokenMatcher::new();
+    matcher.add("rule", vec![pattern]).unwrap();
+    for noncanonical in [
+        "Case=Nom|Case2=Acc",
+        "Case=Acc|Case=Nom",
+        "poſ=NOUN",
+        "POS=noun",
+    ] {
+        assert!(
+            matches!(
+                matcher.find_matches(&doc(noncanonical)),
+                Err(spars::Error::Unsupported(_))
+            ),
+            "{noncanonical}"
+        );
+    }
+    assert_eq!(
+        matcher
+            .find_matches(&doc("Case2=Acc|Case=Nom"))
+            .unwrap()
+            .len(),
+        1
+    );
+}
