@@ -56,11 +56,12 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text, annotation, lexical flag and length conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Extend shared matcher conditions and selection options, building on the existing three native matchers.
-2. Add checked annotation updates, EntityRuler, and SpanRuler.
-3. Add dependency-checked component selection, then measured neural batching.
-4. Add independent sentence segmentation: Sentencizer, then trainable senter.
-5. Resume multilingual model expansion after these four milestones. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
+1. Add annotation-based PhraseMatcher attributes, completing delivery M3.
+2. Add checked annotation updates, EntityRuler, and SpanRuler (deliveries A1–A3).
+3. Add the remaining matcher selection options, regex and fuzzy predicates (deliveries M4 and M5).
+4. Add dependency-checked component selection, then measured neural batching.
+5. Add independent sentence segmentation: Sentencizer, then trainable senter.
+6. Resume multilingual model expansion after these five milestones. Catalog-selected installation, capability-declared loading, and configurable execution order are implemented for the English CNN family; additional component sets, languages and architectures remain planned.
 
 The [implementation sequence](#implementation-sequence) defines dependencies and acceptance for these planned milestones. Token merge/split editing, broader spaCy serialization, custom-trained pipeline loading, and training remain later work. Checked annotation updates do not imply retokenization support. The all-official-pipelines target, including transformer architectures, remains unchanged; this sequence defers multilingual expansion without restricting shared component designs to English. Follow the [quality process](QUALITY.md): every feature needs its own reference cases, failure tests, performance review, and runnable example before it is marked verified.
 
@@ -68,7 +69,7 @@ The separate [Node binding](NODE.md) exposes loading, processing, batches, order
 
 ## Implementation sequence
 
-Deliveries M1 and M2 are implemented; deliveries M3–M5 and the later milestones are planned, not implemented or verified. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
+Deliveries M1 and M2 and the set comparisons of M3 are implemented; the rest of M3, M4, M5 and the later milestones are planned, not implemented or verified. Rulers depend only on the verified token and phrase pattern subset, so A1–A3 follow M3 and precede M4 and M5, which add selection options and predicate kinds that rulers do not require. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
 
 ### 1. Shared matcher conditions and options
 
@@ -78,7 +79,7 @@ The three native matchers and their reference suites are described in the [match
 |---|---|---|
 | M1 (implemented) | Shared Unicode LOWER for TokenMatcher and DependencyMatcher, reusing the pinned lowercase resources where semantics agree | Ordered official outputs for Unicode expansions, combining characters, empty documents, repeated calls, and malformed conditions; existing PhraseMatcher LOWER results unchanged. Evidence: `token-match-lower-v1` and `dependency-match-lower-v1` fixtures through Rust and Node, with predicate unit tests for malformed conditions |
 | M2 (implemented) | Inventory missing attributes and predicates across all three matchers; add typed lexical flags, starting with IS_ALPHA, IS_DIGIT, IS_SPACE, IS_PUNCT and LIKE_NUM; then LENGTH and numeric comparisons | Positive and negative cases for every added attribute/operator, including Unicode length semantics and invalid value types; no implicit string conversion for flags or numbers. Evidence: IS_ALPHA, IS_DIGIT, IS_SPACE, IS_PUNCT and LIKE_NUM through a model lexicon, with `token-match-flags-v1` and `dependency-match-flags-v1`; the twelve other lexical flags, with `token-match-more-flags-v1` and `dependency-match-more-flags-v1`; LENGTH with numeric comparisons and integer sets, with `token-match-length-v1` and `dependency-match-length-v1`; all in Rust and Node |
-| M3 | Remaining set comparisons (`IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` on attributes other than morphology, including `LOWER` and `LENGTH`) and annotation-based PhraseMatcher attributes, one attribute family at a time | Missing annotations, invalid attribute choices, pattern/input consistency, and lifecycle ordering match the declared upstream contract |
+| M3 (set comparisons implemented) | Set comparisons (`IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` on all string attributes and `LENGTH`; implemented), then annotation-based PhraseMatcher attributes, one attribute family at a time | Missing annotations, invalid attribute choices, pattern/input consistency, and lifecycle ordering match the declared upstream contract. Evidence for set comparisons: `token-match-sets-v1` and `dependency-match-sets-v1` through Rust and Node, with an independent set calculation in the reference tool tests and predicate unit tests for invalid value types and attributes; annotation-based PhraseMatcher attributes remain planned |
 | M4 | TokenMatcher greedy FIRST/LONGEST, then alignments, checked span input and labeled-span results where the corresponding spaCy matcher supports them, including PhraseMatcher labeled-span output | Overlap and repetition tie-breaking, duplicate matches, alignment lengths, unavailable annotations and option combinations agree exactly; PhraseMatcher span labels, boundaries and result ordering match the pinned reference; span-relative and document-relative indices are tested separately for each API; existing default behavior and typed Rust callers remain compatible |
 | M5 | Regex and fuzzy predicates as separate deliveries | Pinned reference semantics for search versus full match, Unicode, distance limits and supported operator combinations, checked before selecting an engine or algorithm; unsupported regex constructs reject explicitly |
 
@@ -135,7 +136,7 @@ Multilingual expansion follows completion of milestones 1–4 using the [model e
 
 ## Matching implementation plan
 
-Token Matcher, DependencyMatcher and [PhraseMatcher](PHRASE_MATCHER.md) have native implementations and frozen reference suites. PhraseMatcher implements ORTH/TEXT/LOWER, and Node exposes all three matchers. Steps 1–2 below retain the acceptance requirements for the implemented PhraseMatcher, step 3 records the implemented Node bindings, and step 4 describes the subsequent rule-based annotation milestone. Remaining matcher conditions and options are planned as deliveries M3–M5 in the [implementation sequence](#1-shared-matcher-conditions-and-options); M1 (shared `LOWER`) and M2 (lexical flags, `LENGTH` and numeric comparisons) are implemented.
+Token Matcher, DependencyMatcher and [PhraseMatcher](PHRASE_MATCHER.md) have native implementations and frozen reference suites. PhraseMatcher implements ORTH/TEXT/LOWER, and Node exposes all three matchers. Steps 1–2 below retain the acceptance requirements for the implemented PhraseMatcher, step 3 records the implemented Node bindings, and step 4 describes the subsequent rule-based annotation milestone. Remaining matcher conditions and options are planned as deliveries M3–M5 in the [implementation sequence](#1-shared-matcher-conditions-and-options); M1 (shared `LOWER`), M2 (lexical flags, `LENGTH` and numeric comparisons) and the M3 set comparisons are implemented.
 
 ### 1. PhraseMatcher reference contract (implemented)
 
@@ -171,7 +172,7 @@ Acceptance: official comparisons verify complete documents after rule applicatio
 
 For every increment, follow `docs/QUALITY.md` and obtain reference, test, documentation, and performance reviews. Run focused cases followed by `.venv/bin/python tools/verify.py`; CI must execute new parity tests with explicit denominators. Keep generated mismatch and timing reports under ignored `target/reports/` and update the compatibility inventory only for behavior actually verified.
 
-Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded delivery is M3, the remaining set comparisons (including `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` on `LENGTH`) and annotation-based PhraseMatcher attributes. Later matcher features retain separate acceptance.
+Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded delivery is the rest of M3, annotation-based PhraseMatcher attributes, followed by the annotation and ruler deliveries A1–A3. Later matcher features retain separate acceptance.
 
 ## Model extensibility plan
 

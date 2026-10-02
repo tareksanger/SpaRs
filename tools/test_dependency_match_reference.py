@@ -11,9 +11,62 @@ import unittest
 import dependency_match_reference
 from dependency_match_reference import (
     FLAG_WORDS, LENGTH_WORDS, MORE_FLAG_ATTRIBUTES, MORE_FLAG_WORDS, NumberOperator, lexeme_flag, LOWER_VALUES, LOWER_WORDS, Compare, Constraint, IntegerMembership, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
-    Pattern, Versions, attribute_name, official, write_fixture,
+    Pattern, Versions, attribute_name, official, write_fixture, SET_DEPS, SET_LEMMAS, SET_MORPHS, SET_POS, SET_TAGS, SET_WORDS,
+    set_constraints,
 )
 from json_types import json_array, json_int, json_object, json_string, parse_json
+
+
+def expected_set_matches(constraints: list[Constraint], norms: list[str]) -> set[int]:
+    """Tokens of the annotated set document that satisfy every constraint, computed
+    without spaCy: a string value is a one-element set and morphology is the set of its
+    individual Field=Value features, as in spaCy's set predicates."""
+    def values(attribute: str, index: int) -> set[str | int]:
+        word = SET_WORDS[index]
+        if attribute == 'morphology':
+            return {f'{key}={value}' for field in SET_MORPHS[index].split('|') if field
+                    for key, joined in [field.split('=', 1)] for value in joined.split(',')}
+        if attribute == 'length':
+            return {len(word)}
+        strings = {'text': word, 'lower': word.lower(), 'norm': norms[index], 'lemma': SET_LEMMAS[index],
+                   'pos': SET_POS[index], 'tag': SET_TAGS[index], 'dep': SET_DEPS[index]}
+        return {strings[attribute]}
+
+    def normalize(entry: str) -> str:
+        # A listed morphology entry equals one feature only if, after keeping the last
+        # value of a repeated field and uppercasing the POS alias, one value remains.
+        fields: dict[str, list[str]] = {}
+        for field in entry.split('|'):
+            key, _, joined = field.partition('=')
+            if key.upper() == 'POS':
+                key, joined = 'POS', joined.upper()
+            fields[key] = joined.split(',')
+        if len(fields) != 1:
+            return entry
+        [(key, values)] = fields.items()
+        return f'{key}={values[0]}' if len(values) == 1 else entry
+
+    def holds(constraint: Constraint, index: int) -> bool:
+        actual = values(constraint.attribute, index)
+        predicate = constraint.predicate
+        if isinstance(predicate, Membership | IntegerMembership):
+            expected: set[str | int] = set(predicate.values)
+            if constraint.attribute == 'morphology' and isinstance(predicate, Membership):
+                expected = {normalize(value) for value in predicate.values}
+            kind = predicate.kind.removesuffix('_integers').removeprefix('morph_')
+            if kind == 'in':
+                return actual <= expected and len(actual) == 1
+            if kind == 'is_subset':
+                return actual <= expected
+            if kind in ('is_superset', 'superset'):
+                return actual >= expected
+            if kind == 'intersects':
+                return bool(actual & expected)
+        if isinstance(predicate, Compare) and predicate.operator == '>':
+            return all(value > predicate.value for value in actual if isinstance(value, int))
+        raise ValueError(f'No independent rule for {constraint}')
+
+    return {index for index in range(len(SET_WORDS)) if all(holds(constraint, index) for constraint in constraints)}
 
 
 class DependencyReferenceTests(unittest.TestCase):
@@ -120,7 +173,7 @@ class DependencyReferenceTests(unittest.TestCase):
                     patch.object(dependency_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, True, False, False, False)
+                generate.assert_called_once_with(False, True, False, False, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', '--regressions', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -128,15 +181,19 @@ class DependencyReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False, False)
+                generate.assert_called_once_with(False, False, True, False, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True, False)
+                generate.assert_called_once_with(False, False, False, True, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--more-flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, True)
+                generate.assert_called_once_with(False, False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['dependency_match_reference.py', '--sets', str(output)]):
+                    dependency_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, False, True)
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', '--flags', str(output)]):
                     with self.assertRaises(SystemExit):
                         dependency_match_reference.main()
@@ -152,6 +209,20 @@ class DependencyReferenceTests(unittest.TestCase):
                 official(Pattern([Node('a', [Constraint('length', item) for item in duplicate])]))
         with self.assertRaisesRegex(ValueError, 'distinct attributes'):
             official(Pattern([Node('a', [Constraint('lower', Equals('a')), Constraint('lower', Equals('b'))])]))
+
+    def test_string_set_operators_merge_and_reject_mixed_kinds(self) -> None:
+        pattern = Pattern([Node('a', [Constraint('morphology', Membership('is_superset', ['Number=Plur'])),
+                                      Constraint('morphology', Membership('intersects', ['Tense=Past'])),
+                                      Constraint('length', IntegerMembership('is_subset_integers', [3]))])])
+        self.assertEqual(official(pattern), [{'RIGHT_ID': 'a', 'RIGHT_ATTRS': {
+            'LENGTH': {'IS_SUBSET': [3]}, 'MORPH': {'IS_SUPERSET': ['Number=Plur'], 'INTERSECTS': ['Tense=Past']}}}])
+        for mixed in ([Membership('is_subset', ['3']), Compare('>', 1)], [Compare('>', 1), Membership('is_subset', ['3'])],
+                      [Equals('a'), Membership('in', ['a'])], [Membership('in', ['a']), Equals('a')]):
+            with self.assertRaisesRegex(ValueError, 'distinct'):
+                official(Pattern([Node('a', [Constraint('length', item) for item in mixed])]))
+        with self.assertRaisesRegex(ValueError, 'distinct string operators'):
+            official(Pattern([Node('a', [Constraint('lower', Membership('is_superset', ['a'])),
+                                         Constraint('lower', Membership('is_superset', ['b']))])]))
 
     def test_frozen_length_suite_matches_python_len_per_token(self) -> None:
         path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-length-v1.expected.json'
@@ -324,6 +395,32 @@ class DependencyReferenceTests(unittest.TestCase):
         for attribute, method in methods.items():
             self.assertEqual(found.get(f'{attribute}_true', set()),
                              {index for index, word in enumerate(MORE_FLAG_WORDS) if method(word)}, attribute)
+
+    def test_frozen_set_suite_matches_one_element_and_feature_sets(self) -> None:
+        """Every single-node set rule matches the tokens an independent set calculation selects."""
+        path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-sets-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['set-annotated', 'set-pipeline', 'set-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 546)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 587)
+        self.assertEqual(cases[2]['expected'], [])
+        self.assertEqual(cases[0]['text'], ' '.join(SET_WORDS))
+        found: dict[str, set[int]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            tokens = json_array(match['tokens'])
+            if len(tokens) == 1:
+                found.setdefault(json_string(match['rule']), set()).add(json_int(tokens[0]))
+        norms = [json_string(json_object(token)['norm']) for token in json_array(cases[0]['tokens'])]
+        positive = 0
+        for name, constraints in set_constraints():
+            expected = expected_set_matches(constraints, norms)
+            positive += bool(expected)
+            self.assertEqual(found.get(name, set()), expected, name)
+        # Both outcomes occur often enough to catch an operator that always or never matches.
+        self.assertGreater(positive, 80)
+        self.assertLess(positive, len(set_constraints()) - 50)
 
     def test_exported_url_pattern_is_the_one_like_url_uses(self) -> None:
         # spaCy's like_url uses spacy.lang.tokenizer_exceptions.URL_MATCH; SpaRs uses the

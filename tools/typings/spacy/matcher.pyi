@@ -4,12 +4,13 @@ from typing import TypedDict, NotRequired
 class StringOperator(TypedDict, total=False):
     IN: list[str]
     NOT_IN: list[str]
+    IS_SUBSET: list[str]
     IS_SUPERSET: list[str]
     INTERSECTS: list[str]
 
 NumberOperator = TypedDict('NumberOperator', {
     '==': float, '!=': float, '>=': float, '<=': float, '>': float, '<': float,
-    'IN': list[int], 'NOT_IN': list[int],
+    'IN': list[int], 'NOT_IN': list[int], 'IS_SUBSET': list[int], 'IS_SUPERSET': list[int], 'INTERSECTS': list[int],
 }, total=False)
 
 class DependencyNode(TypedDict):

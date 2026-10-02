@@ -75,6 +75,16 @@ fn official_length_conditions() {
     );
 }
 #[test]
+fn official_set_comparisons() {
+    check(
+        "../../fixtures/token-match-sets-v1.expected.json",
+        3,
+        21,
+        558,
+        653,
+    );
+}
+#[test]
 fn official_unicode_lower_conditions() {
     check(
         "../../fixtures/token-match-lower-v1.expected.json",

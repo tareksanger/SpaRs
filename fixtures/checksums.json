@@ -37,5 +37,7 @@
   "fixtures/phrase-match-v1.expected.json": "d1a28537584c1c5d144b5bf87bf017e87d413f3ed9d2a0c1c3cc1ed6eafbd128",
   "fixtures/phrase-match-holdout-v1.expected.json": "c1dd0438f81278e035e45a5b77d0b8825e80d8dfe0491c162ed12c805a2befc1",
   "fixtures/phrase-match-edges-v1.expected.json": "12052eb1949f5979d44fefe11b58d6c5314786993651b105926d90e56dc982f5",
-  "fixtures/phrase-match-lower-v1.expected.json": "555918903d51ed4e9bce1936542091bb0e233d3399a661a44067fb8a22c5fbdd"
+  "fixtures/phrase-match-lower-v1.expected.json": "555918903d51ed4e9bce1936542091bb0e233d3399a661a44067fb8a22c5fbdd",
+  "fixtures/dependency-match-sets-v1.expected.json": "a65a391f86a901c312d2e77d79100758c09f8ba160746ea7a5f12e8f1ebdee50",
+  "fixtures/token-match-sets-v1.expected.json": "ef3fdccbb95519c9cf744c8b9705e8e3d9bc6e5dccd88db1345dd1a09754f4a4"
 }

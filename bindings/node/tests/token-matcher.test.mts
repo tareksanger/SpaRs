@@ -61,6 +61,7 @@ for (const [filename, cases, rules, matches] of [
   ['token-match-branching-v1.expected.json', 31, 248, 288],
   ['token-match-lower-v1.expected.json', 4, 172, 280],
   ['token-match-length-v1.expected.json', 3, 105, 386],
+  ['token-match-sets-v1.expected.json', 3, 558, 653],
 ] as const) {
   test(`TokenMatcher preserves frozen ordered reference corpus ${filename}`, async () => {
     const parsed: unknown = JSON.parse(readFileSync(new URL(`../../../fixtures/${filename}`, import.meta.url), 'utf8'));
@@ -208,6 +209,43 @@ test('TokenMatcher LENGTH predicates validate numbers and read back exactly', ()
   assert.throws(() => matcher.add('bad', [{ tokens: [{ constraints: [{ attribute: 'text', predicate: { kind: 'compare', operator: '==', value: 1 } }], repetition: { kind: 'once' } }] }]), hasCode('SPARS_INVALID_PATTERN'));
   // napi rejects an array mixing numbers and strings before conversion.
   assert.throws(() => matcher.add('bad', [item({ kind: 'in_integers', values: [1, '1'] } as unknown as TokenPredicate)]), /none of these types/);
+  assert.equal(matcher.contains('bad'), false);
+  assert.equal(matcher.size, valid.length);
+});
+
+test('TokenMatcher set predicates validate value types and read back exactly', () => {
+  const matcher = new TokenMatcher();
+  const item = (attribute: string, predicate: TokenPredicate): TokenPattern => ({ tokens: [{ constraints: [{ attribute, predicate }], repetition: { kind: 'once' } }] });
+  const valid: [string, TokenPredicate][] = [
+    ['lower', { kind: 'is_subset', values: ['the', 'a'] }],
+    ['pos', { kind: 'is_superset', values: [] }],
+    ['morphology', { kind: 'intersects', values: ['Number=Plur'] }],
+    ['morphology', { kind: 'is_subset', values: ['Number=Plur', 'Person=3'] }],
+    ['length', { kind: 'is_subset_integers', values: [1, 2] }],
+    ['length', { kind: 'is_superset_integers', values: [2 ** 53 - 1] }],
+    ['length', { kind: 'intersects_integers', values: [-1, 3] }],
+  ];
+  for (const [index, [attribute, predicate]] of valid.entries()) {
+    matcher.add(`set${index}`, [item(attribute, predicate)]);
+    assert.deepStrictEqual(matcher.get(`set${index}`), [item(attribute, predicate)]);
+  }
+  const invalid = [
+    ['length', { kind: 'is_subset', values: ['1'] }],
+    ['lower', { kind: 'is_subset', values: [1] }],
+    ['lower', { kind: 'is_subset_integers', values: [1] }],
+    ['is_alpha', { kind: 'intersects', values: [] }],
+    ['length', { kind: 'is_superset_integers', values: [1.5] }],
+    ['length', { kind: 'intersects_integers', values: [2 ** 53] }],
+    ['length', { kind: 'intersects_integers', value: 1 }],
+    ['morphology', { kind: 'is_subset', values: ['Number'] }],
+    ['lower', { kind: 'morph_superset', values: ['a'] }],
+    ['lower', { kind: 'IS_SUBSET', values: ['a'] }],
+  ] as unknown as [string, TokenPredicate][];
+  for (const [attribute, predicate] of invalid) {
+    assert.throws(() => matcher.add('bad', [item(attribute, predicate)]), hasCode('SPARS_INVALID_PATTERN'), JSON.stringify([attribute, predicate]));
+  }
+  // napi rejects an array mixing strings and numbers before conversion.
+  assert.throws(() => matcher.add('bad', [item('lower', { kind: 'is_subset', values: ['a', 1] } as unknown as TokenPredicate)]), /none of these types/);
   assert.equal(matcher.contains('bad'), false);
   assert.equal(matcher.size, valid.length);
 });

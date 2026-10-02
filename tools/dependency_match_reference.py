@@ -26,13 +26,14 @@ from spacy.tokens import Doc as make_doc
 class StringOperator(TypedDict, total=False):
     IN: list[str]
     NOT_IN: list[str]
+    IS_SUBSET: list[str]
     IS_SUPERSET: list[str]
     INTERSECTS: list[str]
 
 # Numeric pattern operators, keyed exactly as spaCy spells them.
 NumberOperator = TypedDict('NumberOperator', {
     '==': float, '!=': float, '>=': float, '<=': float, '>': float, '<': float,
-    'IN': list[int], 'NOT_IN': list[int],
+    'IN': list[int], 'NOT_IN': list[int], 'IS_SUBSET': list[int], 'IS_SUPERSET': list[int], 'INTERSECTS': list[int],
 }, total=False)
 OfficialValue = str | bool | StringOperator | NumberOperator
 
@@ -58,7 +59,7 @@ class Equals:
 
 @dataclass(frozen=True)
 class Membership:
-    kind: Literal['in', 'not_in', 'morph_superset', 'morph_intersects']
+    kind: Literal['in', 'not_in', 'morph_superset', 'morph_intersects', 'is_subset', 'is_superset', 'intersects']
     values: list[str]
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ class Compare:
 
 @dataclass(frozen=True)
 class IntegerMembership:
-    kind: Literal['in_integers', 'not_in_integers']
+    kind: Literal['in_integers', 'not_in_integers', 'is_subset_integers', 'is_superset_integers', 'intersects_integers']
     values: list[int]
 
 @dataclass(frozen=True)
@@ -142,15 +143,24 @@ ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA'
               'like_email': 'LIKE_EMAIL'}
 
 
+STRING_KEYS: dict[str, Literal['IN', 'NOT_IN', 'IS_SUBSET', 'IS_SUPERSET', 'INTERSECTS']] = {
+    'in': 'IN', 'not_in': 'NOT_IN', 'morph_superset': 'IS_SUPERSET', 'morph_intersects': 'INTERSECTS',
+    'is_subset': 'IS_SUBSET', 'is_superset': 'IS_SUPERSET', 'intersects': 'INTERSECTS'}
+INTEGER_KEYS: dict[str, Literal['IN', 'NOT_IN', 'IS_SUBSET', 'IS_SUPERSET', 'INTERSECTS']] = {
+    'in_integers': 'IN', 'not_in_integers': 'NOT_IN', 'is_subset_integers': 'IS_SUBSET',
+    'is_superset_integers': 'IS_SUPERSET', 'intersects_integers': 'INTERSECTS'}
+
+
 def official_attrs(constraints: list[Constraint]) -> dict[str, OfficialValue]:
-    """Convert one item's conditions; numeric conditions on an attribute share one dict."""
+    """Convert one item's conditions; operators on one attribute share one dict."""
     attrs: dict[str, OfficialValue] = {}
     numbers: dict[str, NumberOperator] = {}
+    strings: dict[str, StringOperator] = {}
     for constraint in constraints:
         attribute = ATTRIBUTES[constraint.attribute]
         predicate = constraint.predicate
         if isinstance(predicate, Compare | IntegerMembership):
-            if attribute in attrs:
+            if attribute in attrs or attribute in strings:
                 raise ValueError('Official converter requires distinct attributes per node')
             operators = numbers.setdefault(attribute, NumberOperator())
             if isinstance(predicate, Compare):
@@ -158,27 +168,25 @@ def official_attrs(constraints: list[Constraint]) -> dict[str, OfficialValue]:
                     raise ValueError('Official converter requires distinct numeric operators')
                 operators[predicate.operator] = predicate.value
             else:
-                key: Literal['IN', 'NOT_IN'] = 'IN' if predicate.kind == 'in_integers' else 'NOT_IN'
+                key = INTEGER_KEYS[predicate.kind]
                 if key in operators:
                     raise ValueError('Official converter requires distinct numeric operators')
                 operators[key] = predicate.values
             continue
-        if attribute in attrs or attribute in numbers:
+        if isinstance(predicate, Membership):
+            if attribute in attrs or attribute in numbers:
+                raise ValueError('Official converter requires distinct attributes per node')
+            string_operators = strings.setdefault(attribute, StringOperator())
+            string_key = STRING_KEYS[predicate.kind]
+            if string_key in string_operators:
+                raise ValueError('Official converter requires distinct string operators')
+            string_operators[string_key] = predicate.values
+            continue
+        if attribute in attrs or attribute in numbers or attribute in strings:
             raise ValueError('Official converter requires distinct attributes per node')
-        if isinstance(predicate, Flag):
-            value: OfficialValue = predicate.value
-        elif isinstance(predicate, Equals):
-            value = predicate.value
-        elif predicate.kind == 'in':
-            value = {'IN': predicate.values}
-        elif predicate.kind == 'not_in':
-            value = {'NOT_IN': predicate.values}
-        elif predicate.kind == 'morph_superset':
-            value = {'IS_SUPERSET': predicate.values}
-        else:
-            value = {'INTERSECTS': predicate.values}
-        attrs[attribute] = value
+        attrs[attribute] = predicate.value
     attrs.update(numbers)
+    attrs.update(strings)
     return attrs
 
 
@@ -367,6 +375,80 @@ def more_flag_rules() -> list[Rule]:
     return result
 
 
+# One annotated document for set comparisons: case variants, multi-valued, repeated,
+# empty and POS morphology, a combining accent, and Greek final sigma for LOWER.
+SET_WORDS = ['The', 'cats', 'Who', 'were', 'NOT', 'here', '\u039f\u03a3', 'e\u0301', 'x', 'nom', 'noun']
+SET_LEMMAS = ['the', 'cat', 'who', 'be', 'not', 'here', '\u03bf\u03c2', 'e\u0301', 'x', 'nom', 'noun']
+SET_POS = ['DET', 'NOUN', 'PRON', 'AUX', 'PART', 'ADV', 'PROPN', 'X', 'X', 'NOUN', 'NOUN']
+SET_TAGS = ['DT', 'NNS', 'WP', 'VBD', 'RB', 'RB', 'NNP', 'FW', 'FW', 'NN', 'NN']
+SET_HEADS = [1, 3, 3, 3, 3, 3, 3, 6, 6, 6, 6]
+SET_DEPS = ['det', 'nsubj', 'nsubj', 'ROOT', 'neg', 'advmod', 'npadvmod', 'dep', 'dep', 'dep', 'dep']
+SET_MORPHS = ['Definite=Def|PronType=Art', 'Number=Plur', 'PronType=Int,Rel', 'Mood=Ind|Number=Plur|Tense=Past|VerbForm=Fin',
+              'Polarity=Neg', 'PronType=Dem', 'Number=Sing', '', 'Foreign=Yes', 'Case=Nom,Nom', 'POS=NOUN']
+SET_PIPELINE_TEXT = 'The cats were NOT here, but who knows?'
+SET_KINDS: tuple[Literal['is_subset', 'is_superset', 'intersects'], ...] = ('is_subset', 'is_superset', 'intersects')
+SET_VALUES: list[tuple[Attribute, list[list[str]]]] = [
+    ('text', [[], ['The'], ['The', 'cats'], ['the'], ['The', 'The'], ['missing']]),
+    ('lower', [[], ['the'], ['the', 'not'], ['The'], ['\u03bf\u03c2'], ['the', 'the']]),
+    ('norm', [[], ['the'], ['were', 'not'], ['NOT']]),
+    ('lemma', [[], ['be'], ['be', 'cat'], ['Be'], ['be', 'be']]),
+    ('pos', [[], ['NOUN'], ['NOUN', 'PRON'], ['noun'], ['X', 'X']]),
+    ('tag', [[], ['NNS'], ['NNS', 'WP', 'RB'], ['nns']]),
+    ('dep', [[], ['nsubj'], ['nsubj', 'ROOT'], ['root'], ['dep', 'dep']]),
+    ('morphology', [[], ['Number=Plur'], ['PronType=Int'], ['PronType=Int', 'PronType=Rel'], ['PronType=Int,Rel'],
+                    ['PronType=Rel,Int'], ['Number=Plur', 'Number=Sing'], ['Definite=Def|PronType=Art'],
+                    ['Definite=Def', 'PronType=Art'], ['pos=noun'], ['_'],
+                    ['Mood=Ind', 'Number=Plur', 'Tense=Past', 'VerbForm=Fin', 'Extra=Yes'],
+                    ['Number=Sing|Number=Plur'], ['Number=Plur|Number=Plur'], ['Case=Nom'], ['POS=NOUN', 'Number=Plur']]),
+]
+SET_LENGTHS: list[list[int]] = [[], [3], [1, 3], [3, 3], [-1], [2**53 - 1], [3, 4]]
+
+
+def set_constraints() -> list[tuple[str, list[Constraint]]]:
+    """Every set operator on every string attribute and on LENGTH, alone and combined."""
+    result: list[tuple[str, list[Constraint]]] = []
+    for attribute, value_lists in SET_VALUES:
+        for kind in SET_KINDS:
+            for index, values in enumerate(value_lists):
+                result.append((f'{attribute}_{kind}_{index}', [Constraint(attribute, Membership(kind, values))]))
+    integer_kinds: tuple[Literal['is_subset_integers', 'is_superset_integers', 'intersects_integers'], ...] = (
+        'is_subset_integers', 'is_superset_integers', 'intersects_integers')
+    for kind in integer_kinds:
+        for index, values in enumerate(SET_LENGTHS):
+            result.append((f'length_{kind}_{index}', [Constraint('length', IntegerMembership(kind, values))]))
+    return result + [
+        ('morph_superset_and_intersects', [Constraint('morphology', Membership('is_superset', ['Number=Plur'])),
+                                           Constraint('morphology', Membership('intersects', ['Number=Plur', 'Tense=Past']))]),
+        ('morph_subset_and_alias', [Constraint('morphology', Membership('is_subset', ['Number=Plur', 'Number=Sing', 'Polarity=Neg'])),
+                                    Constraint('morphology', Membership('morph_intersects', ['Number=Plur']))]),
+        ('lower_subset_length_superset', [Constraint('lower', Membership('is_subset', ['the', 'not', 'here'])),
+                                          Constraint('length', IntegerMembership('is_superset_integers', [3]))]),
+        ('length_subset_compare', [Constraint('length', IntegerMembership('is_subset_integers', [3, 4, 5])),
+                                   Constraint('length', Compare('>', 3))]),
+        ('length_in_and_intersects', [Constraint('length', IntegerMembership('in_integers', [1, 3])),
+                                      Constraint('length', IntegerMembership('intersects_integers', [3, 4]))]),
+        ('pos_in_and_superset', [Constraint('pos', Membership('in', ['NOUN', 'AUX'])),
+                                 Constraint('pos', Membership('is_superset', ['NOUN']))]),
+        ('lemma_subset_tag_intersects', [Constraint('lemma', Membership('is_subset', ['be', 'cat', 'who'])),
+                                         Constraint('tag', Membership('intersects', ['VBD', 'WP']))]),
+    ]
+
+
+def set_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Node('a', constraints)])]) for name, constraints in set_constraints()]
+    result.append(Rule('be_head_nominal_child', [Pattern([
+        Node('head', [Constraint('lemma', Membership('is_subset', ['be']))]),
+        Node('child', [Constraint('pos', Membership('intersects', ['NOUN', 'PRON']))], Link('head', '>')),
+    ])]))
+    return result
+
+
+def set_document(nlp: Language) -> Doc:
+    count = len(SET_WORDS)
+    return make_doc(nlp.vocab, words=SET_WORDS, spaces=[index + 1 < count for index in range(count)], heads=SET_HEADS,
+                    deps=SET_DEPS, pos=SET_POS, tags=SET_TAGS, lemmas=SET_LEMMAS, morphs=SET_MORPHS)
+
+
 def lexeme_flag(nlp: Language, word: str, attribute: Attribute) -> bool:
     """Read a remaining lexical flag from the vocabulary, for independent checks."""
     lexeme = nlp.vocab[word]
@@ -401,7 +483,7 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
 
 
 def generate(regressions: bool = False, lower: bool = False, flags: bool = False, length: bool = False,
-             more_flags: bool = False) -> Fixture:
+             more_flags: bool = False, sets: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -417,6 +499,8 @@ def generate(regressions: bool = False, lower: bool = False, flags: bool = False
         return generate_length(nlp)
     if more_flags:
         return generate_more_flags(nlp)
+    if sets:
+        return generate_sets(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -509,6 +593,20 @@ def generate_more_flags(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def generate_sets(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = set_rules()
+    # Create documents before any pattern is registered: spaCy records the features of
+    # a new morphology analysis as first spelled, so a pattern spelling such as
+    # `pos=noun` registered first would change later documents' features.
+    annotated, pipeline, empty = set_document(nlp), nlp(SET_PIPELINE_TEXT), make_doc(nlp.vocab, words=[])
+    cases = [case(nlp, 'set-annotated', ' '.join(SET_WORDS), annotated, patterns),
+             case(nlp, 'set-pipeline', SET_PIPELINE_TEXT, pipeline, patterns),
+             case(nlp, 'set-empty', '', empty, patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'dependencymatcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def write_fixture(output: Path, fixture: Fixture) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x', encoding='utf-8') as stream:
@@ -524,6 +622,7 @@ def main() -> None:
     modes.add_argument('--flags', action='store_true')
     modes.add_argument('--length', action='store_true')
     modes.add_argument('--more-flags', action='store_true')
+    modes.add_argument('--sets', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -545,7 +644,10 @@ def main() -> None:
     more_flag_mode: object = args.more_flags
     if not isinstance(more_flag_mode, bool):
         raise TypeError('More-flags flag must be boolean')
-    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode, more_flag_mode))
+    set_mode: object = args.sets
+    if not isinstance(set_mode, bool):
+        raise TypeError('Sets flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode))
 
 
 if __name__ == '__main__':

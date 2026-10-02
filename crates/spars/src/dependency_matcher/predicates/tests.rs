@@ -762,3 +762,222 @@ fn contradictory_flags_fail_even_with_length_checks() {
     assert!(!compiled.matches(&values, 0).unwrap());
     assert!(!compiled.matches(&values, 1).unwrap());
 }
+#[test]
+fn morphology_set_predicates_compare_individual_features() {
+    let set = |values: &[&str]| values.iter().map(|value| value.to_string()).collect();
+    // The token is `Case=Acc,Nom|Number=Sing`: features Case=Acc, Case=Nom, Number=Sing.
+    assert!(check(Predicate::IsSubset {
+        values: set(&["Case=Acc", "Case=Nom", "Number=Sing", "Person=3"])
+    }));
+    assert!(!check(Predicate::IsSubset {
+        values: set(&["Case=Nom", "Number=Sing"])
+    }));
+    // A multi-valued entry never equals one feature, even after normalization.
+    assert!(!check(Predicate::IsSubset {
+        values: set(&["Case=Nom,Acc", "Number=Sing"])
+    }));
+    assert!(!check(Predicate::IsSubset { values: vec![] }));
+    assert!(check(Predicate::IsSuperset {
+        values: set(&["Case=Nom", "Number=Sing"])
+    }));
+    assert!(check(Predicate::IsSuperset { values: vec![] }));
+    assert!(check(Predicate::Intersects {
+        values: set(&["Case=Dat", "Case=Acc"])
+    }));
+    assert!(!check(Predicate::Intersects { values: vec![] }));
+    // A repeated field keeps its last value, as in spaCy, so the entry is one feature.
+    assert!(check(Predicate::IsSuperset {
+        values: set(&["Number=Plur|Number=Sing"])
+    }));
+    assert!(!check(Predicate::IsSuperset {
+        values: set(&["Number=Sing|Number=Plur"])
+    }));
+    // An empty analysis has no features, so it is a subset of every list.
+    assert!(morph_subset("", &HashSet::new()));
+    assert!(!morph_subset("Case=Nom", &HashSet::new()));
+}
+#[test]
+fn string_set_predicates_treat_the_value_as_one_element() {
+    let doc = doc();
+    let matches = |predicate: Predicate| {
+        let compiled = TokenConstraint {
+            attribute: TokenAttribute::Text,
+            predicate,
+        }
+        .compile()
+        .unwrap();
+        let values = TokenValues::new(&doc, Needs::default(), None).unwrap();
+        compiled
+            .matches(doc.token(TokenIndex(0)).unwrap(), &values)
+            .unwrap()
+    };
+    let set = |values: &[&str]| values.iter().map(|value| value.to_string()).collect();
+    assert!(matches(Predicate::IsSubset {
+        values: set(&["x", "y"])
+    }));
+    assert!(!matches(Predicate::IsSubset {
+        values: set(&["X"])
+    }));
+    assert!(!matches(Predicate::IsSubset { values: vec![] }));
+    assert!(matches(Predicate::IsSuperset { values: vec![] }));
+    assert!(matches(Predicate::IsSuperset {
+        values: set(&["x", "x"])
+    }));
+    assert!(!matches(Predicate::IsSuperset {
+        values: set(&["x", "y"])
+    }));
+    assert!(matches(Predicate::Intersects {
+        values: set(&["y", "x"])
+    }));
+    assert!(!matches(Predicate::Intersects { values: vec![] }));
+}
+#[test]
+fn length_set_predicates_match_spacy_one_element_sets() {
+    let doc = doc();
+    let values = TokenValues::new(
+        &doc,
+        Needs {
+            length: true,
+            ..Needs::default()
+        },
+        None,
+    )
+    .unwrap();
+    // The token "x" has length 1.
+    let matches = |predicate: Predicate| {
+        compile(&[TokenConstraint {
+            attribute: TokenAttribute::Length,
+            predicate,
+        }])
+        .unwrap()
+        .matches(&values, 0)
+        .unwrap()
+    };
+    assert!(matches(Predicate::IsSubsetIntegers { values: vec![1, 2] }));
+    assert!(!matches(Predicate::IsSubsetIntegers { values: vec![] }));
+    assert!(matches(Predicate::IsSupersetIntegers { values: vec![] }));
+    assert!(matches(Predicate::IsSupersetIntegers {
+        values: vec![1, 1]
+    }));
+    assert!(!matches(Predicate::IsSupersetIntegers {
+        values: vec![1, 2]
+    }));
+    assert!(!matches(Predicate::IsSupersetIntegers { values: vec![2] }));
+    assert!(matches(Predicate::IntersectsIntegers {
+        values: vec![-1, 1]
+    }));
+    assert!(!matches(Predicate::IntersectsIntegers { values: vec![] }));
+}
+#[test]
+fn malformed_set_conditions_are_rejected() {
+    // String sets need a string attribute; integer sets need LENGTH.
+    for (attribute, predicate) in [
+        (
+            TokenAttribute::Length,
+            Predicate::IsSubset {
+                values: vec!["1".into()],
+            },
+        ),
+        (
+            TokenAttribute::Length,
+            Predicate::IsSuperset { values: vec![] },
+        ),
+        (
+            TokenAttribute::Length,
+            Predicate::Intersects { values: vec![] },
+        ),
+        (
+            TokenAttribute::IsAlpha,
+            Predicate::IsSubset { values: vec![] },
+        ),
+        (
+            TokenAttribute::Text,
+            Predicate::IsSubsetIntegers { values: vec![1] },
+        ),
+        (
+            TokenAttribute::Morphology,
+            Predicate::IsSupersetIntegers { values: vec![] },
+        ),
+        (
+            TokenAttribute::IsStop,
+            Predicate::IntersectsIntegers { values: vec![] },
+        ),
+        (
+            TokenAttribute::IsStop,
+            Predicate::IsSuperset { values: vec![] },
+        ),
+        (
+            TokenAttribute::LikeEmail,
+            Predicate::Intersects { values: vec![] },
+        ),
+        (
+            TokenAttribute::Lower,
+            Predicate::MorphSuperset { values: vec![] },
+        ),
+    ] {
+        assert!(
+            matches!(
+                compile(&[TokenConstraint {
+                    attribute,
+                    predicate: predicate.clone()
+                }]),
+                Err(Error::Pattern(_))
+            ),
+            "{attribute:?} {predicate:?}"
+        );
+    }
+    // Morphology entries are validated as for the other set predicates.
+    for predicate in [
+        Predicate::IsSubset {
+            values: vec!["Case".into()],
+        },
+        Predicate::IsSuperset {
+            values: vec!["Case=".into()],
+        },
+        Predicate::Intersects {
+            values: vec!["Case=Nom Acc".into()],
+        },
+    ] {
+        assert!(matches!(
+            TokenConstraint {
+                attribute: TokenAttribute::Morphology,
+                predicate
+            }
+            .compile(),
+            Err(Error::Pattern(_))
+        ));
+    }
+    for raw in [
+        r#"{"attribute":"length","predicate":{"kind":"is_subset_integers","values":[1.5]}}"#,
+        r#"{"attribute":"length","predicate":{"kind":"is_superset_integers","values":["1"]}}"#,
+        r#"{"attribute":"length","predicate":{"kind":"intersects_integers","values":[true]}}"#,
+        r#"{"attribute":"lower","predicate":{"kind":"is_subset","values":[1]}}"#,
+        r#"{"attribute":"lower","predicate":{"kind":"is_superset","values":null}}"#,
+        r#"{"attribute":"lower","predicate":{"kind":"intersects","value":"a"}}"#,
+        r#"{"attribute":"lower","predicate":{"kind":"IS_SUBSET","values":["a"]}}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<TokenConstraint>(raw).is_err(),
+            "{raw}"
+        );
+    }
+}
+#[test]
+fn set_predicates_still_require_their_annotation() {
+    // Even an always-true `IsSuperset []` validates that the annotation exists.
+    for (attribute, name) in [
+        (TokenAttribute::Pos, "POS"),
+        (TokenAttribute::Lemma, "lemma"),
+    ] {
+        let constraint = TokenConstraint {
+            attribute,
+            predicate: Predicate::IsSuperset { values: vec![] },
+        }
+        .compile()
+        .unwrap();
+        assert!(matches!(
+            constraint.validate_document(&doc()),
+            Err(Error::MissingAnnotation(missing)) if missing == name
+        ));
+    }
+}

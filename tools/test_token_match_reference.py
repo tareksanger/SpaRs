@@ -124,7 +124,7 @@ class TokenReferenceTests(unittest.TestCase):
                     patch.object(token_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['token_match_reference.py', '--lower', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False, False, False)
+                generate.assert_called_once_with(False, False, True, False, False, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['token_match_reference.py', '--lower', '--exhaustive', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -132,15 +132,19 @@ class TokenReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--flags', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True, False, False)
+                generate.assert_called_once_with(False, False, False, True, False, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--length', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, True, False)
+                generate.assert_called_once_with(False, False, False, False, True, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['token_match_reference.py', '--more-flags', str(output)]):
                     token_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, False, True)
+                generate.assert_called_once_with(False, False, False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['token_match_reference.py', '--sets', str(output)]):
+                    token_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, False, False, True)
                 with patch('sys.argv', ['token_match_reference.py', '--flags', '--lower', str(output)]):
                     with self.assertRaises(SystemExit):
                         token_match_reference.main()
@@ -212,6 +216,33 @@ class TokenReferenceTests(unittest.TestCase):
             for flag_value in (True, False):
                 expected = {i for i, word in enumerate(MORE_FLAG_WORDS) if lexeme_flag(nlp, word, attribute) == flag_value}
                 self.assertEqual(found.get(f'{attribute}_{str(flag_value).lower()}', set()), expected, (attribute, flag_value))
+
+    def test_frozen_set_suite_matches_one_element_and_feature_sets(self) -> None:
+        """Every single-item set rule matches the tokens an independent set calculation selects."""
+        from dependency_match_reference import set_constraints
+        path = Path(__file__).resolve().parent.parent / 'fixtures/token-match-sets-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['set-annotated', 'set-pipeline', 'set-empty'])
+        self.assertEqual(sum(len(json_array(case['rules'])) for case in cases), 558)
+        self.assertEqual(sum(len(json_array(case['expected'])) for case in cases), 653)
+        self.assertEqual(cases[2]['expected'], [])
+        from dependency_match_reference import SET_WORDS
+        self.assertEqual(cases[0]['text'], ' '.join(SET_WORDS))
+        found: dict[str, set[int]] = {}
+        for value in json_array(cases[0]['expected']):
+            match = json_object(value)
+            if json_int(match['end']) - json_int(match['start']) == 1:
+                found.setdefault(json_string(match['rule']), set()).add(json_int(match['start']))
+        norms = [json_string(json_object(token)['norm']) for token in json_array(cases[0]['tokens'])]
+        from test_dependency_match_reference import expected_set_matches
+        positive = 0
+        for name, constraints in set_constraints():
+            expected = expected_set_matches(constraints, norms)
+            positive += bool(expected)
+            self.assertEqual(found.get(name, set()), expected, name)
+        self.assertGreater(positive, 80)
+        self.assertLess(positive, len(set_constraints()) - 50)
 
 
 if __name__ == '__main__':
