@@ -728,7 +728,8 @@ fn lower(text: &str) -> Cow<'_, str> {
 // instead compares the supplied string. Feature-set matching uses atomic values.
 // TODO(morph-validation): spaCy accepts entries with an empty field or value, such
 // as `Number=`, `=Sing` or `PronType=Int,`, and entries with spaces, and they never
-// match; SpaRs rejects them as pattern errors. Tracked in docs/COMPATIBILITY.md.
+// match; SpaRs rejects them as pattern errors, and rejects document morphology with
+// empty values such as `POS=` as unsupported. Tracked in docs/COMPATIBILITY.md.
 fn normalize_morph(value: &str) -> Result<String> {
     if value.is_empty() || value == "_" {
         return Ok(String::new());
@@ -766,9 +767,12 @@ fn normalize_morph(value: &str) -> Result<String> {
     // before normalizing aliases such as POS. This matches Python dict updates.
     let mut fields: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (key, mut items) in raw_fields {
-        let key = if key.eq_ignore_ascii_case("POS") {
-            if items.len() == 1 && known_pos(&items[0].to_ascii_uppercase()) {
-                items[0] = items[0].to_ascii_uppercase();
+        let key = if is_pos_key(key) {
+            if items.len() == 1 {
+                let upper = items[0].to_uppercase();
+                if known_pos(&upper) {
+                    items[0] = upper;
+                }
             }
             "POS"
         } else {
@@ -776,11 +780,20 @@ fn normalize_morph(value: &str) -> Result<String> {
         };
         fields.insert(key.to_owned(), items);
     }
-    Ok(fields
+    // spaCy sorts whole `Field=Value` strings, not field names: `Case2=Acc` sorts
+    // before `Case=Nom` because '2' sorts before '='.
+    let mut joined: Vec<String> = fields
         .into_iter()
-        .map(|(key, values)| format!("{key}={}", values.into_iter().collect::<Vec<_>>().join(",")))
-        .collect::<Vec<_>>()
-        .join("|"))
+        .map(|(key, values)| format!("{key}={}", values.join(",")))
+        .collect();
+    joined.sort_unstable();
+    Ok(joined.join("|"))
+}
+
+/// spaCy's POS alias test, `key.upper() == "POS"`, with Unicode case mapping, so the
+/// long s in `poſ` also qualifies. Compares without allocating.
+fn is_pos_key(key: &str) -> bool {
+    key.chars().flat_map(char::to_uppercase).eq("POS".chars())
 }
 
 fn known_pos(value: &str) -> bool {
@@ -815,17 +828,22 @@ fn validate_canonical_morph(value: &str) -> Result<()> {
     if value.is_empty() {
         return Ok(());
     }
-    let mut previous_key = None;
+    let mut previous: Option<(&str, &str)> = None;
     for field in value.split('|') {
         let Some((key, values)) = field.split_once('=') else {
             return Err(Error::Unsupported("malformed document morphology".into()));
         };
+        // Canonical fields are sorted as whole `Field=Value` strings, so fields with
+        // the same name are adjacent; a repeated name is not canonical.
         if key.is_empty()
-            || (key.eq_ignore_ascii_case("POS")
-                && (key != "POS"
-                    || (known_pos(&values.to_ascii_uppercase())
-                        && values != values.to_ascii_uppercase())))
-            || previous_key.is_some_and(|previous| previous >= key)
+            || (is_pos_key(key)
+                && (key != "POS" || {
+                    let upper = values.to_uppercase();
+                    known_pos(&upper) && values != upper
+                }))
+            || previous.is_some_and(|(previous_field, previous_key)| {
+                previous_field >= field || previous_key == key
+            })
             || field.chars().any(char::is_whitespace)
             || values.contains('=')
         {
@@ -833,7 +851,7 @@ fn validate_canonical_morph(value: &str) -> Result<()> {
                 "matcher requires canonical morphology".into(),
             ));
         }
-        previous_key = Some(key);
+        previous = Some((field, key));
         let mut previous_value = None;
         for item in values.split(',') {
             if item.is_empty() || previous_value.is_some_and(|previous| previous > item) {

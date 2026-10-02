@@ -981,3 +981,79 @@ fn set_predicates_still_require_their_annotation() {
         ));
     }
 }
+#[test]
+fn morphology_normalization_sorts_whole_fields_and_folds_pos_like_spacy() {
+    // Outputs of spaCy 3.8.14 `Morphology.normalize_features`, checked in the pinned
+    // reference environment; the frozen fixture covers a subset through the matcher.
+    for (input, expected) in [
+        ("Case=Nom|Case2=Acc", "Case2=Acc|Case=Nom"),
+        (
+            "Number[psor]=Sing|Number=Plur",
+            "Number=Plur|Number[psor]=Sing",
+        ),
+        ("A_B=x|A=y", "A=y|A_B=x"),
+        ("a=1|B=2", "B=2|a=1"),
+        ("poſ=noun", "POS=NOUN"),
+        ("POS=ſym", "POS=SYM"),
+        ("pos=foo", "POS=foo"),
+        ("pos=ıntj", "POS=INTJ"),
+        ("pos=space", "POS=SPACE"),
+        ("POS=noun,verb", "POS=noun,verb"),
+        ("pos=x|POS=y", "POS=y"),
+    ] {
+        assert_eq!(normalize_morph(input).unwrap(), expected, "{input}");
+    }
+    assert!(is_pos_key("poſ") && is_pos_key("Pos") && is_pos_key("POS"));
+    assert!(!is_pos_key("POSS") && !is_pos_key("PO") && !is_pos_key("Case"));
+    // Document morphology must already be in that order, with no repeated field.
+    for canonical in [
+        "Case2=Acc|Case=Nom",
+        "Number=Plur|Number[psor]=Sing",
+        "POS=SYM",
+        "POS=foo",
+        "POS=Foo",
+        "POS=noun,verb",
+        "Case=Acc,Nom",
+        "Case=Nom,Nom",
+        "",
+    ] {
+        assert!(validate_canonical_morph(canonical).is_ok(), "{canonical}");
+    }
+    for noncanonical in [
+        "Case=Nom|Case2=Acc",
+        "Case=Acc|Case=Nom",
+        "poſ=NOUN",
+        "POS=ſym",
+        "POS=noun",
+        "Case=Nom,Acc",
+        "Case=Nom,",
+        "Case=Nom Acc",
+        "Case=Nom=Acc",
+        "=Nom",
+        "Case",
+        "_",
+        "Case2=Acc|Case=Nom|Case=Nom",
+    ] {
+        assert!(
+            matches!(
+                validate_canonical_morph(noncanonical),
+                Err(Error::Unsupported(_))
+            ),
+            "{noncanonical}"
+        );
+    }
+}
+#[test]
+fn known_pos_names_are_spacy_part_of_speech_ids() {
+    // spaCy 3.8.14 `spacy.parts_of_speech.IDS`, without the empty name.
+    let names = [
+        "ADJ", "ADP", "ADV", "AUX", "CCONJ", "CONJ", "DET", "EOL", "INTJ", "NOUN", "NUM", "PART",
+        "PRON", "PROPN", "PUNCT", "SCONJ", "SPACE", "SYM", "VERB", "X",
+    ];
+    for name in names {
+        assert!(known_pos(name), "{name}");
+    }
+    for other in ["", "noun", "NOUNS", "PROPER", "SPACES"] {
+        assert!(!known_pos(other), "{other}");
+    }
+}

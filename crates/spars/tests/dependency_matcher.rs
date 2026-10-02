@@ -126,6 +126,58 @@ fn official_set_comparisons() {
     check(path, 3, None);
 }
 #[test]
+fn official_morphology_normalization() {
+    let path = "../../fixtures/dependency-match-morph-normalization-v1.expected.json";
+    let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let total = |count: fn(&Case) -> usize| fixture.cases.iter().map(count).sum::<usize>();
+    assert_eq!(total(|c| c.tokens.len()), 5);
+    assert_eq!(total(|c| c.rules.len()), 66);
+    assert_eq!(total(|c| c.expected.len()), 80);
+    check(path, 1, None);
+}
+#[test]
+fn noncanonical_document_morphology_is_rejected_by_find_matches() {
+    let doc = |morphology: &str| {
+        Doc::from_json(
+            &serde_json::json!({"format_version": 1, "document": {"text": "a", "tokens": [{
+                "start": 0, "end": 1, "idx": 0, "whitespace": false, "norm": "a", "head": 0,
+                "dep": "ROOT", "morphology": morphology,
+            }]}})
+            .to_string(),
+        )
+        .unwrap()
+    };
+    for predicate in [
+        r#"{"kind":"is_superset","values":["Case=Nom"]}"#,
+        r#"{"kind":"equals","value":"Case=Nom"}"#,
+    ] {
+        let pattern: DependencyPattern = serde_json::from_str(&format!(
+            r#"{{"nodes":[{{"id":"a","constraints":[{{"attribute":"morphology","predicate":{predicate}}}],"link":null}}]}}"#
+        ))
+        .unwrap();
+        let mut matcher = DependencyMatcher::new();
+        matcher.add("rule", vec![pattern]).unwrap();
+        for noncanonical in [
+            "Case=Nom|Case2=Acc",
+            "Case=Acc|Case=Nom",
+            "poſ=NOUN",
+            "POS=noun",
+            "Case=Nom,Acc",
+        ] {
+            assert!(
+                matches!(
+                    matcher.find_matches(&doc(noncanonical)),
+                    Err(spars::Error::Unsupported(_))
+                ),
+                "{noncanonical}"
+            );
+        }
+        // spaCy's own order for the same fields is accepted.
+        let canonical = matcher.find_matches(&doc("Case2=Acc|Case=Nom")).unwrap();
+        assert_eq!(canonical.len(), usize::from(predicate.contains("superset")));
+    }
+}
+#[test]
 fn reused_length_matcher_checks_child_nodes_per_document() {
     // Every token attaches to token 0, the root.
     let snapshot = |words: &[&str]| {

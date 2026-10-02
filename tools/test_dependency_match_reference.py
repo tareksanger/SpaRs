@@ -12,7 +12,7 @@ import dependency_match_reference
 from dependency_match_reference import (
     FLAG_WORDS, LENGTH_WORDS, MORE_FLAG_ATTRIBUTES, MORE_FLAG_WORDS, NumberOperator, lexeme_flag, LOWER_VALUES, LOWER_WORDS, Compare, Constraint, IntegerMembership, Equals, Fixture, Flag, Link, Membership, Node, OPERATORS,
     Pattern, Versions, attribute_name, official, write_fixture, SET_DEPS, SET_LEMMAS, SET_MORPHS, SET_POS, SET_TAGS, SET_WORDS,
-    set_constraints,
+    set_constraints, NORMALIZATION_ENTRIES, NORMALIZATION_MORPHS,
 )
 from json_types import json_array, json_int, json_object, json_string, parse_json
 
@@ -173,7 +173,7 @@ class DependencyReferenceTests(unittest.TestCase):
                     patch.object(dependency_match_reference, 'write_fixture') as write:
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, True, False, False, False, False)
+                generate.assert_called_once_with(False, True, False, False, False, False, False)
                 write.assert_called_once()
                 with patch('sys.argv', ['dependency_match_reference.py', '--lower', '--regressions', str(output)]):
                     with self.assertRaises(SystemExit):
@@ -181,19 +181,23 @@ class DependencyReferenceTests(unittest.TestCase):
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, True, False, False, False)
+                generate.assert_called_once_with(False, False, True, False, False, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, True, False, False)
+                generate.assert_called_once_with(False, False, False, True, False, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--more-flags', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, True, False)
+                generate.assert_called_once_with(False, False, False, False, True, False, False)
                 generate.reset_mock()
                 with patch('sys.argv', ['dependency_match_reference.py', '--sets', str(output)]):
                     dependency_match_reference.main()
-                generate.assert_called_once_with(False, False, False, False, False, True)
+                generate.assert_called_once_with(False, False, False, False, False, True, False)
+                generate.reset_mock()
+                with patch('sys.argv', ['dependency_match_reference.py', '--morph-normalization', str(output)]):
+                    dependency_match_reference.main()
+                generate.assert_called_once_with(False, False, False, False, False, False, True)
                 with patch('sys.argv', ['dependency_match_reference.py', '--length', '--flags', str(output)]):
                     with self.assertRaises(SystemExit):
                         dependency_match_reference.main()
@@ -421,6 +425,43 @@ class DependencyReferenceTests(unittest.TestCase):
         # Both outcomes occur often enough to catch an operator that always or never matches.
         self.assertGreater(positive, 80)
         self.assertLess(positive, len(set_constraints()) - 50)
+
+    def test_frozen_morph_normalization_suite_sorts_whole_fields(self) -> None:
+        """Membership rules match exactly where an independent normalization of the entry
+        equals the token's stored morphology; exact equality compares the spelling."""
+        path = Path(__file__).resolve().parent.parent / 'fixtures/dependency-match-morph-normalization-v1.expected.json'
+        fixture = json_object(parse_json(path.read_text()))
+        cases = [json_object(value) for value in json_array(fixture['cases'])]
+        self.assertEqual([case['id'] for case in cases], ['morph-normalization'])
+        case = cases[0]
+        self.assertEqual(len(json_array(case['rules'])), 66)
+        self.assertEqual(len(json_array(case['expected'])), 80)
+        # spaCy stored each document analysis in the canonical spelling SpaRs validates.
+        stored = [json_string(json_object(token)['morphology']) for token in json_array(case['tokens'])]
+        self.assertEqual(stored, NORMALIZATION_MORPHS)
+        pos_names = {'ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'CONJ', 'DET', 'EOL', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON',
+                     'PROPN', 'PUNCT', 'SCONJ', 'SPACE', 'SYM', 'VERB', 'X'}
+
+        def normalize(entry: str) -> str:
+            fields: dict[str, str] = {}
+            for field in entry.split('|'):
+                key, _, value = field.partition('=')
+                if key.upper() == 'POS':
+                    key, value = 'POS', value.upper() if value.upper() in pos_names else value
+                fields[key] = ','.join(sorted(value.split(',')))
+            return '|'.join(sorted(f'{key}={value}' for key, value in fields.items()))
+
+        found: dict[str, set[int]] = {}
+        for value in json_array(case['expected']):
+            match = json_object(value)
+            found.setdefault(json_string(match['rule']), set()).add(json_int(json_array(match['tokens'])[0]))
+        everything = set(range(len(NORMALIZATION_MORPHS)))
+        for index, entry in enumerate(NORMALIZATION_ENTRIES):
+            members = {token for token, morph in enumerate(NORMALIZATION_MORPHS) if morph == normalize(entry)}
+            self.assertEqual(found.get(f'in_{index}', set()), members, entry)
+            self.assertEqual(found.get(f'not_in_{index}', set()), everything - members, entry)
+            self.assertEqual(found.get(f'equals_{index}', set()),
+                             {token for token, morph in enumerate(NORMALIZATION_MORPHS) if morph == entry}, entry)
 
     def test_exported_url_pattern_is_the_one_like_url_uses(self) -> None:
         # spaCy's like_url uses spacy.lang.tokenizer_exceptions.URL_MATCH; SpaRs uses the
