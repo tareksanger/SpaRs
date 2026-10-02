@@ -103,6 +103,23 @@ fn official_lexical_flag_conditions() {
         );
     }
 }
+#[test]
+#[ignore = "requires official export; mandatory CI"]
+fn official_more_lexical_flag_conditions() {
+    for size in ["sm", "md", "lg"] {
+        let lexicon = spars::Model::load(format!("../../assets/en_core_web_{size}-3.8.0"))
+            .unwrap()
+            .lexicon();
+        check_with(
+            "../../fixtures/token-match-more-flags-v1.expected.json",
+            3,
+            98,
+            99,
+            1228,
+            Some(&lexicon),
+        );
+    }
+}
 const FLAG_CASES: usize = 3;
 const FLAG_TOKENS: usize = 65;
 const FLAG_RULES: usize = 51;
@@ -194,6 +211,53 @@ fn reused_length_matcher_with_mixed_rules_keeps_documents_independent() {
         ]
     );
     assert_eq!(found(&first), [("long".into(), 1, 2)]);
+}
+#[test]
+fn length_on_a_later_item_uses_that_items_checks() {
+    let words = ["x", "ab", "x", "abcd"];
+    let text = words.join(" ");
+    let mut start = 0;
+    let tokens: Vec<Token> = words
+        .iter()
+        .map(|word| {
+            let idx = text[..start].chars().count();
+            let token: Token = serde_json::from_value(serde_json::json!({
+                "start": start, "end": start + word.len(), "idx": idx,
+                "whitespace": start + word.len() < text.len(), "norm": word,
+            }))
+            .unwrap();
+            start += word.len() + 1;
+            token
+        })
+        .collect();
+    let doc = Doc::from_json(
+        &serde_json::json!({"format_version": 1, "document": {"text": text, "tokens": tokens}})
+            .to_string(),
+    )
+    .unwrap();
+    let x = r#"{"constraints":[{"attribute":"text","predicate":{"kind":"equals","value":"x"}}],"repetition":{"kind":"once"}}"#;
+    let skipped = r#"{"constraints":[{"attribute":"text","predicate":{"kind":"equals","value":"x"}}],"repetition":{"kind":"range","min":0,"max":0}}"#;
+    let long = r#"{"constraints":[{"attribute":"length","predicate":{"kind":"compare","operator":">=","value":3}}],"repetition":{"kind":"once"}}"#;
+    for (name, items, expected) in [
+        ("plain_then_long", format!("[{x},{long}]"), vec![(2, 4)]),
+        (
+            "zero_count_first",
+            format!("[{skipped},{x},{long}]"),
+            vec![(2, 4)],
+        ),
+    ] {
+        let pattern: TokenPattern =
+            serde_json::from_str(&format!(r#"{{"tokens":{items}}}"#)).unwrap();
+        let mut matcher = TokenMatcher::new();
+        matcher.add(name, vec![pattern]).unwrap();
+        let found: Vec<_> = matcher
+            .find_matches(&doc)
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.start.0, m.end.0))
+            .collect();
+        assert_eq!(found, expected, "{name}");
+    }
 }
 #[test]
 fn reused_lower_matcher_keeps_documents_independent() {

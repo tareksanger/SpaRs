@@ -137,6 +137,41 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
   assert.deepStrictEqual(withModel.get('not_digit'), [falseFlag]);
 });
 
+test('TokenMatcher remaining lexical flags match the frozen official suite', async () => {
+  const model = await loadModel(modelPath);
+  const parsed: unknown = JSON.parse(readFileSync(new URL('../../../fixtures/token-match-more-flags-v1.expected.json', import.meta.url), 'utf8'));
+  const items = array(record(parsed).cases).map(record);
+  assert.equal(items.length, 3);
+  let ruleCount = 0;
+  let matchCount = 0;
+  for (const item of items) {
+    const matcher = new TokenMatcher(model);
+    const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: item }));
+    for (const raw of array(item.rules)) {
+      const rule = record(raw);
+      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      ruleCount++;
+    }
+    const expected = array(item.expected).map(value => {
+      const match = record(value);
+      return { rule: string(match.rule), start: number(match.start), end: number(match.end) };
+    });
+    matchCount += expected.length;
+    assert.deepEqual(await matcher.findMatches(doc), expected, string(item.id));
+  }
+  assert.equal(ruleCount, 99);
+  assert.equal(matchCount, 1228);
+  const plain = new TokenMatcher();
+  for (const attribute of ['is_lower', 'is_upper', 'is_title', 'is_ascii', 'is_currency', 'is_stop', 'is_bracket', 'is_quote', 'is_left_punct', 'is_right_punct', 'like_url', 'like_email']) {
+    const item: TokenPattern = { tokens: [{ constraints: [{ attribute, predicate: { kind: 'flag', value: false } }], repetition: { kind: 'once' } }] };
+    assert.throws(() => plain.add(attribute, [item]), hasCode('SPARS_INVALID_PATTERN'), attribute);
+    const withModel = new TokenMatcher(model);
+    withModel.add(attribute, [item]);
+    assert.deepStrictEqual(withModel.get(attribute), [item]);
+  }
+  assert.equal(plain.size, 0);
+});
+
 test('TokenMatcher LENGTH predicates validate numbers and read back exactly', () => {
   const matcher = new TokenMatcher();
   const item = (predicate: TokenPredicate): TokenPattern => ({ tokens: [{ constraints: [{ attribute: 'length', predicate }], repetition: { kind: 'once' } }] });

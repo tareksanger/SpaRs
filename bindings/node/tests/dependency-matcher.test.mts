@@ -130,6 +130,28 @@ test('lexical flags match the frozen official suite with a model lexicon', async
   assert.throws(() => new DependencyMatcher({} as unknown as Model));
 });
 
+test('remaining lexical flags match the frozen official suite', async () => {
+  const model = await loadModel(modelPath);
+  const fixture = record(readJson(`${root}fixtures/dependency-match-more-flags-v1.expected.json`));
+  const cases = array(fixture.cases);
+  assert.equal(cases.length, 3);
+  let rules = 0;
+  let matches = 0;
+  for (const value of cases) {
+    const c = record(value);
+    const matcher = new DependencyMatcher(model);
+    for (const raw of array(c.rules)) {
+      const rule = record(raw);
+      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      rules++;
+    }
+    matches += array(c.expected).length;
+    assert.deepEqual(await matcher.findMatches(document(c)), c.expected, string(c.id));
+  }
+  assert.equal(rules, 90);
+  assert.equal(matches, 1209);
+});
+
 test('rule lifecycle appends patterns and isolates returned objects', async () => {
   const matcher = new DependencyMatcher();
   const doc = tiny();

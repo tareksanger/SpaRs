@@ -68,6 +68,22 @@ fn official_lexical_flag_conditions() {
 }
 #[test]
 #[ignore = "requires official export; mandatory CI"]
+fn official_more_lexical_flag_conditions() {
+    let path = "../../fixtures/dependency-match-more-flags-v1.expected.json";
+    let fixture: Fixture = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let total = |count: fn(&Case) -> usize| fixture.cases.iter().map(count).sum::<usize>();
+    assert_eq!(total(|c| c.tokens.len()), 98);
+    assert_eq!(total(|c| c.rules.len()), 90);
+    assert_eq!(total(|c| c.expected.len()), 1209);
+    for size in ["sm", "md", "lg"] {
+        let lexicon = spars::Model::load(format!("../../assets/en_core_web_{size}-3.8.0"))
+            .unwrap()
+            .lexicon();
+        check_with(path, 3, None, Some(&lexicon));
+    }
+}
+#[test]
+#[ignore = "requires official export; mandatory CI"]
 fn reused_flag_matcher_keeps_documents_independent() {
     let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let pattern: DependencyPattern = serde_json::from_str(

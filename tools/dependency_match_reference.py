@@ -43,8 +43,13 @@ class OfficialNode(TypedDict):
     REL_OP: NotRequired[str]
 
 Attribute = Literal['text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology',
-                    'is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num', 'length']
+                    'is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num', 'length',
+                    'is_lower', 'is_upper', 'is_title', 'is_ascii', 'is_currency', 'is_stop',
+                    'is_bracket', 'is_quote', 'is_left_punct', 'is_right_punct', 'like_url', 'like_email']
 FLAG_ATTRIBUTES: tuple[Attribute, ...] = ('is_alpha', 'is_digit', 'is_space', 'is_punct', 'like_num')
+MORE_FLAG_ATTRIBUTES: tuple[Attribute, ...] = ('is_lower', 'is_upper', 'is_title', 'is_ascii', 'is_currency', 'is_stop',
+                                              'is_bracket', 'is_quote', 'is_left_punct', 'is_right_punct',
+                                              'like_url', 'like_email')
 
 @dataclass(frozen=True)
 class Equals:
@@ -130,7 +135,11 @@ class Fixture:
 OPERATORS = ('<', '>', '<<', '>>', '.', '.*', ';', ';*', '$+', '$-', '$++', '$--', '>+', '>-', '>++', '>--', '<+', '<-', '<++', '<--')
 ATTRIBUTES = {'text': 'ORTH', 'lower': 'LOWER', 'norm': 'NORM', 'lemma': 'LEMMA', 'pos': 'POS', 'tag': 'TAG', 'dep': 'DEP', 'morphology': 'MORPH',
               'is_alpha': 'IS_ALPHA', 'is_digit': 'IS_DIGIT', 'is_space': 'IS_SPACE', 'is_punct': 'IS_PUNCT', 'like_num': 'LIKE_NUM',
-              'length': 'LENGTH'}
+              'length': 'LENGTH',
+              'is_lower': 'IS_LOWER', 'is_upper': 'IS_UPPER', 'is_title': 'IS_TITLE', 'is_ascii': 'IS_ASCII',
+              'is_currency': 'IS_CURRENCY', 'is_stop': 'IS_STOP', 'is_bracket': 'IS_BRACKET', 'is_quote': 'IS_QUOTE',
+              'is_left_punct': 'IS_LEFT_PUNCT', 'is_right_punct': 'IS_RIGHT_PUNCT', 'like_url': 'LIKE_URL',
+              'like_email': 'LIKE_EMAIL'}
 
 
 def official_attrs(constraints: list[Constraint]) -> dict[str, OfficialValue]:
@@ -324,10 +333,56 @@ def length_rules() -> list[Rule]:
     return result
 
 
+# Inputs for the remaining lexical flags: case (including titlecase letters and Greek),
+# ASCII, currency symbols versus currency words, English stop words in every case,
+# every bracket and quote spelling, and URL and email lookalikes.
+MORE_FLAG_WORDS = ['hello', 'Hello', 'HELLO', 'hElLo', 'Hello-World', '\u01c5', '\u039f\u03a3', '\u03c3', '123', '\u00df',
+                   '\u00e9', '\u00c9COLE', 'A1', 'ab1', '$', '\u20ac', '\u00a5', 'USD', '$5', '(', ')', '[', ']', '{', '}', '<', '>',
+                   '"', "'", '`', '\u201a', '\u201b', '\u201e', '\u201f', '\u00ab', '\u00bb', '\u2018', '\u2019', '``', "''", '\u201c', '\u201d', '\u2039', '\u203a', '\u276e',
+                   '\u276f', 'the', 'The', 'THE', 'whereby', 'also', 'https://spacy.io', 'http://x', 'www.example.com', 'www.',
+                   'example.org', 'foo.bar', 'example.xyz', 'localhost:8080', 'example.com/', 'a@b.com',
+                   'user.name+tag@example.co.uk', '@handle', '.com', 'file.txt', 'hello.', '1.5', '+1,234.00', 'U.S', '8.8.8.8',
+                   '\u2019s', 'n\u2019t', '\u2018ll', '\u212aeep', 'X\u00aa', '\u2014', '\u2026']
+MORE_FLAG_PIPELINE_TEXT = 'Email a@b.com or visit https://spacy.io \u2014 "The" (quoted) price is $5, NOT \u20ac4!'
+
+
+def more_flag_constraints() -> list[tuple[str, list[Constraint]]]:
+    single = [(f'{attribute}_{str(value).lower()}', [Constraint(attribute, Flag(value))])
+              for attribute in MORE_FLAG_ATTRIBUTES for value in (True, False)]
+    return single + [
+        ('upper_stop', [Constraint('is_upper', Flag(True)), Constraint('is_stop', Flag(True))]),
+        ('title_not_ascii', [Constraint('is_title', Flag(True)), Constraint('is_ascii', Flag(False))]),
+        ('url_not_email', [Constraint('like_url', Flag(True)), Constraint('like_email', Flag(False))]),
+        ('left_quote', [Constraint('is_quote', Flag(True)), Constraint('is_left_punct', Flag(True))]),
+        ('stop_and_lower', [Constraint('is_stop', Flag(True)), Constraint('lower', Equals('the'))]),
+    ]
+
+
+def more_flag_rules() -> list[Rule]:
+    result = [Rule(name, [Pattern([Node('a', constraints)])]) for name, constraints in more_flag_constraints()]
+    result.append(Rule('title_head_stop_child', [Pattern([
+        Node('head', [Constraint('is_title', Flag(True))]),
+        Node('child', [Constraint('is_stop', Flag(True))], Link('head', '>')),
+    ])]))
+    return result
+
+
+def lexeme_flag(nlp: Language, word: str, attribute: Attribute) -> bool:
+    """Read a remaining lexical flag from the vocabulary, for independent checks."""
+    lexeme = nlp.vocab[word]
+    flags: dict[Attribute, bool] = {
+        'is_lower': lexeme.is_lower, 'is_upper': lexeme.is_upper, 'is_title': lexeme.is_title,
+        'is_ascii': lexeme.is_ascii, 'is_currency': lexeme.is_currency, 'is_stop': lexeme.is_stop,
+        'is_bracket': lexeme.is_bracket, 'is_quote': lexeme.is_quote, 'is_left_punct': lexeme.is_left_punct,
+        'is_right_punct': lexeme.is_right_punct, 'like_url': lexeme.like_url, 'like_email': lexeme.like_email,
+    }
+    return flags[attribute]
+
+
 def attribute_name(value: str) -> Attribute:
     if value in ('text', 'lower', 'norm', 'lemma', 'pos', 'tag', 'dep', 'morphology'):
         return value
-    for flag in FLAG_ATTRIBUTES:
+    for flag in FLAG_ATTRIBUTES + MORE_FLAG_ATTRIBUTES:
         if value == flag:
             return flag
     if value == 'length':
@@ -345,7 +400,8 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
     return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, expected)
 
 
-def generate(regressions: bool = False, lower: bool = False, flags: bool = False, length: bool = False) -> Fixture:
+def generate(regressions: bool = False, lower: bool = False, flags: bool = False, length: bool = False,
+             more_flags: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -359,6 +415,8 @@ def generate(regressions: bool = False, lower: bool = False, flags: bool = False
         return generate_flags(nlp)
     if length:
         return generate_length(nlp)
+    if more_flags:
+        return generate_more_flags(nlp)
     cases: list[Case] = []
     for case_id, text in [('ordinary', 'Alice saw Bob and Carol.'), ('sentences', 'Alice left. Bob stayed.'), ('unicode', 'Zoë sees 👩🏽‍💻 today.'), ('empty', '')]:
         cases.append(case(nlp, case_id, text, nlp(text)))
@@ -438,6 +496,19 @@ def generate_length(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def generate_more_flags(nlp: Language) -> Fixture:
+    require_pinned_unicode()
+    patterns = more_flag_rules()
+    count = len(MORE_FLAG_WORDS)
+    words = make_doc(nlp.vocab, words=MORE_FLAG_WORDS, spaces=[index + 1 < count for index in range(count)],
+                     heads=[0] * count, deps=['ROOT'] + ['dep'] * (count - 1))
+    cases = [case(nlp, 'more-flag-words', ' '.join(MORE_FLAG_WORDS), words, patterns),
+             case(nlp, 'more-flag-pipeline', MORE_FLAG_PIPELINE_TEXT, nlp(MORE_FLAG_PIPELINE_TEXT), patterns),
+             case(nlp, 'more-flag-empty', '', make_doc(nlp.vocab, words=[]), patterns)]
+    source = Path(spacy.__file__).parent / 'matcher' / 'dependencymatcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
 def write_fixture(output: Path, fixture: Fixture) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x', encoding='utf-8') as stream:
@@ -452,6 +523,7 @@ def main() -> None:
     modes.add_argument('--lower', action='store_true')
     modes.add_argument('--flags', action='store_true')
     modes.add_argument('--length', action='store_true')
+    modes.add_argument('--more-flags', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -470,7 +542,10 @@ def main() -> None:
     length_mode: object = args.length
     if not isinstance(length_mode, bool):
         raise TypeError('Length flag must be boolean')
-    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode))
+    more_flag_mode: object = args.more_flags
+    if not isinstance(more_flag_mode, bool):
+        raise TypeError('More-flags flag must be boolean')
+    write_fixture(output, generate(regressions, lower_mode, flag_mode, length_mode, more_flag_mode))
 
 
 if __name__ == '__main__':

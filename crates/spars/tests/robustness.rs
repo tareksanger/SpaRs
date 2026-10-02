@@ -76,6 +76,24 @@ fn malformed_resource_types_and_missing_configuration_are_rejected() {
             "{pointer}: {error}"
         );
     }
+    // Stop-word and TLD lookups binary-search these lists, so they must stay sorted.
+    for pointer in ["/lexical/stops", "/lexical/tlds"] {
+        let mut unsorted = manifest.clone();
+        let list = unsorted
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_array_mut()
+            .unwrap();
+        assert!(list.len() > 1, "{pointer}");
+        list.reverse();
+        tmp.write(&unsorted, &weights);
+        let error = load_error(&tmp.0, pointer);
+        assert!(matches!(error, Error::Model(_)), "{pointer}: {error}");
+        assert!(
+            error.to_string().contains("not sorted"),
+            "{pointer}: {error}"
+        );
+    }
     let mut missing = manifest.clone();
     missing.as_object_mut().unwrap().remove("tokenizer");
     tmp.write(&missing, &weights);

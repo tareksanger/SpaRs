@@ -112,7 +112,9 @@ fn run<const CACHE_SUFFIXES: bool>(
                     value
                 } else {
                     let item = &pattern.items[node.item];
-                    let mut value = item.lexical.matches(values, index, &pattern.lengths)?;
+                    let mut value =
+                        item.lexical
+                            .matches(values, index, &pattern.lengths, node.item)?;
                     if value {
                         for constraint in &item.constraints {
                             if !constraint.matches(token, values)? {

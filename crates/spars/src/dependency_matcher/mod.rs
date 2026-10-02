@@ -160,7 +160,9 @@ impl DependencyMatcher {
             let root = graph.roots[index];
             for (pattern, positions) in patterns.iter().zip(&mut candidates) {
                 for (node_index, node) in pattern.nodes.iter().enumerate() {
-                    let mut matches = node.lexical.matches(&values, index, &pattern.lengths)?;
+                    let mut matches =
+                        node.lexical
+                            .matches(&values, index, &pattern.lengths, node_index)?;
                     if matches {
                         for constraint in &node.constraints {
                             if !constraint.matches(token, &values)? {
