@@ -824,7 +824,7 @@ fn known_pos(value: &str) -> bool {
 
 // Check normal document morphology without allocating normalization tables for
 // every token. Pattern-set normalization above happens only during registration.
-fn validate_canonical_morph(value: &str) -> Result<()> {
+pub(crate) fn validate_canonical_morph(value: &str) -> Result<()> {
     if value.is_empty() {
         return Ok(());
     }

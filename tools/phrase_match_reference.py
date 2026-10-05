@@ -9,9 +9,10 @@ from pathlib import Path
 import random
 
 import spacy
+from spacy.attrs import DEP, LEMMA, MORPH, NORM, POS, TAG
 from spacy.matcher import PhraseMatcher
 from spacy.tokens import Doc as make_doc
-from reference_types import Vocab
+from reference_types import Doc, Language, Vocab
 from json_types import read_json, json_object, json_string
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -212,10 +213,199 @@ def build_edges() -> EdgeFixture:
     return EdgeFixture(1, versions, sources, starts, case, probes)
 
 
+@dataclass(frozen=True)
+class AnnotatedToken:
+    """One token; None means spaCy stores no value (key 0), and morph "" is the empty analysis."""
+    word: str
+    space: bool
+    norm: str
+    lemma: str | None
+    pos: str | None
+    tag: str | None
+    dep: str | None
+    morph: str | None
+
+@dataclass(frozen=True)
+class AnnotatedOperation:
+    action: str
+    rule: str
+    patterns: list[list[AnnotatedToken]]
+
+@dataclass(frozen=True)
+class AnnotatedState:
+    error: str | None
+    rules: list[str]
+    # spaCy's stored pattern keys for each rule in `rules`, as strings, sorted.
+    patterns: list[list[list[str]]]
+    matches: list[Match]
+
+@dataclass(frozen=True)
+class AnnotatedCase:
+    id: str
+    attribute: str
+    tokens: list[AnnotatedToken]
+    operations: list[AnnotatedOperation]
+    states: list[AnnotatedState]
+
+@dataclass(frozen=True)
+class AnnotationFixture:
+    format_version: int
+    versions: dict[str, str]
+    sources: dict[str, str]
+    cases: list[AnnotatedCase]
+
+
+ANNOTATION_ATTRIBUTES = ['NORM', 'LEMMA', 'POS', 'TAG', 'DEP', 'MORPH']
+ANNOTATION_IDS = {'NORM': NORM, 'LEMMA': LEMMA, 'POS': POS, 'TAG': TAG, 'DEP': DEP, 'MORPH': MORPH}
+# (word, norm, lemma, pos, tag, dep, morph) for project-authored synthetic tokens.
+type TokenSpec = tuple[str, str, str | None, str | None, str | None, str | None, str | None]
+
+
+def record_tokens(doc: Doc) -> list[AnnotatedToken]:
+    """Record values with spaCy's own missing-value test: a zero key is no value."""
+    keys = doc.to_array([LEMMA, POS, TAG, DEP, MORPH])
+    tokens: list[AnnotatedToken] = []
+    for token, row in zip(doc, keys, strict=True):
+        lemma, pos, tag, dep, morph = (int(value) for value in row)
+        tokens.append(AnnotatedToken(
+            token.text, token.whitespace_ == ' ', token.norm_,
+            token.lemma_ if lemma else None, token.pos_ if pos else None,
+            token.tag_ if tag else None, token.dep_ if dep else None,
+            str(token.morph) if morph else None))
+    return tokens
+
+
+def annotated_doc(vocab: Vocab, tokens: list[AnnotatedToken]) -> Doc:
+    doc = make_doc(vocab, words=[t.word for t in tokens], spaces=[t.space for t in tokens])
+    for token, spec in zip(doc, tokens, strict=True):
+        token.norm_ = spec.norm
+        if spec.lemma is not None:
+            token.lemma_ = spec.lemma
+        if spec.pos is not None:
+            token.pos_ = spec.pos
+        if spec.tag is not None:
+            token.tag_ = spec.tag
+        if spec.dep is not None:
+            token.dep_ = spec.dep
+        if spec.morph is not None:
+            token.set_morph(spec.morph)
+    if record_tokens(doc) != tokens:
+        raise ValueError('spaCy did not store the requested annotations unchanged')
+    return doc
+
+
+def synthetic(specs: list[TokenSpec]) -> list[AnnotatedToken]:
+    return [AnnotatedToken(word, True, norm, lemma, pos, tag, dep, morph) for word, norm, lemma, pos, tag, dep, morph in specs]
+
+
+def stored_patterns(matcher: PhraseMatcher, label: str) -> list[tuple[int, ...]]:
+    """Read spaCy's private stored keys from its pickling data, checking each key."""
+    stored = matcher.__reduce__()[1][1]
+    return [tuple(checked_integer(key) for key in keyword) for keyword in stored[label]]
+
+
+def capture_annotated(nlp: Language, name: str, attribute: str, tokens: list[AnnotatedToken], operations: list[AnnotatedOperation]) -> AnnotatedCase:
+    vocab = nlp.vocab
+    doc = annotated_doc(vocab, tokens)
+    matcher = PhraseMatcher(vocab, attr=attribute)
+    labels: list[str] = []
+    states: list[AnnotatedState] = []
+    for op in operations:
+        if op.rule not in labels:
+            labels.append(op.rule)
+        error: str | None = None
+        try:
+            if op.action == 'add':
+                matcher.add(op.rule, [annotated_doc(vocab, pattern) for pattern in op.patterns])
+            elif op.action == 'remove':
+                matcher.remove(op.rule)
+            else:
+                raise ValueError('Unknown operation')
+        except (ValueError, KeyError) as exc:
+            error = type(exc).__name__
+        registered = [label for label in labels if label in matcher]
+        if len(registered) != len(matcher):
+            raise ValueError('Rule count mismatch')
+        patterns = [sorted([checked_label(vocab.strings[checked_integer(key)]) for key in keyword] for keyword in stored_patterns(matcher, label)) for label in registered]
+        states.append(AnnotatedState(error, registered, patterns, convert_matches(matcher(doc), vocab, len(doc))))
+    return AnnotatedCase(name, attribute, tokens, operations, states)
+
+
+def build_annotations() -> AnnotationFixture:
+    versions, sources = verify_sources()
+    nlp = spacy.load('en_core_web_md')
+    if nlp.meta.get('version') != '3.8.0':
+        raise ValueError('Expected en_core_web_md 3.8.0')
+    versions['en_core_web_md'] = '3.8.0'
+    cases: list[AnnotatedCase] = []
+    def add(label: str, *patterns: list[AnnotatedToken]) -> AnnotatedOperation:
+        return AnnotatedOperation('add', label, list(patterns))
+    def remove(label: str) -> AnnotatedOperation:
+        return AnnotatedOperation('remove', label, [])
+    # Model-annotated input and patterns: each pattern is processed on its own.
+    text = 'The dogs ran home, and the dog runs fast. We were running and they ran. Gon na go?'
+    parsed = record_tokens(nlp(text))
+    phrase = {value: record_tokens(nlp(value)) for value in ['the dog', 'the dogs', 'A cat runs', 'were running', 'they run', 'is running', 'going to', 'gonna', 'We ran', 'home ,', 'fast .']}
+    plain = record_tokens(nlp.make_doc('the dog'))
+    for attribute in ANNOTATION_ATTRIBUTES:
+        cases.append(capture_annotated(nlp, f'pipeline-{attribute.lower()}', attribute, parsed, [
+            add('np', phrase['the dog'], phrase['A cat runs']),
+            add('verb', phrase['were running'], phrase['they run']),
+            add('np', phrase['the dog'], phrase['the dogs']),
+            add('slang', phrase['going to'], phrase['gonna']),
+            add('np', plain),
+            # spaCy keeps patterns before the rejected one; SpaRs keeps none.
+            add('mixed', phrase['the dogs'], plain),
+            add('mixed', phrase['the dogs']),
+            remove('np'),
+            add('np', phrase['We ran'], phrase['home ,'], phrase['fast .']),
+            remove('verb'),
+            add('fresh', plain),
+            add('fresh', phrase['is running']),
+        ]))
+    # Synthetic tokens with missing values, the empty morphological analysis and
+    # values that differ from the token text.
+    sentence = synthetic([
+        ('Cats', 'cats', 'cat', 'NOUN', 'NNS', 'nsubj', 'Number=Plur'),
+        ('sleep', 'sleep', 'sleep', 'VERB', 'VBP', 'ROOT', 'Tense=Pres|VerbForm=Fin'),
+        ('here', 'here', None, None, None, None, None),
+        ('now', 'now', 'now', 'ADV', 'RB', 'advmod', ''),
+        ('cats', 'cats', 'cat', 'NOUN', 'NNS', 'dobj', 'Number=Plur'),
+        ('!', '!', None, 'PUNCT', None, 'punct', ''),
+        ('Gon', 'going', 'go', 'VERB', 'VBG', 'aux', 'Tense=Pres|VerbForm=Part'),
+        ('na', 'to', 'to', 'PART', 'TO', 'aux', ''),
+    ])
+    full = synthetic([('Cat', 'cats', 'cat', 'NOUN', 'NNS', 'nsubj', 'Number=Plur'), ('sleeps', 'sleep', 'sleep', 'VERB', 'VBP', 'ROOT', 'Tense=Pres|VerbForm=Fin')])
+    partial = synthetic([('there', 'here', None, None, None, None, None), ('then', 'now', 'now', 'ADV', 'RB', 'advmod', '')])
+    empty_morph = synthetic([('?', '!', 'x', 'PUNCT', '.', 'punct', '')])
+    missing_tail = synthetic([('dogs', 'cats', 'cat', 'NOUN', 'NNS', 'dobj', 'Number=Plur'), ('.', '!', None, None, None, None, None)])
+    slang = synthetic([('going', 'going', 'go', 'VERB', 'VBG', 'aux', 'Tense=Pres|VerbForm=Part'), ('to', 'to', 'to', 'PART', 'TO', 'aux', '')])
+    unannotated = synthetic([('Cats', 'cats', None, None, None, None, None), ('sleep', 'sleep', None, None, None, None, None)])
+    bare = [AnnotatedToken(t.word, t.space, t.norm, None, None, None, None, None) for t in sentence]
+    operations = [
+        add('full', full),
+        add('partial', partial, empty_morph),
+        add('tail', missing_tail, slang),
+        add('missing', unannotated),
+        add('missing', partial),
+        add('mixed', full, unannotated),
+        add('mixed', full),
+        add('empty', []),
+        add('full', unannotated, full),
+        remove('partial'),
+        add('partial', partial),
+    ]
+    for attribute in ANNOTATION_ATTRIBUTES:
+        cases.append(capture_annotated(nlp, f'missing-values-{attribute.lower()}', attribute, sentence, operations))
+        cases.append(capture_annotated(nlp, f'unannotated-input-{attribute.lower()}', attribute, bare, operations))
+    return AnnotationFixture(1, versions, sources, cases)
+
+
 class Options(argparse.Namespace):
     output: Path = Path('target/reports/phrase-reference.json')
     holdout: bool = False
     edges: bool = False
+    annotations: bool = False
 
 
 def main() -> None:
@@ -223,15 +413,18 @@ def main() -> None:
     parser.add_argument('output', type=Path)
     parser.add_argument('--holdout', action='store_true')
     parser.add_argument('--edges', action='store_true')
+    parser.add_argument('--annotations', action='store_true')
     args = Options()
     parser.parse_args(namespace=args)
     output = args.output
     if output.exists():
         raise ValueError('Refusing to overwrite frozen output')
-    fixture = build_edges() if args.edges else build(bool(args.holdout))
+    fixture = build_annotations() if args.annotations else build_edges() if args.edges else build(bool(args.holdout))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(asdict(fixture), ensure_ascii=False, indent=2) + '\n')
     if isinstance(fixture, Fixture):
+        print(f'{len(fixture.cases)} cases; {sum(len(c.states) for c in fixture.cases)} states; {sum(len(s.matches) for c in fixture.cases for s in c.states)} matches')
+    elif isinstance(fixture, AnnotationFixture):
         print(f'{len(fixture.cases)} cases; {sum(len(c.states) for c in fixture.cases)} states; {sum(len(s.matches) for c in fixture.cases for s in c.states)} matches')
     else:
         print('1 explicit sentence-boundary case; 2 error-state probes')

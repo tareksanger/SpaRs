@@ -40,5 +40,6 @@
   "fixtures/phrase-match-lower-v1.expected.json": "555918903d51ed4e9bce1936542091bb0e233d3399a661a44067fb8a22c5fbdd",
   "fixtures/dependency-match-sets-v1.expected.json": "a65a391f86a901c312d2e77d79100758c09f8ba160746ea7a5f12e8f1ebdee50",
   "fixtures/token-match-sets-v1.expected.json": "ef3fdccbb95519c9cf744c8b9705e8e3d9bc6e5dccd88db1345dd1a09754f4a4",
-  "fixtures/dependency-match-morph-normalization-v1.expected.json": "6cc2f03d39afbab93a7828a78b8e58e394179f929675b75dc3f4e912c5079d19"
+  "fixtures/dependency-match-morph-normalization-v1.expected.json": "6cc2f03d39afbab93a7828a78b8e58e394179f929675b75dc3f4e912c5079d19",
+  "fixtures/phrase-match-annotations-v1.expected.json": "4e654ddf44b895ee9d7dc2e0b19850de23f6a58998e5d0a4962998fce0e62753"
 }

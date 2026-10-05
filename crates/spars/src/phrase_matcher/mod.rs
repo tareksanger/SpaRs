@@ -1,6 +1,7 @@
-//! Native exact-token-text phrase matching; no model or shared vocabulary required.
+//! Native phrase matching on token text or token annotations; no model or shared vocabulary required.
 mod terminal;
-use crate::{Doc, Error, Result, TokenIndex};
+use crate::dependency_matcher::predicates::validate_canonical_morph;
+use crate::{Doc, Error, Result, Token, TokenIndex};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
@@ -26,7 +27,13 @@ impl std::borrow::Borrow<str> for PhraseRuleId {
     }
 }
 
-/// ORTH and TEXT match exact text; LOWER uses pinned Python Unicode lowercase.
+/// The token value a [`PhraseMatcher`] compares, named as in spaCy.
+///
+/// ORTH and TEXT match exact text; LOWER uses pinned Python Unicode lowercase. NORM uses the
+/// token's norm. LEMMA, POS, TAG, DEP and MORPH compare annotations: a missing value is the
+/// empty string, as in spaCy, and the empty morphological analysis is `_`.
+// TODO(phrase-attributes): add spaCy's lexical flag, LENGTH, SHAPE, entity, sentence-start and
+// SPACY attributes. Tracked in docs/PHRASE_MATCHER.md#rust-boundaries-and-remaining-scope
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PhraseAttribute {
@@ -34,28 +41,101 @@ pub enum PhraseAttribute {
     Orth,
     Text,
     Lower,
+    Norm,
+    Lemma,
+    Pos,
+    Tag,
+    Dep,
+    Morph,
 }
 
-/// Owned, unique token-text pattern retained for rule lookup.
+// spaCy stores no value as key 0, whose string is empty, and the empty
+// morphological analysis as its own symbol `_`.
+const MISSING: &str = "";
+const EMPTY_MORPH: &str = "_";
+
+impl PhraseAttribute {
+    /// The annotation name used in missing-annotation errors, for attributes that
+    /// spaCy requires on pattern documents.
+    fn required_annotation(self) -> Option<&'static str> {
+        match self {
+            Self::Lemma => Some("lemma"),
+            Self::Pos => Some("POS"),
+            Self::Tag => Some("tag"),
+            Self::Dep => Some("dependency label"),
+            Self::Morph => Some("morphology"),
+            Self::Orth | Self::Text | Self::Lower | Self::Norm => None,
+        }
+    }
+    /// The stored value for NORM and the annotation attributes, as spaCy's string for its key.
+    fn annotation(self, token: &Token) -> &str {
+        match self {
+            Self::Norm => &token.norm,
+            Self::Lemma => token.lemma.as_deref().unwrap_or(MISSING),
+            Self::Pos => token.pos.as_deref().unwrap_or(MISSING),
+            Self::Tag => token.tag.as_deref().unwrap_or(MISSING),
+            Self::Dep => token.dep.as_deref().unwrap_or(MISSING),
+            Self::Morph => match token.morphology.as_deref() {
+                None => MISSING,
+                Some("") => EMPTY_MORPH,
+                Some(value) => value,
+            },
+            Self::Orth | Self::Text | Self::Lower => {
+                unreachable!("text attributes read token text")
+            }
+        }
+    }
+    // Document morphology is compared as stored, so it must be in spaCy's canonical order.
+    fn validate_document(self, doc: &Doc) -> Result<()> {
+        if self == Self::Morph {
+            for token in doc.tokens() {
+                if let Some(value) = token.morphology.as_deref() {
+                    validate_canonical_morph(value)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Owned, unique pattern of token values retained for rule lookup.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PhrasePattern {
     tokens: Vec<String>,
 }
 impl PhrasePattern {
+    /// The compared value of each pattern token, as described on [`PhraseAttribute`].
     pub fn tokens(&self) -> &[String] {
         &self.tokens
     }
     fn from_doc(doc: &Doc, attribute: PhraseAttribute) -> Result<Self> {
-        Ok(Self {
-            tokens: (0..doc.tokens().len())
-                .map(|i| {
-                    doc.token_text(TokenIndex(i)).map(|text| match attribute {
-                        PhraseAttribute::Lower => crate::unicode_lower::lower(text),
-                        _ => text.to_owned(),
+        let tokens: Vec<String> = match attribute {
+            PhraseAttribute::Orth | PhraseAttribute::Text | PhraseAttribute::Lower => {
+                (0..doc.tokens().len())
+                    .map(|i| {
+                        doc.token_text(TokenIndex(i)).map(|text| match attribute {
+                            PhraseAttribute::Lower => crate::unicode_lower::lower(text),
+                            _ => text.to_owned(),
+                        })
                     })
-                })
-                .collect::<Result<_>>()?,
-        })
+                    .collect::<Result<_>>()?
+            }
+            _ => {
+                attribute.validate_document(doc)?;
+                doc.tokens()
+                    .iter()
+                    .map(|token| attribute.annotation(token).to_owned())
+                    .collect()
+            }
+        };
+        // Like spaCy, a nonempty pattern needs at least one annotated token; empty
+        // patterns are skipped before this check.
+        if let Some(name) = attribute.required_annotation() {
+            if !tokens.is_empty() && tokens.iter().all(|value| value == MISSING) {
+                return Err(Error::MissingAnnotation(name));
+            }
+        }
+        Ok(Self { tokens })
     }
 }
 /// A phrase occurrence; end is an exclusive document token index.
@@ -119,7 +199,8 @@ impl PhraseMatcher {
     pub fn get(&self, name: &str) -> Option<&[PhrasePattern]> {
         self.rules.get(name).map(|r| r.patterns.as_slice())
     }
-    /// Copy token texts from validated documents. Empty patterns are ignored but register the rule.
+    /// Copy the selected token values from validated documents. Empty patterns are ignored but
+    /// register the rule. LEMMA, POS, TAG, DEP and MORPH patterns need at least one annotated token.
     /// All fallible validation completes before mutation; duplicate additions still update terminal order.
     pub fn add(&mut self, name: impl Into<PhraseRuleId>, documents: &[&Doc]) -> Result<()> {
         let name = name.into();
@@ -202,24 +283,37 @@ impl PhraseMatcher {
         Ok(())
     }
     /// Return all overlapping occurrences in pinned spaCy start/end/terminal-table order.
+    ///
+    /// Like spaCy, the input needs no annotations: a token without the selected
+    /// annotation matches only a pattern token that also lacks it.
     pub fn find_matches(&self, doc: &Doc) -> Result<Vec<PhraseMatch>> {
+        // Validate even without rules, so the outcome does not depend on matcher state.
+        self.attribute.validate_document(doc)?;
         if self.rules.is_empty() {
             return Ok(Vec::new());
         }
         // Dispatch once so exact matching does not branch on attributes for
         // every trie edge. LOWER keys are computed once per input token.
-        if self.attribute == PhraseAttribute::Lower {
-            let lowered = (0..doc.tokens().len())
-                .map(|i| {
-                    doc.token_text(TokenIndex(i))
-                        .map(crate::unicode_lower::lower)
+        match self.attribute {
+            PhraseAttribute::Orth | PhraseAttribute::Text => self
+                .find_keys(doc.tokens().len(), |index| {
+                    doc.token_text(TokenIndex(index))
+                }),
+            PhraseAttribute::Lower => {
+                let lowered = (0..doc.tokens().len())
+                    .map(|i| {
+                        doc.token_text(TokenIndex(i))
+                            .map(crate::unicode_lower::lower)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
+            }
+            attribute => {
+                let tokens = doc.tokens();
+                self.find_keys(tokens.len(), |index| {
+                    Ok(attribute.annotation(&tokens[index]))
                 })
-                .collect::<Result<Vec<_>>>()?;
-            self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
-        } else {
-            self.find_keys(doc.tokens().len(), |index| {
-                doc.token_text(TokenIndex(index))
-            })
+            }
         }
     }
 

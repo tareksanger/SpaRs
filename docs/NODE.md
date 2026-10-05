@@ -407,9 +407,9 @@ const doc = await model.processDocument('Alice runs.');
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'subject', tokens: [1, 0] }]);
 ```
 
-## Phrase matching, including lowercase names
+## Phrase matching on text, lowercase or annotations
 
-`PhraseMatcher` accepts tokenized native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, or `ORTH`/`TEXT` for exact token text. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
+`PhraseMatcher` accepts native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, `ORTH`/`TEXT` for exact token text, `NORM` for token norms, or `LEMMA`, `POS`, `TAG`, `DEP` or `MORPH` for linguistic annotations. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
 
 ```typescript
 import assert from 'node:assert/strict';
@@ -423,7 +423,25 @@ assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'hotel', start: 0, end
 assert.deepEqual(matcher.get('hotel'), [['the', 'ritz']]);
 ```
 
-Lowercase mappings are pinned to Unicode 15.0.0 and include contextual Greek sigma. This is lowercase matching, not case folding or Unicode normalization: `ß` does not become `ss`, and composed/decomposed accents remain distinct. Phrase boundaries still follow tokenization. `get(rule)` returns copied unique token keys in first-registration order, normalized for `LOWER`. Matching preserves overlaps and native result order. Other attributes, span input, callbacks, and Python pattern JSON are unsupported; see the [phrase matcher guide](PHRASE_MATCHER.md).
+Lowercase mappings are pinned to Unicode 15.0.0 and include contextual Greek sigma. This is lowercase matching, not case folding or Unicode normalization: `ß` does not become `ss`, and composed/decomposed accents remain distinct. Phrase boundaries still follow tokenization. `get(rule)` returns copies of the unique compared token values in first-registration order: lowercase text for `LOWER`, and the annotation values, such as `[['the', 'dog', 'run']]`, for `LEMMA`. Matching preserves overlaps and native result order. Attribute names must be uppercase. spaCy also accepts lowercase names, but here lowercase names such as `'lemma'` and the unsupported attributes `SHAPE`, `LENGTH`, the lexical flags, the entity attributes, `SENT_START` and `SPACY` throw `SPARS_UNSUPPORTED`. Span input, callbacks, and Python pattern JSON are unsupported; see the [phrase matcher guide](PHRASE_MATCHER.md).
+
+Annotation attributes need pattern documents processed by the model rather than only tokenized:
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, PhraseMatcher } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const matcher = new PhraseMatcher('LEMMA');
+matcher.add('dog-runs', [await model.processDocument('the dog runs')]);
+const doc = await model.processDocument('The dogs ran home.');
+assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'dog-runs', start: 0, end: 3 }]);
+const tokensOnly = await model.processDocument('the dog', 'Tokenizer');
+assert.throws(() => matcher.add('tokens-only', [tokensOnly]), { code: 'SPARS_INVALID_PATTERN' });
+assert.equal(matcher.contains('tokens-only'), false);
+```
+
+A nonempty pattern document with no token carrying the selected annotation throws `SPARS_INVALID_PATTERN`, and the matcher is unchanged. Input documents need no annotations: a token without the annotation has the value `""` and matches only a pattern token that also lacks it. An empty morphological analysis has the value `_`. Morphology must be in spaCy's canonical order, as the model writes it; other morphology makes `MORPH` matching reject with `SPARS_UNSUPPORTED`.
 
 ## Errors and verification
 
