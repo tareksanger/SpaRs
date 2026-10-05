@@ -468,7 +468,11 @@ const FLAG_ATTRIBUTES: [TokenAttribute; 17] = [
 ];
 
 // The same functions compute these fields in `Model::lexeme`.
-fn lexical_flag(lexicon: &Lexicon, attribute: TokenAttribute, text: &str) -> Result<bool> {
+pub(crate) fn lexical_flag(
+    lexicon: &Lexicon,
+    attribute: TokenAttribute,
+    text: &str,
+) -> Result<bool> {
     let r = lexicon.resources();
     Ok(match attribute {
         TokenAttribute::IsAlpha => r.is_alpha(text),

@@ -401,11 +401,91 @@ def build_annotations() -> AnnotationFixture:
     return AnnotationFixture(1, versions, sources, cases)
 
 
+@dataclass(frozen=True)
+class LexicalState:
+    error: str | None
+    rules: list[str]
+    # spaCy's stored integer keys for each rule in `rules`: 0 or 1 for a flag, or a length; sorted.
+    patterns: list[list[list[int]]]
+    matches: list[Match]
+
+@dataclass(frozen=True)
+class LexicalCase:
+    id: str
+    attribute: str
+    words: list[str]
+    spaces: list[bool]
+    operations: list[Operation]
+    states: list[LexicalState]
+
+@dataclass(frozen=True)
+class LexicalFixture:
+    format_version: int
+    versions: dict[str, str]
+    sources: dict[str, str]
+    cases: list[LexicalCase]
+
+
+LEXICAL_ATTRIBUTES = ['IS_ALPHA', 'IS_ASCII', 'IS_DIGIT', 'IS_LOWER', 'IS_UPPER', 'IS_TITLE', 'IS_PUNCT', 'IS_SPACE',
+                      'IS_BRACKET', 'IS_QUOTE', 'IS_LEFT_PUNCT', 'IS_RIGHT_PUNCT', 'IS_CURRENCY', 'IS_STOP',
+                      'LIKE_NUM', 'LIKE_URL', 'LIKE_EMAIL', 'LENGTH']
+
+
+def build_lexical() -> LexicalFixture:
+    from dependency_match_reference import LENGTH_PIPELINE_TEXT, MORE_FLAG_PIPELINE_TEXT
+    versions, sources = verify_sources()
+    nlp = spacy.load('en_core_web_md')
+    if nlp.meta.get('version') != '3.8.0':
+        raise ValueError('Expected en_core_web_md 3.8.0')
+    versions['en_core_web_md'] = '3.8.0'
+    vocab = nlp.vocab
+    # Lexical values come from the model vocabulary, so tokenized documents suffice.
+    # Each flag is true for some of these words and false for others; lengths vary too.
+    words = ['Hello', 'hello', 'HELLO', '123', '\u0661\u0662\u0663', '\u00b2', '...', '\u2014', '$', '\u20ac', '(', ')',
+             '"', '\u00ab', '\u00bb', 'the', 'ten', '3rd', 'https://spacy.io', 'example.org', 'a@b.com', '\u00a0', '\n',
+             '\U0001f642', 'e\u0301', 'supercalifragilistic', 'caf\u00e9', '1,000', 'Twelfth', '.']
+    # The double space becomes a whitespace token, so IS_SPACE varies in the text too.
+    parsed = nlp.make_doc('  '.join([MORE_FLAG_PIPELINE_TEXT, LENGTH_PIPELINE_TEXT]))
+    inputs = [('words', words, [True] * (len(words) - 1) + [False]),
+              ('text', [t.text for t in parsed], [t.whitespace_ == ' ' for t in parsed])]
+    def add(label: str, *patterns: list[str]) -> Operation:
+        return Operation('add', label, list(patterns))
+    # No removals: preshed reserves the keys 0 and 1, which are flag values and a
+    # one-character length. spaCy 3.8.14 removal then frees a trie node that stays
+    # reachable, so later matching reads freed memory or loses rules sharing the prefix.
+    operations = [
+        add('one', ['Hello'], ['123']),
+        add('two', ['ten', 'the'], ['https://spacy.io', 'a@b.com']),
+        add('three', ['$', '(', '"'], ['hello', 'Hello', 'HELLO'], []),
+        add('one', ['Hello'], ['\u00a0']),
+        add('long', ['supercalifragilistic', 'caf\u00e9', '1,000', '.'], ['\u0661\u0662\u0663', '\u2014', 'Twelfth']),
+    ]
+    cases: list[LexicalCase] = []
+    for attribute in LEXICAL_ATTRIBUTES:
+        for name, input_words, spaces in inputs:
+            doc = make_doc(vocab, words=input_words, spaces=spaces)
+            matcher = PhraseMatcher(vocab, attr=attribute)
+            labels: list[str] = []
+            states: list[LexicalState] = []
+            for op in operations:
+                if op.rule not in labels:
+                    labels.append(op.rule)
+                matcher.add(op.rule, [make_doc(vocab, words=pattern) for pattern in op.patterns])
+                registered = [label for label in labels if label in matcher]
+                if len(registered) != len(matcher):
+                    raise ValueError('Rule count mismatch')
+                patterns = [sorted(list(keyword) for keyword in stored_patterns(matcher, label)) for label in registered]
+                states.append(LexicalState(None, registered, patterns, convert_matches(matcher(doc), vocab, len(doc))))
+            cases.append(LexicalCase(f'{name}-{attribute.lower()}', attribute, input_words, spaces, operations, states))
+    return LexicalFixture(1, versions, sources, cases)
+
+
 class Options(argparse.Namespace):
     output: Path = Path('target/reports/phrase-reference.json')
     holdout: bool = False
     edges: bool = False
     annotations: bool = False
+    lexical: bool = False
 
 
 def main() -> None:
@@ -414,17 +494,18 @@ def main() -> None:
     parser.add_argument('--holdout', action='store_true')
     parser.add_argument('--edges', action='store_true')
     parser.add_argument('--annotations', action='store_true')
+    parser.add_argument('--lexical', action='store_true')
     args = Options()
     parser.parse_args(namespace=args)
     output = args.output
     if output.exists():
         raise ValueError('Refusing to overwrite frozen output')
-    fixture = build_annotations() if args.annotations else build_edges() if args.edges else build(bool(args.holdout))
+    fixture = build_lexical() if args.lexical else build_annotations() if args.annotations else build_edges() if args.edges else build(bool(args.holdout))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(asdict(fixture), ensure_ascii=False, indent=2) + '\n')
     if isinstance(fixture, Fixture):
         print(f'{len(fixture.cases)} cases; {sum(len(c.states) for c in fixture.cases)} states; {sum(len(s.matches) for c in fixture.cases for s in c.states)} matches')
-    elif isinstance(fixture, AnnotationFixture):
+    elif isinstance(fixture, (AnnotationFixture, LexicalFixture)):
         print(f'{len(fixture.cases)} cases; {sum(len(c.states) for c in fixture.cases)} states; {sum(len(s.matches) for c in fixture.cases for s in c.states)} matches')
     else:
         print('1 explicit sentence-boundary case; 2 error-state probes')
