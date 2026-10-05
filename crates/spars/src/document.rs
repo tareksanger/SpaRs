@@ -1,7 +1,9 @@
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
+mod entities;
 mod traversal;
+pub use entities::{EntityDefault, EntityUpdate, TokenRange};
 pub use traversal::{Ancestors, Children, DependencyError, Subtree};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ByteOffset(pub usize);

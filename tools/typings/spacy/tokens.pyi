@@ -1,3 +1,5 @@
-from reference_types import Doc as ReferenceDoc, Vocab
+from reference_types import Doc as ReferenceDoc, Span as ReferenceSpan, Vocab
 
 def Doc(vocab: Vocab, *, words: list[str], spaces: list[bool] = ..., heads: list[int] = ..., deps: list[str] = ..., pos: list[str] = ..., tags: list[str] = ..., lemmas: list[str] = ..., morphs: list[str] = ..., sent_starts: list[bool] = ...) -> ReferenceDoc: ...
+
+def Span(doc: ReferenceDoc, start: int, end: int, label: str = ...) -> ReferenceSpan: ...

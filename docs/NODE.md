@@ -327,6 +327,24 @@ assert.equal(doc.sentenceViews()?.length, 1);
 
 `token.annotations()` returns a copied record of the native annotations and byte/code-point start offsets. `token.children()`, `ancestors()`, `subtree()`, `head()`, `span()`, and `sentence()` provide graph and sentence access. Use `doc.toObject()` for the full JavaScript output with UTF-16 offsets. Views are immutable; retaining even one view retains its full document and contextual tensor. Traversal and view creation run synchronously and allocate in proportion to the returned results.
 
+## Edit entity annotation
+
+`doc.withEntities(update)` replaces entity annotation like spaCy's `Doc.set_ents` and returns a new native document. The original document and every token and span view of it keep their earlier annotation, so code holding them is unaffected. Intervals use token indices with an exclusive end. `entities` lists labeled intervals; `outside`, `blocked` and `missing` list unlabeled intervals for tokens outside any entity, tokens that can never be part of one, and tokens whose annotation is unknown. `default` sets every other token: `'outside'` (the default), `'missing'`, `'blocked'` or `'unmodified'`.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('Tim Cook visited London.');
+const edited = doc.withEntities({ entities: [{ start: 3, end: 4, label: 'CITY' }], default: 'unmodified' });
+assert.deepEqual(edited.toObject().entities?.map(entity => entity.label), ['PERSON', 'CITY']);
+assert.equal(doc.token(3).annotations().entityType, 'GPE');
+assert.throws(() => doc.withEntities({ entities: [{ start: 3, end: 9, label: 'CITY' }] }), { code: 'SPARS_BOUNDS' });
+```
+
+The original `doc` still reports London as `GPE`. An interval outside the document, a reversed interval, a non-integer or negative index, or two intervals sharing a token (entities with an empty label are ignored) throws `SPARS_BOUNDS`. A label with an unpaired surrogate throws `SPARS_INVALID_TEXT`, and tags restored from an edited snapshot that spaCy could not read throw `SPARS_UNSUPPORTED`. An object of the wrong shape, an unknown `default`, or an undeclared property such as a misspelled `ents` or an unsupported `kbId` throws a native argument error (`InvalidArg`, `NumberExpected` or `StringExpected`), so a typo cannot silently become the default update. The update runs synchronously on the JavaScript thread, outside inference admission and input limits, and copies the whole document, including any contextual tensor. Token states, the repair of inside tags and the differences from spaCy are described in the [entity editing guide](ENTITIES.md).
+
 ## Vectors and similarity
 
 ```typescript

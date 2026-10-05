@@ -42,5 +42,6 @@
   "fixtures/token-match-sets-v1.expected.json": "ef3fdccbb95519c9cf744c8b9705e8e3d9bc6e5dccd88db1345dd1a09754f4a4",
   "fixtures/dependency-match-morph-normalization-v1.expected.json": "6cc2f03d39afbab93a7828a78b8e58e394179f929675b75dc3f4e912c5079d19",
   "fixtures/phrase-match-annotations-v1.expected.json": "4e654ddf44b895ee9d7dc2e0b19850de23f6a58998e5d0a4962998fce0e62753",
-  "fixtures/phrase-match-lexical-v1.expected.json": "d3e0052dadcd6538d4d5649163d195acd4bbe314be5e31f8987c9f48db6cef51"
+  "fixtures/phrase-match-lexical-v1.expected.json": "d3e0052dadcd6538d4d5649163d195acd4bbe314be5e31f8987c9f48db6cef51",
+  "fixtures/entity-updates-v1.expected.json": "08334306c95a3c0d0e7f1ad5218663516c9fd0e7eab663cf1f377d8844b64c88"
 }
