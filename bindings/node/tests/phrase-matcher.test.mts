@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { NativeDocument, PhraseMatcher } from '../index.js';
+import { loadModel, NativeDocument, PhraseMatcher } from '../index.js';
+import { modelPath } from './fixtures.mts';
 
 type Match = { rule: string; start: number; end: number };
 type Operation = { action: string; rule: string; patterns: string[][] };
@@ -100,7 +101,7 @@ test('PhraseMatcher owns patterns, validates strings, and prevents pending mutat
   const matcher = new PhraseMatcher('TEXT');
   assert.equal(matcher.attribute, 'TEXT');
   assert.equal(new PhraseMatcher().attribute, 'ORTH');
-  for (const attribute of ['lemma', 'SHAPE', 'ENT_TYPE', 'IS_ALPHA', 'LENGTH', 'MORPHOLOGY']) {
+  for (const attribute of ['lemma', 'SHAPE', 'ENT_TYPE', 'MORPHOLOGY']) {
     assert.throws(() => new PhraseMatcher(attribute), hasCode('SPARS_UNSUPPORTED'));
   }
   assert.throws(() => new PhraseMatcher('\ud800'), hasCode('SPARS_INVALID_TEXT'));
@@ -269,4 +270,71 @@ test('PhraseMatcher MORPH rejects noncanonical morphology with SPARS_UNSUPPORTED
   const lemma = new PhraseMatcher('LEMMA');
   lemma.add('r', [noncanonical]);
   assert.deepEqual(await lemma.findMatches(noncanonical), [{ rule: 'r', start: 0, end: 1 }]);
+});
+
+const LEXICAL = ['IS_ALPHA', 'IS_ASCII', 'IS_DIGIT', 'IS_LOWER', 'IS_UPPER', 'IS_TITLE', 'IS_PUNCT', 'IS_SPACE', 'IS_BRACKET', 'IS_QUOTE',
+  'IS_LEFT_PUNCT', 'IS_RIGHT_PUNCT', 'IS_CURRENCY', 'IS_STOP', 'LIKE_NUM', 'LIKE_URL', 'LIKE_EMAIL', 'LENGTH'];
+
+test('PhraseMatcher accepts every supported attribute name and rejects the rest', () => {
+  for (const name of ['ORTH', 'TEXT', 'LOWER', 'NORM', 'LEMMA', 'POS', 'TAG', 'DEP', 'MORPH', ...LEXICAL]) {
+    assert.equal(new PhraseMatcher(name).attribute, name);
+  }
+  for (const name of ['is_alpha', 'ISALPHA', 'SHAPE', 'IS_SENT_START', 'SPACY', 'ENT_TYPE']) {
+    assert.throws(() => new PhraseMatcher(name), hasCode('SPARS_UNSUPPORTED'));
+  }
+  const matcher = new PhraseMatcher('IS_ALPHA');
+  assert.throws(() => matcher.add('r', [doc(['a'])]), hasCode('SPARS_INVALID_PATTERN'));
+  assert.throws(() => matcher.add('r', []), hasCode('SPARS_INVALID_PATTERN'));
+  assert.equal(matcher.size, 0);
+});
+
+// spaCy stores a flag as 0 or 1 and a length as itself; SpaRs stores text.
+function storedValue(attribute: string, key: number): string {
+  if (attribute === 'LENGTH') return String(key);
+  assert.ok(key === 0 || key === 1);
+  return key === 1 ? 'true' : 'false';
+}
+
+test('PhraseMatcher lexical flags and LENGTH match the pinned reference', async () => {
+  const model = await loadModel(modelPath);
+  const cases = array(fixture('phrase-match-lexical-v1.expected.json').cases);
+  assert.equal(cases.length, 36);
+  let states = 0;
+  let matches = 0;
+  for (const value of cases) {
+    const item = record(value);
+    const attribute = string(item.attribute);
+    assert.ok(LEXICAL.includes(attribute));
+    const input = doc(array(item.words).map(string), array(item.spaces).map(boolean));
+    // LENGTH needs no model; the flags use the model's language rules.
+    const matcher = attribute === 'LENGTH' ? new PhraseMatcher(attribute) : new PhraseMatcher(attribute, model);
+    const operations = array(item.operations).map(record);
+    const expectedStates = array(item.states).map(record);
+    assert.equal(operations.length, expectedStates.length);
+    for (const [index, operation] of operations.entries()) {
+      const expected = expectedStates[index];
+      assert.ok(expected);
+      const context = `${string(item.id)} state ${index}`;
+      assert.equal(string(operation.action), 'add', context);
+      assert.equal(expected.error, null, context);
+      matcher.add(string(operation.rule), array(operation.patterns).map(pattern => doc(array(pattern).map(string))));
+      const rules = array(expected.rules).map(string);
+      assert.equal(matcher.size, rules.length, context);
+      for (const [position, rule] of rules.entries()) {
+        const keys: string[][] = array(array(expected.patterns)[position]).map(pattern => array(pattern).map(number).map(key => storedValue(attribute, key)));
+        const stored = matcher.get(rule);
+        assert.ok(stored, context);
+        assert.deepEqual([...stored].sort(compareSequences), keys.sort(compareSequences), context);
+      }
+      const expectedMatches = array(expected.matches).map(value => {
+        const match = record(value);
+        return { rule: string(match.rule), start: number(match.start), end: number(match.end) };
+      });
+      const results = await Promise.all([matcher.findMatches(input), matcher.findMatches(input)]);
+      for (const result of results) assert.deepEqual(result, expectedMatches, context);
+      states += 1;
+      matches += expectedMatches.length;
+    }
+  }
+  assert.deepEqual([states, matches], [180, 11956]);
 });

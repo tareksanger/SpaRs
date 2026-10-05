@@ -237,7 +237,7 @@ Requested annotations must be available throughout the document. Missing annotat
 
 ## Scope and cost
 
-This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, token-level attributes such as `IS_SENT_START`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) supports exact or Unicode-lowercase token phrase patterns.
+This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, token-level attributes such as `IS_SENT_START`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) matches token phrases by text, lowercase, norm, annotations, lexical flags or length.
 
 Patterns are limited to 4,096 expanded nodes to keep registration bounded. `OneOrMore` uses two nodes; a bounded range uses its maximum count, and an unbounded range uses its minimum plus one. Larger patterns return an error.
 

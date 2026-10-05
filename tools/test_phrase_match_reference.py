@@ -14,7 +14,7 @@ from spacy.attrs import DEP, LEMMA, MORPH, POS, TAG
 from spacy.symbols import IDS
 from spacy.tokens import Doc as make_doc
 from json_types import json_object, read_json
-from phrase_match_reference import ROOT, AnnotatedToken, AnnotationFixture, build, build_annotations, build_edges, convert_matches, verify_sources
+from phrase_match_reference import ROOT, LEXICAL_ATTRIBUTES, AnnotatedToken, AnnotationFixture, build, build_annotations, build_edges, build_lexical, convert_matches, verify_sources
 
 class PhraseReferenceTests(unittest.TestCase):
     def test_symbols_and_sources(self) -> None:
@@ -87,6 +87,29 @@ class PhraseReferenceTests(unittest.TestCase):
                 self.assertTrue(any(state.matches for state in case.states), case.id)
             else:
                 self.assertFalse(any(state.matches for state in case.states), case.id)
+
+    def test_lexical_fixture_regenerates_and_agrees_with_lexeme_values(self) -> None:
+        fixture = build_lexical()
+        self.assertEqual(asdict(fixture), json.loads((ROOT / 'fixtures/phrase-match-lexical-v1.expected.json').read_text()))
+        vocab = spacy.load('en_core_web_md').vocab
+        def key(attribute: str, word: str) -> int:
+            # A flag is the lexeme's own property, independent of the PhraseMatcher trie.
+            return len(word) if attribute == 'LENGTH' else int(bool(getattr(vocab[word], attribute.lower())))
+        self.assertEqual(sorted({case.attribute for case in fixture.cases}), sorted(LEXICAL_ATTRIBUTES))
+        for case in fixture.cases:
+            stored: dict[str, set[tuple[int, ...]]] = {}
+            values = [key(case.attribute, word) for word in case.words]
+            for op, state in zip(case.operations, case.states, strict=True):
+                self.assertEqual((op.action, state.error), ('add', None), case.id)
+                stored.setdefault(op.rule, set()).update(tuple(key(case.attribute, w) for w in p) for p in op.patterns if p)
+                self.assertEqual(set(state.rules), set(stored), case.id)
+                self.assertEqual(state.patterns, [sorted(list(p) for p in stored[rule]) for rule in state.rules], case.id)
+                expected = {(rule, start, start + len(p)) for rule, patterns in stored.items() for p in patterns
+                            for start in range(len(values) - len(p) + 1) if tuple(values[start:start + len(p)]) == p}
+                self.assertEqual({(m.rule, m.start, m.end) for m in state.matches}, expected, case.id)
+                self.assertEqual(len(state.matches), len(expected), case.id)
+            # Every flag takes both values on the input, so patterns can tell them apart.
+            self.assertGreater(len(set(values)), 1, case.id)
 
     def test_empty_annotation_strings_are_spacy_key_zero(self) -> None:
         nlp = spacy.blank('en')

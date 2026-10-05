@@ -14,6 +14,37 @@ pub struct PhraseMatch {
     pub end: u32,
 }
 
+/// Attribute names as spaCy spells them, in both directions.
+const ATTRIBUTES: [(&str, spars::PhraseAttribute); 27] = [
+    ("ORTH", spars::PhraseAttribute::Orth),
+    ("TEXT", spars::PhraseAttribute::Text),
+    ("LOWER", spars::PhraseAttribute::Lower),
+    ("NORM", spars::PhraseAttribute::Norm),
+    ("LEMMA", spars::PhraseAttribute::Lemma),
+    ("POS", spars::PhraseAttribute::Pos),
+    ("TAG", spars::PhraseAttribute::Tag),
+    ("DEP", spars::PhraseAttribute::Dep),
+    ("MORPH", spars::PhraseAttribute::Morph),
+    ("IS_ALPHA", spars::PhraseAttribute::IsAlpha),
+    ("IS_ASCII", spars::PhraseAttribute::IsAscii),
+    ("IS_DIGIT", spars::PhraseAttribute::IsDigit),
+    ("IS_LOWER", spars::PhraseAttribute::IsLower),
+    ("IS_UPPER", spars::PhraseAttribute::IsUpper),
+    ("IS_TITLE", spars::PhraseAttribute::IsTitle),
+    ("IS_PUNCT", spars::PhraseAttribute::IsPunct),
+    ("IS_SPACE", spars::PhraseAttribute::IsSpace),
+    ("IS_BRACKET", spars::PhraseAttribute::IsBracket),
+    ("IS_QUOTE", spars::PhraseAttribute::IsQuote),
+    ("IS_LEFT_PUNCT", spars::PhraseAttribute::IsLeftPunct),
+    ("IS_RIGHT_PUNCT", spars::PhraseAttribute::IsRightPunct),
+    ("IS_CURRENCY", spars::PhraseAttribute::IsCurrency),
+    ("IS_STOP", spars::PhraseAttribute::IsStop),
+    ("LIKE_NUM", spars::PhraseAttribute::LikeNum),
+    ("LIKE_URL", spars::PhraseAttribute::LikeUrl),
+    ("LIKE_EMAIL", spars::PhraseAttribute::LikeEmail),
+    ("LENGTH", spars::PhraseAttribute::Length),
+];
+
 #[napi]
 pub struct PhraseMatcher {
     inner: Arc<spars::PhraseMatcher>,
@@ -21,39 +52,41 @@ pub struct PhraseMatcher {
 
 #[napi]
 impl PhraseMatcher {
-    /// Match exact token text using ORTH (default) or TEXT, pinned Unicode LOWER, NORM, or the
-    /// LEMMA, POS, TAG, DEP and MORPH annotations.
-    #[napi(constructor, strict)]
-    pub fn new(env: Env, attribute: Option<Utf16String>) -> Result<Self> {
+    /// Match exact token text using ORTH (default) or TEXT, pinned Unicode LOWER, NORM, the
+    /// LEMMA, POS, TAG, DEP and MORPH annotations, a lexical flag such as IS_ALPHA, or LENGTH.
+    /// Pass a model to enable lexical flag attributes with its language rules.
+    #[napi(constructor)]
+    pub fn new(
+        env: Env,
+        attribute: Option<Utf16String>,
+        model: Option<&crate::Model>,
+    ) -> Result<Self> {
         let attribute = attribute
             .as_ref()
             .map(|value| errors::text(value))
             .transpose()
             .map_err(|error| error.into_napi(env))?;
-        let attribute = match attribute.as_deref().unwrap_or("ORTH") {
-            "ORTH" => spars::PhraseAttribute::Orth,
-            "TEXT" => spars::PhraseAttribute::Text,
-            "LOWER" => spars::PhraseAttribute::Lower,
-            "NORM" => spars::PhraseAttribute::Norm,
-            "LEMMA" => spars::PhraseAttribute::Lemma,
-            "POS" => spars::PhraseAttribute::Pos,
-            "TAG" => spars::PhraseAttribute::Tag,
-            "DEP" => spars::PhraseAttribute::Dep,
-            "MORPH" => spars::PhraseAttribute::Morph,
-            _ => {
-                return Err(errors::BindingError::from(spars::Error::Unsupported(
-                    "PhraseMatcher supports only ORTH, TEXT, LOWER, NORM, LEMMA, POS, TAG, DEP, and MORPH".into(),
-                ))
-                .into_napi(env))
-            }
+        let name = attribute.as_deref().unwrap_or("ORTH");
+        let Some(&(_, attribute)) = ATTRIBUTES.iter().find(|(known, _)| *known == name) else {
+            return Err(
+                errors::BindingError::from(spars::Error::Unsupported(format!(
+                    "PhraseMatcher does not support the attribute {name:?}"
+                )))
+                .into_napi(env),
+            );
+        };
+        let matcher = match model {
+            Some(model) => spars::PhraseMatcher::with_lexicon(attribute, model.inner.lexicon()),
+            None => spars::PhraseMatcher::with_attribute(attribute),
         };
         Ok(Self {
-            inner: Arc::new(spars::PhraseMatcher::with_attribute(attribute)),
+            inner: Arc::new(matcher),
         })
     }
 
     #[napi(getter)]
     pub fn attribute(&self) -> &'static str {
+        // Exhaustive, so a new attribute must be named here; `new` accepts the same names.
         match self.inner.attribute() {
             spars::PhraseAttribute::Orth => "ORTH",
             spars::PhraseAttribute::Text => "TEXT",
@@ -64,6 +97,24 @@ impl PhraseMatcher {
             spars::PhraseAttribute::Tag => "TAG",
             spars::PhraseAttribute::Dep => "DEP",
             spars::PhraseAttribute::Morph => "MORPH",
+            spars::PhraseAttribute::IsAlpha => "IS_ALPHA",
+            spars::PhraseAttribute::IsAscii => "IS_ASCII",
+            spars::PhraseAttribute::IsDigit => "IS_DIGIT",
+            spars::PhraseAttribute::IsLower => "IS_LOWER",
+            spars::PhraseAttribute::IsUpper => "IS_UPPER",
+            spars::PhraseAttribute::IsTitle => "IS_TITLE",
+            spars::PhraseAttribute::IsPunct => "IS_PUNCT",
+            spars::PhraseAttribute::IsSpace => "IS_SPACE",
+            spars::PhraseAttribute::IsBracket => "IS_BRACKET",
+            spars::PhraseAttribute::IsQuote => "IS_QUOTE",
+            spars::PhraseAttribute::IsLeftPunct => "IS_LEFT_PUNCT",
+            spars::PhraseAttribute::IsRightPunct => "IS_RIGHT_PUNCT",
+            spars::PhraseAttribute::IsCurrency => "IS_CURRENCY",
+            spars::PhraseAttribute::IsStop => "IS_STOP",
+            spars::PhraseAttribute::LikeNum => "LIKE_NUM",
+            spars::PhraseAttribute::LikeUrl => "LIKE_URL",
+            spars::PhraseAttribute::LikeEmail => "LIKE_EMAIL",
+            spars::PhraseAttribute::Length => "LENGTH",
         }
     }
 

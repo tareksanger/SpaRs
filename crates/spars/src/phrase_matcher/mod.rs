@@ -1,7 +1,8 @@
-//! Native phrase matching on token text or token annotations; no model or shared vocabulary required.
+//! Native phrase matching on token text, annotations, lexical flags or length. No shared
+//! vocabulary is required; lexical flag attributes need a model lexicon.
 mod terminal;
-use crate::dependency_matcher::predicates::validate_canonical_morph;
-use crate::{Doc, Error, Result, Token, TokenIndex};
+use crate::dependency_matcher::predicates::{lexical_flag, validate_canonical_morph};
+use crate::{Doc, Error, Lexicon, Result, Token, TokenAttribute, TokenIndex};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
@@ -32,10 +33,14 @@ impl std::borrow::Borrow<str> for PhraseRuleId {
 /// ORTH and TEXT match exact text; LOWER uses pinned Python Unicode lowercase. NORM uses the
 /// token's norm. LEMMA, POS, TAG, DEP and MORPH compare annotations: a missing value is the
 /// empty string, as in spaCy, and the empty morphological analysis is `_`.
-// TODO(phrase-attributes): add spaCy's lexical flag, LENGTH, SHAPE, entity, sentence-start and
-// SPACY attributes. Tracked in docs/PHRASE_MATCHER.md#rust-boundaries-and-remaining-scope
+///
+/// The lexical flags, from `IS_ALPHA` to `LIKE_EMAIL`, compare `true` or `false` for each
+/// token and need a matcher created with [`PhraseMatcher::with_lexicon`]. LENGTH compares
+/// the number of code points in the token text.
+// TODO(phrase-attributes): add spaCy's SHAPE, entity, sentence-start and SPACY attributes.
+// Tracked in docs/PHRASE_MATCHER.md#rust-boundaries-and-remaining-scope
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PhraseAttribute {
     #[default]
     Orth,
@@ -47,6 +52,45 @@ pub enum PhraseAttribute {
     Tag,
     Dep,
     Morph,
+    IsAlpha,
+    IsAscii,
+    IsDigit,
+    IsLower,
+    IsUpper,
+    IsTitle,
+    IsPunct,
+    IsSpace,
+    IsBracket,
+    IsQuote,
+    IsLeftPunct,
+    IsRightPunct,
+    IsCurrency,
+    IsStop,
+    LikeNum,
+    LikeUrl,
+    LikeEmail,
+    Length,
+}
+
+/// Where an attribute's compared value comes from.
+enum Source {
+    Text,
+    Computed,
+    Annotation,
+}
+impl PhraseAttribute {
+    fn source(self) -> Source {
+        match self {
+            Self::Orth | Self::Text => Source::Text,
+            Self::Norm | Self::Lemma | Self::Pos | Self::Tag | Self::Dep | Self::Morph => {
+                Source::Annotation
+            }
+            _ => Source::Computed,
+        }
+    }
+}
+fn missing_lexicon() -> Error {
+    Error::Pattern("lexical flag attributes require a phrase matcher created with a lexicon".into())
 }
 
 // spaCy stores no value as key 0, whose string is empty, and the empty
@@ -55,6 +99,52 @@ const MISSING: &str = "";
 const EMPTY_MORPH: &str = "_";
 
 impl PhraseAttribute {
+    /// The matcher attribute computing the same lexical flag.
+    fn flag(self) -> Option<TokenAttribute> {
+        Some(match self {
+            Self::IsAlpha => TokenAttribute::IsAlpha,
+            Self::IsAscii => TokenAttribute::IsAscii,
+            Self::IsDigit => TokenAttribute::IsDigit,
+            Self::IsLower => TokenAttribute::IsLower,
+            Self::IsUpper => TokenAttribute::IsUpper,
+            Self::IsTitle => TokenAttribute::IsTitle,
+            Self::IsPunct => TokenAttribute::IsPunct,
+            Self::IsSpace => TokenAttribute::IsSpace,
+            Self::IsBracket => TokenAttribute::IsBracket,
+            Self::IsQuote => TokenAttribute::IsQuote,
+            Self::IsLeftPunct => TokenAttribute::IsLeftPunct,
+            Self::IsRightPunct => TokenAttribute::IsRightPunct,
+            Self::IsCurrency => TokenAttribute::IsCurrency,
+            Self::IsStop => TokenAttribute::IsStop,
+            Self::LikeNum => TokenAttribute::LikeNum,
+            Self::LikeUrl => TokenAttribute::LikeUrl,
+            Self::LikeEmail => TokenAttribute::LikeEmail,
+            _ => return None,
+        })
+    }
+    /// The value of a lexical flag attribute, computed with the model's language rules.
+    fn flag_value(self, text: &str, lexicon: Option<&Lexicon>) -> Result<Option<&'static str>> {
+        let Some(flag) = self.flag() else {
+            return Ok(None);
+        };
+        let lexicon = lexicon.ok_or_else(missing_lexicon)?;
+        Ok(Some(if lexical_flag(lexicon, flag, text)? {
+            "true"
+        } else {
+            "false"
+        }))
+    }
+    /// The compared value for LOWER, the lexical flags and LENGTH, computed from the token text.
+    fn computed(self, text: &str, lexicon: Option<&Lexicon>) -> Result<String> {
+        Ok(match self {
+            Self::Lower => crate::unicode_lower::lower(text),
+            Self::Length => text.chars().count().to_string(),
+            _ => self
+                .flag_value(text, lexicon)?
+                .expect("only LOWER, LENGTH and the lexical flags are computed")
+                .to_owned(),
+        })
+    }
     /// The annotation name used in missing-annotation errors, for attributes that
     /// spaCy requires on pattern documents.
     fn required_annotation(self) -> Option<&'static str> {
@@ -64,7 +154,7 @@ impl PhraseAttribute {
             Self::Tag => Some("tag"),
             Self::Dep => Some("dependency label"),
             Self::Morph => Some("morphology"),
-            Self::Orth | Self::Text | Self::Lower | Self::Norm => None,
+            _ => None,
         }
     }
     /// The stored value for NORM and the annotation attributes, as spaCy's string for its key.
@@ -80,9 +170,7 @@ impl PhraseAttribute {
                 Some("") => EMPTY_MORPH,
                 Some(value) => value,
             },
-            Self::Orth | Self::Text | Self::Lower => {
-                unreachable!("text attributes read token text")
-            }
+            _ => unreachable!("text-derived attributes read token text"),
         }
     }
     // Document morphology is compared as stored, so it must be in spaCy's canonical order.
@@ -108,19 +196,16 @@ impl PhrasePattern {
     pub fn tokens(&self) -> &[String] {
         &self.tokens
     }
-    fn from_doc(doc: &Doc, attribute: PhraseAttribute) -> Result<Self> {
-        let tokens: Vec<String> = match attribute {
-            PhraseAttribute::Orth | PhraseAttribute::Text | PhraseAttribute::Lower => {
-                (0..doc.tokens().len())
-                    .map(|i| {
-                        doc.token_text(TokenIndex(i)).map(|text| match attribute {
-                            PhraseAttribute::Lower => crate::unicode_lower::lower(text),
-                            _ => text.to_owned(),
-                        })
-                    })
-                    .collect::<Result<_>>()?
-            }
-            _ => {
+    fn from_doc(doc: &Doc, attribute: PhraseAttribute, lexicon: Option<&Lexicon>) -> Result<Self> {
+        let texts = (0..doc.tokens().len()).map(|i| doc.token_text(TokenIndex(i)));
+        let tokens: Vec<String> = match attribute.source() {
+            Source::Text => texts
+                .map(|text| text.map(str::to_owned))
+                .collect::<Result<_>>()?,
+            Source::Computed => texts
+                .map(|text| attribute.computed(text?, lexicon))
+                .collect::<Result<_>>()?,
+            Source::Annotation => {
                 attribute.validate_document(doc)?;
                 doc.tokens()
                     .iter()
@@ -160,6 +245,7 @@ struct Rule {
 /// Reusable prefix trie. Read-only searches own their output and share no mutable state.
 pub struct PhraseMatcher {
     attribute: PhraseAttribute,
+    lexicon: Option<Lexicon>,
     rules: HashMap<PhraseRuleId, Rule>,
     identities: HashMap<u64, PhraseRuleId>,
     nodes: Vec<Node>,
@@ -174,13 +260,25 @@ impl PhraseMatcher {
     pub fn new() -> Self {
         Self::default()
     }
+    /// A matcher comparing `attribute`. Lexical flag attributes also need a lexicon; see
+    /// [`PhraseMatcher::with_lexicon`].
     pub fn with_attribute(attribute: PhraseAttribute) -> Self {
         Self {
             attribute,
+            lexicon: None,
             rules: HashMap::new(),
             identities: HashMap::new(),
             nodes: vec![Node::default()],
             free: Vec::new(),
+        }
+    }
+    /// A matcher comparing `attribute` that computes lexical flags such as `IS_STOP` and
+    /// `LIKE_NUM` with the model's language rules, as spaCy matchers use their vocabulary.
+    /// Obtain the lexicon with [`crate::Model::lexicon`].
+    pub fn with_lexicon(attribute: PhraseAttribute, lexicon: Lexicon) -> Self {
+        Self {
+            lexicon: Some(lexicon),
+            ..Self::with_attribute(attribute)
         }
     }
     pub fn attribute(&self) -> PhraseAttribute {
@@ -212,9 +310,13 @@ impl PhraseMatcher {
         {
             return Err(Error::Pattern("phrase rule hash collision".into()));
         }
+        // Reject even an empty addition, so a flag rule never exists without a lexicon.
+        if self.attribute.flag().is_some() && self.lexicon.is_none() {
+            return Err(missing_lexicon());
+        }
         let patterns = documents
             .iter()
-            .map(|doc| PhrasePattern::from_doc(doc, self.attribute))
+            .map(|doc| PhrasePattern::from_doc(doc, self.attribute, self.lexicon.as_ref()))
             .collect::<Result<Vec<_>>>()?;
         self.identities.insert(key, name.clone());
         self.rules.entry(name.clone()).or_insert_with(|| Rule {
@@ -293,13 +395,14 @@ impl PhraseMatcher {
             return Ok(Vec::new());
         }
         // Dispatch once so exact matching does not branch on attributes for
-        // every trie edge. LOWER keys are computed once per input token.
-        match self.attribute {
-            PhraseAttribute::Orth | PhraseAttribute::Text => self
-                .find_keys(doc.tokens().len(), |index| {
-                    doc.token_text(TokenIndex(index))
-                }),
-            PhraseAttribute::Lower => {
+        // every trie edge. Computed keys such as LOWER are made once per input token.
+        let attribute = self.attribute;
+        match attribute.source() {
+            Source::Text => self.find_keys(doc.tokens().len(), |index| {
+                doc.token_text(TokenIndex(index))
+            }),
+            // Plain vectors keep the per-edge key lookup branch-free.
+            Source::Computed if attribute == PhraseAttribute::Lower => {
                 let lowered = (0..doc.tokens().len())
                     .map(|i| {
                         doc.token_text(TokenIndex(i))
@@ -308,7 +411,24 @@ impl PhraseMatcher {
                     .collect::<Result<Vec<_>>>()?;
                 self.find_keys(doc.tokens().len(), |index| Ok(lowered[index].as_str()))
             }
-            attribute => {
+            Source::Computed if attribute.flag().is_some() => {
+                let lexicon = self.lexicon.as_ref();
+                let keys = (0..doc.tokens().len())
+                    .map(|i| {
+                        let value =
+                            attribute.flag_value(doc.token_text(TokenIndex(i))?, lexicon)?;
+                        Ok(value.expect("flag attribute"))
+                    })
+                    .collect::<Result<Vec<&str>>>()?;
+                self.find_keys(doc.tokens().len(), |index| Ok(keys[index]))
+            }
+            Source::Computed => {
+                let keys = (0..doc.tokens().len())
+                    .map(|i| attribute.computed(doc.token_text(TokenIndex(i))?, None))
+                    .collect::<Result<Vec<_>>>()?;
+                self.find_keys(doc.tokens().len(), |index| Ok(keys[index].as_str()))
+            }
+            Source::Annotation => {
                 let tokens = doc.tokens();
                 self.find_keys(tokens.len(), |index| {
                     Ok(attribute.annotation(&tokens[index]))

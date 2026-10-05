@@ -407,9 +407,9 @@ const doc = await model.processDocument('Alice runs.');
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'subject', tokens: [1, 0] }]);
 ```
 
-## Phrase matching on text, lowercase or annotations
+## Phrase matching on text, lowercase, annotations, lexical flags or length
 
-`PhraseMatcher` accepts native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, `ORTH`/`TEXT` for exact token text, `NORM` for token norms, or `LEMMA`, `POS`, `TAG`, `DEP` or `MORPH` for linguistic annotations. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
+`PhraseMatcher` accepts native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, `ORTH`/`TEXT` for exact token text, `NORM` for token norms, `LEMMA`, `POS`, `TAG`, `DEP` or `MORPH` for linguistic annotations, a lexical flag such as `IS_ALPHA` or `LIKE_NUM`, or `LENGTH`. Lexical flags need the model as a second argument, `new PhraseMatcher('LIKE_NUM', model)`, for its language rules; adding a rule to a flag matcher without one throws `SPARS_INVALID_PATTERN`. `LENGTH` needs no model, and a model passed for any other attribute has no effect. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
 
 ```typescript
 import assert from 'node:assert/strict';
@@ -423,7 +423,7 @@ assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'hotel', start: 0, end
 assert.deepEqual(matcher.get('hotel'), [['the', 'ritz']]);
 ```
 
-Lowercase mappings are pinned to Unicode 15.0.0 and include contextual Greek sigma. This is lowercase matching, not case folding or Unicode normalization: `ß` does not become `ss`, and composed/decomposed accents remain distinct. Phrase boundaries still follow tokenization. `get(rule)` returns copies of the unique compared token values in first-registration order: lowercase text for `LOWER`, and the annotation values, such as `[['the', 'dog', 'run']]`, for `LEMMA`. Matching preserves overlaps and native result order. Attribute names must be uppercase. spaCy also accepts lowercase names, but here lowercase names such as `'lemma'` and the unsupported attributes `SHAPE`, `LENGTH`, the lexical flags, the entity attributes, `SENT_START` and `SPACY` throw `SPARS_UNSUPPORTED`. Span input, callbacks, and Python pattern JSON are unsupported; see the [phrase matcher guide](PHRASE_MATCHER.md).
+Lowercase mappings are pinned to Unicode 15.0.0 and include contextual Greek sigma. This is lowercase matching, not case folding or Unicode normalization: `ß` does not become `ss`, and composed/decomposed accents remain distinct. Phrase boundaries still follow tokenization. `get(rule)` returns copies of the unique compared token values in first-registration order: lowercase text for `LOWER`, the annotation values, such as `[['the', 'dog', 'run']]`, for `LEMMA`, `'true'` and `'false'` for flags, and decimal numbers such as `'3'` for `LENGTH`. Matching preserves overlaps and native result order. Attribute names must be uppercase. spaCy also accepts lowercase names, but here lowercase names such as `'lemma'` and the unsupported attributes `SHAPE`, the entity attributes, `SENT_START` and `SPACY` throw `SPARS_UNSUPPORTED`. Span input, callbacks, and Python pattern JSON are unsupported; see the [phrase matcher guide](PHRASE_MATCHER.md).
 
 Annotation attributes need pattern documents processed by the model rather than only tokenized:
 
@@ -442,6 +442,20 @@ assert.equal(matcher.contains('tokens-only'), false);
 ```
 
 A nonempty pattern document with no token carrying the selected annotation throws `SPARS_INVALID_PATTERN`, and the matcher is unchanged. Input documents need no annotations: a token without the annotation has the value `""` and matches only a pattern token that also lacks it. An empty morphological analysis has the value `_`. Morphology must be in spaCy's canonical order, as the model writes it; other morphology makes `MORPH` matching reject with `SPARS_UNSUPPORTED`.
+
+Lexical flags compare whether each token has a property, so a pattern matches any tokens with the same flags. This matcher finds a number-like token followed by one that is not:
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, PhraseMatcher } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const matcher = new PhraseMatcher('LIKE_NUM', model);
+matcher.add('count', [await model.processDocument('3 apples', 'Tokenizer')]);
+assert.deepEqual(matcher.get('count'), [['true', 'false']]);
+const doc = await model.processDocument('I ate 3 apples and ten pears.', 'Tokenizer');
+assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'count', start: 2, end: 4 }, { rule: 'count', start: 5, end: 7 }]);
+```
 
 ## Errors and verification
 

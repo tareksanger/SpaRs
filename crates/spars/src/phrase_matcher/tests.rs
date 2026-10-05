@@ -11,6 +11,10 @@ fn typed_options_reject_unsupported_attributes() {
         ("TAG", PhraseAttribute::Tag),
         ("DEP", PhraseAttribute::Dep),
         ("MORPH", PhraseAttribute::Morph),
+        ("IS_ALPHA", PhraseAttribute::IsAlpha),
+        ("IS_LEFT_PUNCT", PhraseAttribute::IsLeftPunct),
+        ("LIKE_EMAIL", PhraseAttribute::LikeEmail),
+        ("LENGTH", PhraseAttribute::Length),
     ] {
         let json = format!("\"{name}\"");
         assert_eq!(
@@ -23,9 +27,10 @@ fn typed_options_reject_unsupported_attributes() {
         "lemma",
         "SHAPE",
         "ENT_TYPE",
-        "IS_ALPHA",
-        "LENGTH",
         "MORPHOLOGY",
+        "ISALPHA",
+        "IS_SENT_START",
+        "SPACY",
     ] {
         assert!(serde_json::from_str::<PhraseAttribute>(&format!("\"{name}\"")).is_err());
     }
