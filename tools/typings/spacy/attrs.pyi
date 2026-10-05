@@ -4,3 +4,8 @@ SUFFIX: int
 SHAPE: int
 SPACY: int
 IS_SPACE: int
+LEMMA: int
+POS: int
+TAG: int
+DEP: int
+MORPH: int

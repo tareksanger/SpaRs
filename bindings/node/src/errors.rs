@@ -63,6 +63,18 @@ impl From<spars::Error> for BindingError {
     }
 }
 
+/// Convert a pattern registration failure. A pattern document without the annotation a
+/// matcher compares is an invalid pattern, not a processing failure.
+pub fn registration(error: spars::Error) -> BindingError {
+    match error {
+        spars::Error::MissingAnnotation(_) => BindingError {
+            code: Code::InvalidPattern,
+            message: error.to_string(),
+        },
+        error => error.into(),
+    }
+}
+
 pub fn busy() -> BindingError {
     BindingError {
         code: Code::Busy,

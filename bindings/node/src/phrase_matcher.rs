@@ -21,7 +21,8 @@ pub struct PhraseMatcher {
 
 #[napi]
 impl PhraseMatcher {
-    /// Match exact token text using ORTH (default), TEXT, or pinned Unicode LOWER.
+    /// Match exact token text using ORTH (default) or TEXT, pinned Unicode LOWER, NORM, or the
+    /// LEMMA, POS, TAG, DEP and MORPH annotations.
     #[napi(constructor, strict)]
     pub fn new(env: Env, attribute: Option<Utf16String>) -> Result<Self> {
         let attribute = attribute
@@ -33,9 +34,15 @@ impl PhraseMatcher {
             "ORTH" => spars::PhraseAttribute::Orth,
             "TEXT" => spars::PhraseAttribute::Text,
             "LOWER" => spars::PhraseAttribute::Lower,
+            "NORM" => spars::PhraseAttribute::Norm,
+            "LEMMA" => spars::PhraseAttribute::Lemma,
+            "POS" => spars::PhraseAttribute::Pos,
+            "TAG" => spars::PhraseAttribute::Tag,
+            "DEP" => spars::PhraseAttribute::Dep,
+            "MORPH" => spars::PhraseAttribute::Morph,
             _ => {
                 return Err(errors::BindingError::from(spars::Error::Unsupported(
-                    "PhraseMatcher supports only ORTH, TEXT, and LOWER".into(),
+                    "PhraseMatcher supports only ORTH, TEXT, LOWER, NORM, LEMMA, POS, TAG, DEP, and MORPH".into(),
                 ))
                 .into_napi(env))
             }
@@ -51,6 +58,12 @@ impl PhraseMatcher {
             spars::PhraseAttribute::Orth => "ORTH",
             spars::PhraseAttribute::Text => "TEXT",
             spars::PhraseAttribute::Lower => "LOWER",
+            spars::PhraseAttribute::Norm => "NORM",
+            spars::PhraseAttribute::Lemma => "LEMMA",
+            spars::PhraseAttribute::Pos => "POS",
+            spars::PhraseAttribute::Tag => "TAG",
+            spars::PhraseAttribute::Dep => "DEP",
+            spars::PhraseAttribute::Morph => "MORPH",
         }
     }
 
@@ -65,7 +78,7 @@ impl PhraseMatcher {
         Ok(self.inner.contains(&rule))
     }
 
-    /// Return owned unique nonempty token-text patterns in registration order.
+    /// Return owned unique nonempty patterns of compared token values in registration order.
     #[napi(strict)]
     pub fn get(&self, env: Env, rule: Utf16String) -> Result<Option<Vec<Vec<String>>>> {
         let rule = errors::text(&rule).map_err(|error| error.into_napi(env))?;
@@ -77,7 +90,7 @@ impl PhraseMatcher {
         }))
     }
 
-    /// Copy pattern token text into the trie. Pending searches prevent mutation.
+    /// Copy the compared pattern token values into the trie. Pending searches prevent mutation.
     #[napi(strict)]
     pub fn add(
         &mut self,
@@ -93,7 +106,7 @@ impl PhraseMatcher {
             .collect();
         matcher
             .add(rule, &docs)
-            .map_err(|error| errors::BindingError::from(error).into_napi(env))
+            .map_err(|error| errors::registration(error).into_napi(env))
     }
 
     #[napi(strict)]
