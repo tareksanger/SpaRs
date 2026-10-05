@@ -61,9 +61,8 @@ fn apply_rules(rules: &[AttributeRule], d: &mut Doc, lower: impl Fn(&str) -> Str
                             break;
                         }
                     }
-                    if !p
-                        .is_space
-                        .is_none_or(|v| v == word.chars().all(crate::tokenizer::is_space))
+                    if p.is_space
+                        .is_some_and(|v| v != word.chars().all(crate::tokenizer::is_space))
                     {
                         yes = false;
                         break;
