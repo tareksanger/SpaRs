@@ -149,7 +149,7 @@ def main(root: Path | None = None) -> None:
     # A failed generator must not leave an earlier successful report visible.
     output.unlink(missing_ok=True)
     subprocess.run([sys.executable, str(root / 'tools/phrase_lower_reference.py'), '--check'], check=True)
-    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'dependency-match-lower-v1.expected.json', 'dependency-match-flags-v1.expected.json', 'dependency-match-length-v1.expected.json', 'dependency-match-more-flags-v1.expected.json', 'dependency-match-sets-v1.expected.json', 'dependency-match-morph-normalization-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json', 'token-match-lower-v1.expected.json', 'token-match-flags-v1.expected.json', 'token-match-length-v1.expected.json', 'token-match-more-flags-v1.expected.json', 'token-match-sets-v1.expected.json', 'phrase-match-v1.expected.json', 'phrase-match-holdout-v1.expected.json', 'phrase-match-edges-v1.expected.json', 'phrase-match-annotations-v1.expected.json', 'phrase-match-lexical-v1.expected.json']
+    expected = ['development.expected.json', 'stages.expected.json', 'hash.expected.json', 'traversal-v1.expected.json', 'dependency-match-v1.expected.json', 'dependency-match-regressions-v1.expected.json', 'dependency-match-lower-v1.expected.json', 'dependency-match-flags-v1.expected.json', 'dependency-match-length-v1.expected.json', 'dependency-match-more-flags-v1.expected.json', 'dependency-match-sets-v1.expected.json', 'dependency-match-morph-normalization-v1.expected.json', 'token-match-v1.expected.json', 'token-match-exhaustive-v1.expected.json', 'token-match-branching-v1.expected.json', 'token-match-lower-v1.expected.json', 'token-match-flags-v1.expected.json', 'token-match-length-v1.expected.json', 'token-match-more-flags-v1.expected.json', 'token-match-sets-v1.expected.json', 'phrase-match-v1.expected.json', 'phrase-match-holdout-v1.expected.json', 'phrase-match-edges-v1.expected.json', 'phrase-match-annotations-v1.expected.json', 'phrase-match-lexical-v1.expected.json', 'entity-updates-v1.expected.json']
     reports: list[FixtureReport] = []
     failure: ReferenceMismatch | None = None
     with tempfile.TemporaryDirectory(prefix='spars-reference-check-') as temporary:
@@ -196,6 +196,8 @@ def main(root: Path | None = None) -> None:
         for name, arguments in [('phrase-match-v1.expected.json', []), ('phrase-match-holdout-v1.expected.json', ['--holdout']), ('phrase-match-edges-v1.expected.json', ['--edges']), ('phrase-match-annotations-v1.expected.json', ['--annotations']), ('phrase-match-lexical-v1.expected.json', ['--lexical'])]:
             subprocess.run([sys.executable, str(root / 'tools/phrase_match_reference.py'), *arguments,
                             str(work / 'fixtures' / name)], cwd=work, check=True)
+        subprocess.run([sys.executable, str(root / 'tools/entity_update_reference.py'),
+                        str(work / 'fixtures/entity-updates-v1.expected.json')], cwd=work, check=True)
         for name in expected:
             original = root / 'fixtures' / name
             generated = work / 'fixtures' / name
