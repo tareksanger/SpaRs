@@ -1,0 +1,35 @@
+// Compiled separately (tsconfig.json here) because augmentation is global to a compilation. The
+// package name resolves to the local declarations, as it does for an installed package.
+import type { DependencyLabel, Document, EntityInput, EntityLabel, FineGrainedTag, ModelName, ModelNames, Token } from '@spars/node';
+
+declare module '@spars/node' {
+  interface EntityLabels { PRODUCT_CODE: true }
+  interface FineGrainedTags { CUSTOM_TAG: true }
+  interface ModelNames { my_model: true }
+  interface StrictLabelSets { entity: true; tag: true; dependency: true }
+}
+
+type Assert<T extends true> = T;
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+
+export type Contracts = [
+  // Registered labels are accepted, and strict label sets reject unregistered ones.
+  Assert<Equal<'PRODUCT_CODE' extends EntityLabel ? true : false, true>>,
+  Assert<Equal<'PERSON' extends EntityLabel ? true : false, true>>,
+  Assert<Equal<'UNREGISTERED' extends EntityLabel ? true : false, false>>,
+  Assert<Equal<string extends NonNullable<Token['entityType']> ? true : false, false>>,
+  Assert<Equal<string extends NonNullable<Document['entities']>[number]['label'] ? true : false, false>>,
+  Assert<Equal<string extends EntityInput['label'] ? true : false, false>>,
+  Assert<Equal<'CUSTOM_TAG' extends FineGrainedTag ? true : false, true>>,
+  Assert<Equal<'OTHER_TAG' extends FineGrainedTag ? true : false, false>>,
+  Assert<Equal<'nsubj' extends DependencyLabel ? true : false, true>>,
+  Assert<Equal<'custom_dep' extends DependencyLabel ? true : false, false>>,
+  // Model names autocomplete registered names but always accept a path.
+  Assert<Equal<'my_model' extends keyof ModelNames ? true : false, true>>,
+  Assert<Equal<'./models/custom' extends ModelName ? true : false, true>>,
+];
+
+export function label(value: EntityLabel): string { return value; }
+label('PRODUCT_CODE');
+// @ts-expect-error strict entity labels reject unregistered values
+label('UNREGISTERED');

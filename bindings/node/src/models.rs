@@ -13,7 +13,11 @@ pub struct DownloadOptions {
     pub version: Option<Utf16String>,
 }
 /// Download an official model explicitly and remember its installation for loadModel(name).
-#[napi(strict)]
+#[napi(
+    strict,
+    ts_args_type = "name: OfficialModelName, options?: DownloadOptions | undefined | null",
+    ts_return_type = "Promise<string>"
+)]
 pub fn download_model(
     name: Utf16String,
     options: Option<DownloadOptions>,

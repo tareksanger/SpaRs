@@ -132,7 +132,10 @@ impl Model {
 }
 
 /// Load and validate an installed model on Node's worker pool. No network access.
-#[napi(strict)]
+#[napi(
+    strict,
+    ts_args_type = "path: ModelName, options?: LoadOptions | undefined | null"
+)]
 pub fn load_model(path: Utf16String, options: Option<models::LoadOptions>) -> AsyncTask<LoadTask> {
     AsyncTask::new(LoadTask {
         source: models::LoadSource::prepare(&path, options),

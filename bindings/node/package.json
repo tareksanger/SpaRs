@@ -11,7 +11,7 @@
   "scripts": {
     "build": "napi build --platform --release --no-const-enum -- --locked --offline",
     "postbuild": "node scripts/declarations.mts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/strict-labels",
     "test": "node --expose-gc --test tests/*.test.mts"
   },
   "napi": {

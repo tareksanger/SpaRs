@@ -10,7 +10,9 @@ use std::sync::Arc;
 #[napi(object)]
 pub struct PhraseMatch {
     pub rule: String,
+    #[napi(ts_type = "import('./units.js').TokenIndex")]
     pub start: u32,
+    #[napi(ts_type = "import('./units.js').TokenIndex")]
     pub end: u32,
 }
 
@@ -55,7 +57,10 @@ impl PhraseMatcher {
     /// Match exact token text using ORTH (default) or TEXT, pinned Unicode LOWER, NORM, the
     /// LEMMA, POS, TAG, DEP and MORPH annotations, a lexical flag such as IS_ALPHA, or LENGTH.
     /// Pass a model to enable lexical flag attributes with its language rules.
-    #[napi(constructor)]
+    #[napi(
+        constructor,
+        ts_args_type = "attribute?: PhraseAttribute | undefined | null, model?: Model | undefined | null"
+    )]
     pub fn new(
         env: Env,
         attribute: Option<Utf16String>,
@@ -84,7 +89,7 @@ impl PhraseMatcher {
         })
     }
 
-    #[napi(getter)]
+    #[napi(getter, ts_return_type = "PhraseAttribute")]
     pub fn attribute(&self) -> &'static str {
         // Exhaustive, so a new attribute must be named here; `new` accepts the same names.
         match self.inner.attribute() {

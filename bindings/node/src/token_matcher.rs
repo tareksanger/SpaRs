@@ -28,7 +28,9 @@ pub struct TokenPattern {
 #[napi(object)]
 pub struct TokenMatch {
     pub rule: String,
+    #[napi(ts_type = "import('./units.js').TokenIndex")]
     pub start: u32,
+    #[napi(ts_type = "import('./units.js').TokenIndex")]
     pub end: u32,
 }
 

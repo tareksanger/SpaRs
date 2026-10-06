@@ -90,10 +90,12 @@ impl Doc {
     /// Every check runs before anything changes. A span outside the document, a reversed span
     /// or two spans sharing a token return [`Error::Bounds`]. A current IOB tag other than `B`,
     /// `I`, `O` or missing, or an `I` left with no entity to continue, returns
-    /// [`Error::Unsupported`]; only an edited snapshot can contain either. Afterwards an inside
-    /// tag that follows a missing or outside token, or a token of another type, becomes a
-    /// beginning tag. Tokens the update does not write keep their stored values. A non-empty
-    /// document whose tokens are all missing has no entity annotation (`entities()` is `None`).
+    /// [`Error::Unsupported`]. [`Doc::from_json`] rejects unknown tags, so one can only come from
+    /// direct changes to the public token fields; a stray `I` can also come from an edited
+    /// snapshot. Afterwards an inside tag that follows a missing or outside token, or a token of
+    /// another type, becomes a beginning tag. Tokens the update does not write keep their stored
+    /// values. A non-empty document whose tokens are all missing has no entity annotation
+    /// (`entities()` is `None`).
     pub fn set_entities(&mut self, update: &EntityUpdate) -> Result<()> {
         let changes = self.entity_changes(update)?;
         self.apply_entity_changes(changes);
@@ -224,8 +226,8 @@ impl Doc {
         })
     }
 
-    /// The current tags. A missing tag is read without its type, which only an edited snapshot
-    /// can store; `set_ents` clears the type whenever it writes a missing tag.
+    /// The current tags. A missing tag is read without its type, which only an edited snapshot or
+    /// a direct field change can store; `set_ents` clears the type whenever it writes a missing tag.
     fn entity_tags(&self) -> Result<Vec<(Iob, &str)>> {
         self.tokens
             .iter()

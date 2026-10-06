@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { downloadModel } from '../index.js';
+import { downloadModel, isOfficialModelName } from '../index.js';
 
 /** @param {string[]} args @returns {Promise<void>} */
 async function main(args) {
@@ -11,6 +11,7 @@ async function main(args) {
   if (command !== 'download') throw new Error('Use `spars download MODEL [--path DIR]`.');
   const name = args.shift();
   if (!name || name.startsWith('-')) throw new Error('download requires a model name');
+  if (!isOfficialModelName(name)) throw new Error(`Unknown model ${name}; choose en_core_web_sm, en_core_web_md or en_core_web_lg`);
   /** @type {import('../index.js').DownloadOptions} */
   const options = {};
   while (args.length) {
