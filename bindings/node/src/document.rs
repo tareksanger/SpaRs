@@ -55,6 +55,7 @@ pub struct EntityInput {
     pub start: f64,
     pub end: f64,
     /// An empty label ignores the interval, as spaCy does.
+    #[napi(ts_type = "EntityLabel | ''")]
     pub label: Utf16String,
 }
 
@@ -201,8 +202,9 @@ impl NativeDocument {
 
     /// Return a new document with replaced entity annotation, like spaCy's `Doc.set_ents`.
     /// This document and its token and span views are unchanged. Invalid intervals throw
-    /// `SPARS_BOUNDS`, a label with an unpaired surrogate `SPARS_INVALID_TEXT`, tags from an edited
-    /// snapshot that spaCy could not read `SPARS_UNSUPPORTED`, and undeclared fields `InvalidArg`.
+    /// `SPARS_BOUNDS`, a label with an unpaired surrogate `SPARS_INVALID_TEXT`, an `I` tag left on the
+    /// first token (only an edited snapshot has one) `SPARS_UNSUPPORTED`, and undeclared fields
+    /// `InvalidArg`.
     #[napi(strict, ts_args_type = "update: EntityUpdate")]
     pub fn with_entities(&self, env: Env, update: Object) -> Result<NativeDocument> {
         let update = EntityUpdate::from_object(&update)?.native(env)?;

@@ -10,9 +10,9 @@ interface EntitySpan { start: number; end: number; label: string }
 interface State { error: string | null; tokens: TokenEntity[]; entities: EntitySpan[] | null }
 interface Case { id: string; words: string[]; spaces: boolean[]; initial: State; updates: EntityUpdate[]; states: State[] }
 
-function string(value: unknown): string { assert.equal(typeof value, 'string'); return value as string; }
+function string(value: unknown): string { assert.ok(typeof value === 'string'); return value; }
 function nullableString(value: unknown): string | null { return value === null ? null : string(value); }
-function integer(value: unknown): number { assert.ok(Number.isSafeInteger(value)); return value as number; }
+function integer(value: unknown): number { assert.ok(typeof value === 'number' && Number.isSafeInteger(value)); return value; }
 function span(value: unknown): EntitySpan {
   const s = record(value);
   return { start: integer(s.start), end: integer(s.end), label: string(s.label) };
@@ -44,7 +44,7 @@ function cases(): Case[] {
   const fixture = record(JSON.parse(readFileSync(`${root}fixtures/entity-updates-v1.expected.json`, 'utf8')));
   return array(fixture.cases).map(value => {
     const c = record(value);
-    return { id: string(c.id), words: array(c.words).map(string), spaces: array(c.spaces).map(s => { assert.equal(typeof s, 'boolean'); return s as boolean; }),
+    return { id: string(c.id), words: array(c.words).map(string), spaces: array(c.spaces).map(s => { assert.ok(typeof s === 'boolean'); return s; }),
       initial: state(c.initial), updates: array(c.updates).map(update), states: array(c.states).map(state) };
   });
 }
@@ -150,11 +150,13 @@ test('withEntities rejects invalid intervals, defaults and labels', async () => 
   }
 });
 
-test('withEntities rejects current tags that spaCy could not read', () => {
+test('withEntities and snapshots reject tags that spaCy could not read', () => {
   const token = (iob: string | null, start: number) => ({ start, end: start + 1, idx: start, whitespace: false, norm: 'a', tag: null, pos: null,
     morphology: null, lemma: null, head: null, dep: null, sentence_start: null, entity_iob: iob, entity_type: iob === null ? null : 'X' });
-  for (const first of ['I', 'X']) {
-    const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { text: 'aa', tokens: [token(first, 0), token(null, 1)], entities: null } }));
-    assert.throws(() => doc.withEntities({ entities: [{ start: 1, end: 2, label: 'Y' }], default: 'unmodified' }), { code: 'SPARS_UNSUPPORTED' });
-  }
+  const snapshot = (first: string): string => JSON.stringify({ format_version: 1, document: { text: 'aa', tokens: [token(first, 0), token(null, 1)], entities: null } });
+  // An I with no entity to continue is a valid tag, but spaCy could not read the entity list.
+  const doc = NativeDocument.fromSnapshot(snapshot('I'));
+  assert.throws(() => doc.withEntities({ entities: [{ start: 1, end: 2, label: 'Y' }], default: 'unmodified' }), { code: 'SPARS_UNSUPPORTED' });
+  // A tag outside B, I, O and empty is rejected when the snapshot is read.
+  assert.throws(() => NativeDocument.fromSnapshot(snapshot('X')), { code: 'SPARS_INVALID_MODEL' });
 });

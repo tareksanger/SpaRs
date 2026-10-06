@@ -94,6 +94,18 @@ fn malformed_resource_types_and_missing_configuration_are_rejected() {
             "{pointer}: {error}"
         );
     }
+    // An attribute rule may only assign a universal POS tag, as in spaCy.
+    let mut lowercase = manifest.clone();
+    let rule = lowercase["attribute_rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|rule| rule["attrs"].get("POS").is_some())
+        .unwrap();
+    rule["attrs"]["POS"] = json!("noun");
+    tmp.write(&lowercase, &weights);
+    let error = load_error(&tmp.0, "lowercase POS");
+    assert!(error.to_string().contains("universal POS"), "{error}");
     let mut missing = manifest.clone();
     missing.as_object_mut().unwrap().remove("tokenizer");
     tmp.write(&missing, &weights);
@@ -210,6 +222,50 @@ fn malformed_snapshots_reject_unicode_offsets_indices_and_spans() {
                 "accepted {field}: {invalid}"
             );
         }
+    }
+    // Closed value sets: spaCy's IOB tags and universal POS tags, and the fixed span labels.
+    let values = [
+        ("/document/tokens/0/entity_iob", json!("X")),
+        ("/document/tokens/0/entity_iob", json!("b")),
+        ("/document/tokens/0/pos", json!("noun")),
+        ("/document/tokens/0/pos", json!("FOO")),
+    ];
+    for (pointer, replacement) in values {
+        let mut invalid = valid.clone();
+        *invalid.pointer_mut(pointer).unwrap() = replacement;
+        assert!(
+            matches!(Doc::from_json(&invalid.to_string()), Err(Error::Model(_))),
+            "accepted {pointer}: {invalid}"
+        );
+    }
+    for (field, label) in [("entities", ""), ("sentences", "S"), ("noun_chunks", "")] {
+        let mut invalid = valid.clone();
+        invalid["document"][field] = json!([{"start": 0, "end": 1, "label": label}]);
+        assert!(
+            matches!(Doc::from_json(&invalid.to_string()), Err(Error::Model(_))),
+            "accepted {field} label {label:?}"
+        );
+    }
+    for (field, label) in [("entities", "X"), ("sentences", ""), ("noun_chunks", "NP")] {
+        let mut snapshot = valid.clone();
+        snapshot["document"][field] = json!([{"start": 0, "end": 1, "label": label}]);
+        assert!(
+            Doc::from_json(&snapshot.to_string()).is_ok(),
+            "rejected {field} label {label:?}"
+        );
+    }
+    for (pointer, accepted) in [
+        ("/document/tokens/0/entity_iob", json!("")),
+        ("/document/tokens/0/entity_iob", json!("I")),
+        ("/document/tokens/0/pos", json!("")),
+        ("/document/tokens/0/pos", json!("SPACE")),
+    ] {
+        let mut snapshot = valid.clone();
+        *snapshot.pointer_mut(pointer).unwrap() = accepted;
+        assert!(
+            Doc::from_json(&snapshot.to_string()).is_ok(),
+            "rejected {pointer}"
+        );
     }
     let mut unsupported = valid.clone();
     unsupported["format_version"] = json!(3);

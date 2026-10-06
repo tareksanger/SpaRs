@@ -40,7 +40,11 @@ impl ModelStore {
     }
 
     /// Resolve a registered model without downloading or reading its weights.
-    #[napi(strict, ts_return_type = "Promise<string>")]
+    #[napi(
+        strict,
+        ts_args_type = "name: ModelName",
+        ts_return_type = "Promise<string>"
+    )]
     pub fn resolve(&self, name: Utf16String) -> AsyncTask<ResolveTask> {
         AsyncTask::new(ResolveTask {
             store: self.inner.clone(),
@@ -49,7 +53,11 @@ impl ModelStore {
     }
 
     /// Select a direct child directory. This records selection; it does not validate model weights.
-    #[napi(strict, ts_return_type = "Promise<void>")]
+    #[napi(
+        strict,
+        ts_args_type = "name: ModelName, installed: string",
+        ts_return_type = "Promise<void>"
+    )]
     pub fn register(&self, name: Utf16String, installed: Utf16String) -> AsyncTask<RegisterTask> {
         AsyncTask::new(RegisterTask {
             store: self.inner.clone(),

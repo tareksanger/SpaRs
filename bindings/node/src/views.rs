@@ -41,17 +41,23 @@ pub struct TokenAnnotations {
     pub byte_end: u32,
     #[napi(ts_type = "import('./units.js').CodePointOffset")]
     pub code_point_start: u32,
+    #[napi(ts_type = "'' | ' '")]
     pub whitespace: String,
     pub norm: String,
+    #[napi(ts_type = "FineGrainedTag | ''")]
     pub tag: Option<String>,
+    #[napi(ts_type = "UniversalPos | ''")]
     pub pos: Option<String>,
     pub morphology: Option<String>,
     pub lemma: Option<String>,
     #[napi(ts_type = "import('./units.js').TokenIndex")]
     pub head: Option<u32>,
+    #[napi(ts_type = "DependencyLabel | ''")]
     pub dep: Option<String>,
     pub sentence_start: Option<bool>,
+    #[napi(ts_type = "EntityIob | ''")]
     pub entity_iob: Option<String>,
+    #[napi(ts_type = "EntityLabel | ''")]
     pub entity_type: Option<String>,
 }
 

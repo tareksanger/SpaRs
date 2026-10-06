@@ -24,7 +24,7 @@ Required top-level fields:
 - tok2vec: width, ordered attrs, hash table references and seeds, static projection, mix maxout/normalization parameters, windows, encoder layers and padding count.
 - tagger: ordered labels and affine parameter references.
 - parser/ner: ordered action names, reduction/lower/upper tensor references; NER additionally contains its independent tok2vec. Format v1 specifies greedy maxout transition inference with no unseen-class mask.
-- attribute_rules: ordered patterns/attributes/index; only the pinned model's finite TAG/DEP/LOWER/IS_SPACE predicates with equality/IN/NOT_IN/REGEX are accepted.
+- attribute_rules: ordered patterns/attributes/index; only the pinned model's finite TAG/DEP/LOWER/IS_SPACE predicates with equality/IN/NOT_IN/REGEX are accepted. An assigned `POS` must be a spaCy universal POS tag or empty, because spaCy cannot store any other value.
 - lemmas: lemma_index, lemma_exc, lemma_rules per POS.
 - vector_keys: lexical hash to row; vectors tensor provides row width/count.
 

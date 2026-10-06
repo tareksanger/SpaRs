@@ -24,5 +24,8 @@
     "units.d.ts",
     "bin/**/*.mjs",
     "execution.cjs"
+  ],
+  "exclude": [
+    "tests/strict-labels"
   ]
 }

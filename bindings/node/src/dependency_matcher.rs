@@ -15,6 +15,7 @@ use std::sync::Arc;
 pub struct DependencyLink {
     pub left: Utf16String,
     /// One of the twenty supported spaCy dependency relation symbols.
+    #[napi(ts_type = "DependencyRelation")]
     pub relation: Utf16String,
 }
 
