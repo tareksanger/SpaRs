@@ -77,6 +77,12 @@ enum Iob {
     Begin,
 }
 
+/// A checked entity update: the tokens whose stored values change, and the resulting entities.
+struct EntityChanges {
+    tokens: Vec<(usize, Option<String>, Option<String>)>,
+    entities: Option<Vec<Span>>,
+}
+
 impl Doc {
     /// Replace entity annotation like spaCy's `Doc.set_ents`, keeping the token IOB tags,
     /// token entity types and [`Doc::entities`] consistent.
@@ -89,6 +95,32 @@ impl Doc {
     /// beginning tag. Tokens the update does not write keep their stored values. A non-empty
     /// document whose tokens are all missing has no entity annotation (`entities()` is `None`).
     pub fn set_entities(&mut self, update: &EntityUpdate) -> Result<()> {
+        let changes = self.entity_changes(update)?;
+        self.apply_entity_changes(changes);
+        Ok(())
+    }
+
+    /// Return a copy with replaced entity annotation, leaving this document unchanged. The update
+    /// is checked before anything is copied, so an invalid update costs no copy. Errors and the
+    /// resulting annotation are those of [`Doc::set_entities`].
+    pub fn with_entities(&self, update: &EntityUpdate) -> Result<Doc> {
+        let changes = self.entity_changes(update)?;
+        let mut doc = self.clone();
+        doc.apply_entity_changes(changes);
+        Ok(doc)
+    }
+
+    /// Write checked changes from [`Doc::entity_changes`] computed for this document's tokens.
+    fn apply_entity_changes(&mut self, changes: EntityChanges) {
+        for (i, iob, kind) in changes.tokens {
+            self.tokens[i].entity_iob = iob;
+            self.tokens[i].entity_type = kind;
+        }
+        self.entities = changes.entities;
+    }
+
+    /// Check an update and compute the token values it changes, without changing anything.
+    fn entity_changes(&self, update: &EntityUpdate) -> Result<EntityChanges> {
         let length = self.tokens.len();
         let ranges = update
             .entities
@@ -169,7 +201,7 @@ impl Doc {
         // spaCy's has_annotation: an empty document counts as annotated.
         let annotated = length == 0 || tags.iter().any(|(iob, _)| *iob != Iob::Missing);
         // Allocate only for written tokens whose stored values change; updates usually touch few.
-        let changes: Vec<(usize, Option<String>, Option<String>)> = tags
+        let tokens: Vec<(usize, Option<String>, Option<String>)> = tags
             .iter()
             .zip(&self.tokens)
             .enumerate()
@@ -186,13 +218,10 @@ impl Doc {
                 (!unchanged).then(|| (i, iob.map(str::to_owned), kind.map(str::to_owned)))
             })
             .collect();
-        // Every check has passed; write the new annotation.
-        for (i, iob, kind) in changes {
-            self.tokens[i].entity_iob = iob;
-            self.tokens[i].entity_type = kind;
-        }
-        self.entities = annotated.then_some(spans);
-        Ok(())
+        Ok(EntityChanges {
+            tokens,
+            entities: annotated.then_some(spans),
+        })
     }
 
     /// The current tags. A missing tag is read without its type, which only an edited snapshot

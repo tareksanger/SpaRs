@@ -126,7 +126,14 @@ fn updates_match_spacy_set_ents() {
         for (step, (update, expected)) in case.updates.iter().zip(&case.states).enumerate() {
             let context = format!("{} update {step}", case.id);
             let before = document.clone();
+            // The copying form gives the same result and never changes its source.
+            let copied = before.with_entities(update);
             let result = document.set_entities(update);
+            match (&copied, &result) {
+                (Ok(copy), Ok(())) => assert_eq!(copy, &document, "{context}: with_entities"),
+                (Err(a), Err(b)) => assert_eq!(a.to_string(), b.to_string(), "{context}"),
+                _ => panic!("{context}: with_entities {copied:?}, set_entities {result:?}"),
+            }
             match &expected.error {
                 // spaCy raises IndexError for spans outside the document and ValueError for
                 // overlaps; both are invalid spans here, and neither changes the document.

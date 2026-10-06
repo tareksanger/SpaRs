@@ -119,6 +119,6 @@ impl Task for ProcessDocumentTask {
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> Result<Self::JsValue> {
-        output.map_err(|error| error.into_napi(env))
+        output.map_err(|error| error.into_napi(env))?.reported(&env)
     }
 }

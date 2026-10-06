@@ -67,9 +67,9 @@ Every check runs before anything changes, so a rejected update leaves the docume
 
 ## Ownership and views
 
-`set_entities` takes `&mut Doc`. Rust's borrow rules prevent calling it while a `TokenView`, `SpanView` or other borrow of the document is alive, so no view can observe a half-applied update. Clone the document first to keep the earlier annotation. Text, token boundaries, offsets and all other annotations are unchanged. A native snapshot taken after an update restores the same annotation.
+`set_entities` takes `&mut Doc`. Rust's borrow rules prevent calling it while a `TokenView`, `SpanView` or other borrow of the document is alive, so no view can observe a half-applied update. To keep the earlier annotation, call `doc.with_entities(&update)` instead: it checks the update, then returns an updated copy and leaves the original unchanged, so an invalid update copies nothing. Text, token boundaries, offsets and all other annotations are unchanged. A native snapshot taken after an update restores the same annotation.
 
-The [Node binding](NODE.md#edit-entity-annotation) returns a new document from `withEntities` instead, because native documents and their views are immutable and shared.
+The [Node binding](NODE.md#edit-entity-annotation) offers only the copying form, `withEntities`, because native documents and their views are immutable and shared.
 
 ## Limits
 
@@ -77,15 +77,15 @@ These differ from spaCy or are not supported:
 
 - Knowledge-base IDs (`kb_id`) and entity IDs (`ent_id`) are not stored. spaCy's `set_ents` copies them from each entity span, keeps a token's previous entity ID when the span has none, and leaves both unchanged on blocked, missing and outside tokens; SpaRs entities have only a label. Entity IDs are planned with EntityRuler support (delivery A2); knowledge-base IDs have no planned delivery.
 - spaCy's `Doc.ents` setter, which also accepts `(label, start, end)` tuples and tuples carrying knowledge-base and entity IDs, is not provided; nor is the `ents` argument of spaCy's `Doc` constructor, which takes IOB strings. Use `set_entities` with token intervals.
-- spaCy's `set_ents` edits the document in place; the Node binding returns a copy, as described above.
+- spaCy's `set_ents` edits the document in place; `Doc::with_entities` and the Node binding return a copy, as described above.
 - Span groups (`Doc.spans`), merging or splitting tokens, and other annotation edits are not supported. The [compatibility inventory](COMPATIBILITY.md) tracks them.
 
 ## Verification
 
-`fixtures/entity-updates-v1.expected.json` records spaCy 3.8.14's token tags, entity list and errors after 330 updates in 34 cases. One case applies four updates to `en_core_web_md` 3.8.0 predictions; the others use constructed documents. `crates/spars/tests/entity_updates.rs` replays every update and checks that rejected updates change nothing; its model-dependent test checks that SpaRs predicts that case's starting entities and that updating them leaves all other annotations unchanged. `bindings/node/tests/entities.test.mts` replays the same fixture through `withEntities`. `tools/test_entity_update_reference.py` regenerates the fixture with spaCy and then recomputes every recorded state from the rules above with plain Python. Run them with:
+`fixtures/entity-updates-v1.expected.json` records spaCy 3.8.14's token tags, entity list and errors after 330 updates in 34 cases. One case applies four updates to `en_core_web_md` 3.8.0 predictions; the others use constructed documents. `crates/spars/tests/entity_updates.rs` replays every update through both `set_entities` and `with_entities` and checks that rejected updates change nothing; its model-dependent test checks that SpaRs predicts that case's starting entities and that updating them leaves all other annotations unchanged. `crates/spars/tests/entity_update_allocation.rs` checks that a rejected `with_entities` update does not copy the document. `bindings/node/tests/entities.test.mts` replays the same fixture through `withEntities`. `tools/test_entity_update_reference.py` regenerates the fixture with spaCy and then recomputes every recorded state from the rules above with plain Python. Run them with:
 
 ```sh
-cargo test --release --offline -p spars-nlp --test entity_updates -- --include-ignored
+cargo test --release --offline -p spars-nlp --test entity_updates --test entity_update_allocation -- --include-ignored
 npm --prefix bindings/node test
 .venv/bin/python -m unittest discover -s tools -p test_entity_update_reference.py
 ```

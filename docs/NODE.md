@@ -266,6 +266,25 @@ assert.ok(restored.toObject().tokens.length > 0);
 
 `toSnapshot()` preserves native annotations and contextual vectors when available. `NativeDocument.fromSnapshot(json)` validates the complete snapshot, including text boundaries, annotation indices, and tensor shapes. This versioned native format is separate from spaCy JSON and DocBin. Native documents remain usable after their originating model is released. Snapshot import/export and plain-object conversion run synchronously on the JavaScript thread and allocate memory proportional to the document, including any contextual tensor; inference admission limits do not bound these operations.
 
+### Native memory and garbage collection
+
+A native document's text, tokens, spans and contextual tensor live outside the JavaScript heap. Each `NativeDocument` reports an estimate of that memory to V8, Node's JavaScript engine and garbage collector, when it is created, and withdraws it when the object is collected, so V8 can collect unused documents sooner when many large ones are created. `reportedNativeMemory()` returns the total external memory reported through Node-API to the current thread's V8 isolate (one independent JavaScript heap; each worker thread has its own), in bytes. The total also includes memory reported by other native code, so compare values taken before and after an operation rather than reading it as SpaRs' own use. On Node 24.17, the version tested, `process.memoryUsage().external` does not include it. This example builds a document from a small snapshot, so it needs only the built addon, not a model.
+
+```typescript
+import assert from 'node:assert/strict';
+import { NativeDocument, reportedNativeMemory } from './index.js';
+
+const before = reportedNativeMemory();
+const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { text: 'Hello world', tokens: [
+  { start: 0, end: 5, idx: 0, whitespace: true, norm: 'hello' },
+  { start: 6, end: 11, idx: 6, whitespace: false, norm: 'world' },
+] } }));
+assert.ok(reportedNativeMemory() > before);
+assert.equal(doc.utf16Length, 11);
+```
+
+`utf16Length` is the text length in UTF-16 code units, the same as JavaScript's `string.length`. For documents from `processDocument` and `NativeDocument.fromSnapshot`, the estimate counts allocated capacity and is a lower bound: it leaves out the allocator's per-allocation overhead and the dependency index that the first tree traversal builds and caches. A document from `withEntities` reports its source's estimate without recounting; the copy usually owns somewhat less, because copying drops unused capacity, but slightly more when the update adds entity tags to a document that had none. Token and span views share their document's memory without reporting it, so a view that outlives its document object keeps unreported memory alive until the view is collected. Node frees a document's native memory in a finalizer, a cleanup callback that runs on a later event-loop turn after garbage collection finds the object unused, so a synchronous loop that creates many documents without yielding cannot free any of them until it ends. When creating many large documents in one task, yield between documents (or every few documents), for example with `await setImmediate()` from `node:timers/promises`. `bindings/node/tests/memory.test.mts` checks that reports are made, released on collection, reused by copies and skipped for rejected updates; `npm --prefix bindings/node test` runs it.
+
 ## Lexical attributes
 
 `model.lexeme(text)` returns an owned record of the existing native lexical attributes, including normalization, shape, prefix/suffix, lexical flags, and static-vector availability. It runs synchronously and does not change the vocabulary.
@@ -343,7 +362,7 @@ assert.equal(doc.token(3).annotations().entityType, 'GPE');
 assert.throws(() => doc.withEntities({ entities: [{ start: 3, end: 9, label: 'CITY' }] }), { code: 'SPARS_BOUNDS' });
 ```
 
-The original `doc` still reports London as `GPE`. An interval outside the document, a reversed interval, a non-integer or negative index, or two intervals sharing a token (entities with an empty label are ignored) throws `SPARS_BOUNDS`. A label with an unpaired surrogate throws `SPARS_INVALID_TEXT`, and tags restored from an edited snapshot that spaCy could not read throw `SPARS_UNSUPPORTED`. An object of the wrong shape, an unknown `default`, or an undeclared property such as a misspelled `ents` or an unsupported `kbId` throws a native argument error (`InvalidArg`, `NumberExpected` or `StringExpected`), so a typo cannot silently become the default update. The update runs synchronously on the JavaScript thread, outside inference admission and input limits, and copies the whole document, including any contextual tensor. Token states, the repair of inside tags and the differences from spaCy are described in the [entity editing guide](ENTITIES.md).
+The original `doc` still reports London as `GPE`. An interval outside the document, a reversed interval, a non-integer or negative index, or two intervals sharing a token (entities with an empty label are ignored) throws `SPARS_BOUNDS`. A label with an unpaired surrogate throws `SPARS_INVALID_TEXT`, and tags restored from an edited snapshot that spaCy could not read throw `SPARS_UNSUPPORTED`. An object of the wrong shape, an unknown `default`, or an undeclared property such as a misspelled `ents` or an unsupported `kbId` throws a native argument error (`InvalidArg`, `NumberExpected` or `StringExpected`), so a typo cannot silently become the default update. The update runs synchronously on the JavaScript thread, outside inference admission and input limits. It is checked before anything is copied, so an invalid update throws without copying; a valid one copies the whole document, including any contextual tensor. Token states, the repair of inside tags and the differences from spaCy are described in the [entity editing guide](ENTITIES.md).
 
 ## Vectors and similarity
 

@@ -139,6 +139,16 @@ pub fn load_model(path: Utf16String, options: Option<models::LoadOptions>) -> As
     })
 }
 
+/// Bytes of external memory reported through Node-API to this JavaScript thread's V8 isolate,
+/// including the documents SpaRs holds. V8 counts it when deciding to collect garbage; on Node 24
+/// `process.memoryUsage().external` does not include it.
+#[napi]
+pub fn reported_native_memory(env: Env) -> Result<f64> {
+    // Adjusting by zero reads the running total without changing it. This relies on V8's
+    // AdjustAmountOfExternalAllocatedMemory returning that total; tests/memory.test.mts checks it.
+    Ok(env.adjust_external_memory(0)? as f64)
+}
+
 fn setting(value: f64, minimum: u32, name: &str) -> Result<u32> {
     if !value.is_finite()
         || value.fract() != 0.0
