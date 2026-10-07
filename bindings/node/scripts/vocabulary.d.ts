@@ -115,7 +115,7 @@ export type TokenRepetition =
   | { kind: 'once' | 'optional' | 'zero_or_more' | 'one_or_more' | 'negated' }
   | { kind: 'range'; min: number; max?: number }
 
-/** spaCy's twenty DependencyMatcher relation operators. */
+/** A spaCy `DependencyMatcher` relation operator, read as "left OPERATOR right"; see `DependencyLink.relation`. */
 export type DependencyRelation = '<' | '>' | '<<' | '>>' | '.' | '.*' | ';' | ';*' | '$+' | '$-' | '$++' | '$--'
   | '>+' | '>-' | '>++' | '>--' | '<+' | '<-' | '<++' | '<--'
 

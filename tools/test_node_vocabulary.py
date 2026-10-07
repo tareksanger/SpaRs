@@ -83,6 +83,9 @@ class NodeVocabularyTests(unittest.TestCase):
         self.assertEqual(sorted(declared), sorted(attributes))
         relations = rust_strings('bindings/node/src/dependency_matcher.rs', r'\n\s*"([^"]+)" => [A-Z]\w+,')
         self.assertEqual(sorted(union('DependencyRelation')), sorted(relations))
+        # The core enum's serde names are the relations native patterns accept.
+        native_relations = rust_strings('crates/spars/src/dependency_matcher/relations.rs', r'#\[serde\(rename = "([^"]+)"\)\]')
+        self.assertEqual(sorted(union('DependencyRelation')), sorted(native_relations))
         operators = rust_strings('bindings/node/src/matcher_types.rs', r'\n\s*"([^"]+)" => spars::Comparison::')
         self.assertEqual(sorted(union('Comparison')), sorted(operators))
         repetitions = rust_strings('bindings/node/src/token_matcher.rs', r'"([a-z_]+)" => spars::Repetition::')
