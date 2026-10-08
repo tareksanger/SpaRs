@@ -505,7 +505,7 @@ def build() -> Fixture:
             cases.append(random_case(nlp, rng, len(cases)))
         except AmbiguousTie:
             # spaCy orders identical spans from different rules by Python set iteration, which SpaRs
-            # does not reproduce; see docs/ENTITY_RULER.md. Such cases are drawn again.
+            # does not reproduce; see docs/SPACY_DIFFERENCES.md. Such cases are drawn again.
             continue
     return Fixture(1, versions, sources, cases)
 

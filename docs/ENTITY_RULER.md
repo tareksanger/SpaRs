@@ -90,10 +90,12 @@ Like spaCy, the ruler stores a pattern with an ID under the rule name `label + i
 
 ## Differences from spaCy
 
-- **Ties between identical spans.** When patterns with different labels or IDs match exactly the same tokens, spaCy keeps the one that comes first in Python's set iteration order, which depends on string hashes rather than on the patterns. SpaRs keeps the rule added earliest; a rule removed and added again counts from its new addition. The reference suite leaves out such ties.
-- **Removing a rule with both kinds of pattern.** In spaCy 3.8.14, `remove` on an ID whose label has both token patterns and phrases stops listing both but removes only the phrases from matching, so the token patterns keep producing entities, and a second `remove` of that ID then removes them. SpaRs removes both at once, so the second `remove` fails.
-- **Failed changes.** When `remove` fails because an old rule name has no patterns, spaCy has already removed the ID's other rules from its pattern listing, and possibly from matching. SpaRs changes nothing. Similarly, spaCy's `add_patterns` can add some patterns before rejecting a later one, while SpaRs adds nothing.
-- **Empty separator.** spaCy accepts an empty `ent_id_sep` until labels, IDs or the pattern list are read, which then fails. SpaRs rejects it when the ruler is created.
+These differences are SpaRs's intended behavior; [accepted differences from spaCy](SPACY_DIFFERENCES.md#entityruler) gives spaCy's behavior, the reason and the tests for each.
+
+- **Ties between identical spans.** When patterns with different labels or IDs match exactly the same tokens, SpaRs keeps the rule that received its first pattern earliest; a rule removed and added again counts from its new addition. spaCy's choice depends on hashes of the rule names.
+- **Removing a rule with both kinds of pattern.** `remove` removes an ID's token patterns and phrases at once, so a second `remove` of that ID fails. spaCy 3.8.14 removes only the phrases from matching, so the token patterns keep producing entities until a second `remove`.
+- **Failed changes.** A failed `add` or `remove` changes nothing, where spaCy can be left partly changed.
+- **Empty separator.** An empty ID separator is rejected when the ruler is created, where spaCy fails later when labels, IDs or patterns are read once it has patterns.
 - **Not provided.** The `__contains__` check, the `validate` setting (SpaRs always checks patterns), fuzzy matching (`matcher_fuzzy_compare`), `initialize`, scoring, loading or saving patterns (JSONL, `to_disk`, `to_bytes`), spaCy's pattern-dictionary format, knowledge-base IDs, the warning for a ruler without patterns, and running the ruler as a pipeline component or before the recognizer. Callers apply the ruler to processed documents.
 
 ## Reuse and errors

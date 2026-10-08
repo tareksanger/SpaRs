@@ -152,6 +152,17 @@ fn phrase_attributes_validate_pattern_documents() {
     let unannotated = doc("a");
     assert!(ruler.add(&[phrase("X", None, &unannotated)]).is_err());
     assert!(ruler.is_empty());
+    // A rejected phrase also discards the valid patterns before it.
+    let rejected = [
+        tokens("NEW", Some("n"), word("a")),
+        phrase("X", None, &unannotated),
+    ];
+    assert!(matches!(
+        ruler.add(&rejected),
+        Err(Error::MissingAnnotation(_))
+    ));
+    assert!(ruler.is_empty());
+    assert_eq!(ruler.find_matches(&doc("a")).unwrap(), []);
     let mut flags = EntityRuler::new(EntityRulerOptions {
         phrase_attribute: PhraseAttribute::IsAlpha,
         ..EntityRulerOptions::default()
