@@ -62,6 +62,37 @@ This prints `[ 'London' ]`. `GPE` labels a country, city, or similar political a
 
 Use `utf16Start` and `utf16End` with JavaScript's `slice`. `byteStart` and `byteEnd` count UTF-8 bytes; `codePointStart` and `codePointEnd` count Unicode code points. TypeScript treats these as distinct types to prevent accidental interchange. Offsets and token indices are checked unsigned 32-bit values. Text containing an unpaired UTF-16 surrogate is rejected because it cannot be preserved as valid Rust text.
 
+## Types and autocomplete
+
+The TypeScript declarations type every fixed vocabulary as a set of literal values, so editors offer them as completions and the compiler rejects typos. These include part-of-speech tags (`UniversalPos`), entity IOB tags (`EntityIob`: `B` begins an entity, `I` continues it, `O` is outside any entity), `PhraseMatcher` attributes (`PhraseAttribute`), token-condition attributes, predicate kinds and comparison operators (`TokenConstraint`), repetition kinds (`TokenRepetition`), DependencyMatcher relation operators such as `>` and `<<` (`DependencyRelation`), official model names (`OfficialModelName`) and error codes (`SparsErrorCode`). `TokenConstraint` also ties each attribute to the predicates it accepts: a lexical flag takes only `{ kind: 'flag', value }`, and `length` takes only numeric predicates. Token fields that are unavailable are `null`, while an empty string `''` is spaCy's unset or empty value; for example, tokens outside any entity have `entityType: ''`. Entity spans are `Span<EntityLabel>`, sentences `Span<''>` and noun chunks `Span<'NP'>`.
+
+Entity labels (`EntityLabel`), fine-grained tags (`FineGrainedTag`), dependency labels (`DependencyLabel`) and model names (`ModelName`) are open sets: they offer the labels of the supported official models for autocomplete, but also accept any other string, because custom models and edited documents can use other labels. Register your own labels by extending the matching interface (`EntityLabels`, `FineGrainedTags`, `DependencyLabels` or `ModelNames`); TypeScript's declaration merging adds the members of a redeclared interface to the original. In your own project, write the declaration in a file that your `tsconfig` includes and that has at least one `import` or `export`, and name the package: `declare module '@spars/node' { interface EntityLabels { PRODUCT_CODE: true } }`. Without an `import` or `export`, TypeScript treats the block as a replacement for the package's types rather than an extension. To accept only registered values in a set, declare `interface StrictLabelSets { entity: true }` the same way, using `entity`, `tag` or `dependency`; strict `tag` and `dependency` also narrow the values allowed in token conditions. Model names always accept any string, because `loadModel` also takes directory paths. Strict mode changes only compile-time types: `entityType`, span labels, `tag` and `dep` still hold whatever the loaded model or snapshot contains, so enable it only when your registered labels cover every model you load.
+
+```typescript
+import assert from 'node:assert/strict';
+import { isSparsError, NativeDocument, PhraseMatcher } from './index.js';
+import type { EntityLabel, TokenConstraint } from './index.js';
+
+declare module './index.js' {
+  interface EntityLabels { PRODUCT_CODE: true }
+}
+
+const label: EntityLabel = 'PRODUCT_CODE';
+const number: TokenConstraint = { attribute: 'like_num', predicate: { kind: 'flag', value: true } };
+assert.equal(new PhraseMatcher('LOWER').attribute, 'LOWER');
+// @ts-expect-error 'LOWERR' is not a PhraseMatcher attribute
+assert.throws(() => new PhraseMatcher('LOWERR'));
+try {
+  NativeDocument.fromSnapshot('{}');
+  assert.fail('expected an error');
+} catch (error) {
+  assert.ok(isSparsError(error));
+  console.log(label, number.attribute, error.code);
+}
+```
+
+This prints `PRODUCT_CODE like_num SPARS_INVALID_MODEL`. `isSparsError(error)` narrows a caught value to `SparsError`, whose `code` is a `SparsErrorCode`, and `isOfficialModelName(name)` narrows a string to `OfficialModelName` before calling `downloadModel`. A POS condition such as `{ attribute: 'pos', predicate: { kind: 'equals', value: 'noun' } }` is a compile error: spaCy and SpaRs accept it at runtime, but POS values are compared exactly and every POS tag is uppercase (`NOUN`), so `'noun'` never equals a token's POS. In `in` it matches nothing, and in `not_in` it excludes nothing. These types add no runtime checks: JavaScript callers, and values cast past the types, still receive the same native errors. A matcher stores what it was given, so `get()` returns such a value unchanged even though its declared return type excludes it.
+
 ## Batches, stages, and vectors
 
 This example can also be saved beside `index.js` and run from the repository root:
@@ -139,6 +170,17 @@ assert.equal(completed, texts.length);
 Valid `process`, `processBatch`, loading, vector lookup, result shapes, and within-batch ordering retain their APIs. Small sequential documents need no call-site rewrite. Batch chunking changes scheduling and result-conversion timing, not the ordered result contract: `processBatch` still collects all results and rejects the whole call on failure. `pipe` is optional; choosing it introduces incremental delivery, so earlier buffers may already have been consumed when a later error occurs.
 
 The former 32,768-unit text, 128-document batch, and 65,536-unit aggregate caps existed in later unreleased source builds, not npm 0.2.0. Users of those builds who relied on the caps should enable `configureInputLimits` as shown below. Existing explicit input policies retain their UTF-16 units and values; a policy allowing text over 1,000,000 code points now also needs an appropriate per-model `maxLength`.
+
+## Upgrade TypeScript code to the literal types
+
+The declarations now use literal types for fixed vocabularies, as described in [types and autocomplete](#types-and-autocomplete). JavaScript behavior is unchanged except for snapshot validation, but TypeScript code that passed plain strings can stop compiling:
+
+| Affected usage | Change and observable impact | Migration |
+| --- | --- | --- |
+| Passing a `string` variable to `downloadModel`, `new PhraseMatcher(...)`, a token condition's `attribute`, `kind` or `operator`, a repetition `kind` or a dependency `relation` | These parameters take literal types, so a value typed as `string` is a compile error. | Narrow external input first: use `isOfficialModelName` for model names, or check the value against your own list of the literal values. |
+| Code importing the generated `TokenPredicate` interface or building conditions as `{ attribute: string; predicate: TokenPredicate }` | `TokenPredicate` is removed; `TokenConstraint` is a union whose predicate shape depends on the attribute. | Write conditions as `TokenConstraint` values, or use `Extract<TokenConstraint, { attribute: 'length' }>['predicate']` for one attribute's predicates. |
+| Fields typed as `string` in your own code, such as `token.pos` or `span.label` | Output fields have literal or open label types. Assigning them to `string` still works, but comparing a closed field with an impossible value, such as `token.pos === 'noun'`, is a compile error. | Compare with the declared values; register custom labels as described above. |
+| Hand-edited or third-party snapshots with an IOB tag outside `B`, `I`, `O` and empty, a POS tag outside the universal tags, an unlabeled entity, a labeled sentence, or a noun chunk not labeled `NP` | `NativeDocument.fromSnapshot` and Rust `Doc::from_json` now reject them with `SPARS_INVALID_MODEL` (`Error::Model` in Rust). Snapshots written by SpaRs are unaffected. | Correct the values, or regenerate the snapshot by processing the text again. |
 
 ## Server resource limits
 
@@ -264,7 +306,26 @@ output.tokens.length = 0;
 assert.ok(restored.toObject().tokens.length > 0);
 ```
 
-`toSnapshot()` preserves native annotations and contextual vectors when available. `NativeDocument.fromSnapshot(json)` validates the complete snapshot, including text boundaries, annotation indices, and tensor shapes. This versioned native format is separate from spaCy JSON and DocBin. Native documents remain usable after their originating model is released. Snapshot import/export and plain-object conversion run synchronously on the JavaScript thread and allocate memory proportional to the document, including any contextual tensor; inference admission limits do not bound these operations.
+`toSnapshot()` preserves native annotations and contextual vectors when available. `NativeDocument.fromSnapshot(json)` validates the complete snapshot, including text boundaries, annotation indices, tensor shapes and closed values: entity IOB tags must be `B`, `I`, `O` or empty, POS tags must be spaCy universal POS tags or empty, entities need a label, sentences have none and noun chunks are `NP`. Malformed JSON, a missing field, an invalid tensor or a value outside these closed sets throws `SPARS_INVALID_MODEL`; offsets, token indices or spans that do not fit the text throw `SPARS_BOUNDS`; an unknown format version throws `SPARS_UNSUPPORTED`; and input with an unpaired UTF-16 surrogate throws `SPARS_INVALID_TEXT`. Import does not check that entity spans agree with the tokens' IOB tags and entity types. This versioned native format is separate from spaCy JSON and DocBin. Native documents remain usable after their originating model is released. Snapshot import/export and plain-object conversion run synchronously on the JavaScript thread and allocate memory proportional to the document, including any contextual tensor; inference admission limits do not bound these operations.
+
+### Native memory and garbage collection
+
+A native document's text, tokens, spans and contextual tensor live outside the JavaScript heap. Each `NativeDocument` reports an estimate of that memory to V8, Node's JavaScript engine and garbage collector, when it is created, and withdraws it when the object is collected, so V8 can collect unused documents sooner when many large ones are created. `reportedNativeMemory()` returns the total external memory reported through Node-API to the current thread's V8 isolate (one independent JavaScript heap; each worker thread has its own), in bytes. The total also includes memory reported by other native code, so compare values taken before and after an operation rather than reading it as SpaRs' own use. On Node 24.17, the version tested, `process.memoryUsage().external` does not include it. This example builds a document from a small snapshot, so it needs only the built addon, not a model.
+
+```typescript
+import assert from 'node:assert/strict';
+import { NativeDocument, reportedNativeMemory } from './index.js';
+
+const before = reportedNativeMemory();
+const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { text: 'Hello world', tokens: [
+  { start: 0, end: 5, idx: 0, whitespace: true, norm: 'hello' },
+  { start: 6, end: 11, idx: 6, whitespace: false, norm: 'world' },
+] } }));
+assert.ok(reportedNativeMemory() > before);
+assert.equal(doc.utf16Length, 11);
+```
+
+`utf16Length` is the text length in UTF-16 code units, the same as JavaScript's `string.length`. For documents from `processDocument` and `NativeDocument.fromSnapshot`, the estimate counts allocated capacity and is a lower bound: it leaves out the allocator's per-allocation overhead and the dependency index that the first tree traversal builds and caches. A document from `withEntities` reports its source's estimate without recounting; the copy usually owns somewhat less, because copying drops unused capacity, but slightly more when the update adds entity tags to a document that had none. Token and span views share their document's memory without reporting it, so a view that outlives its document object keeps unreported memory alive until the view is collected. Node frees a document's native memory in a finalizer, a cleanup callback that runs on a later event-loop turn after garbage collection finds the object unused, so a synchronous loop that creates many documents without yielding cannot free any of them until it ends. When creating many large documents in one task, yield between documents (or every few documents), for example with `await setImmediate()` from `node:timers/promises`. `bindings/node/tests/memory.test.mts` checks that reports are made, released on collection, reused by copies and skipped for rejected updates; `npm --prefix bindings/node test` runs it.
 
 ## Lexical attributes
 
@@ -327,6 +388,24 @@ assert.equal(doc.sentenceViews()?.length, 1);
 
 `token.annotations()` returns a copied record of the native annotations and byte/code-point start offsets. `token.children()`, `ancestors()`, `subtree()`, `head()`, `span()`, and `sentence()` provide graph and sentence access. Use `doc.toObject()` for the full JavaScript output with UTF-16 offsets. Views are immutable; retaining even one view retains its full document and contextual tensor. Traversal and view creation run synchronously and allocate in proportion to the returned results.
 
+## Edit entity annotation
+
+`doc.withEntities(update)` replaces entity annotation like spaCy's `Doc.set_ents` and returns a new native document. The original document and every token and span view of it keep their earlier annotation, so code holding them is unaffected. Intervals use token indices with an exclusive end. `entities` lists labeled intervals; `outside`, `blocked` and `missing` list unlabeled intervals for tokens outside any entity, tokens that can never be part of one, and tokens whose annotation is unknown. `default` sets every other token: `'outside'` (the default), `'missing'`, `'blocked'` or `'unmodified'`.
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from './index.js';
+
+const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+const doc = await model.processDocument('Tim Cook visited London.');
+const edited = doc.withEntities({ entities: [{ start: 3, end: 4, label: 'CITY' }], default: 'unmodified' });
+assert.deepEqual(edited.toObject().entities?.map(entity => entity.label), ['PERSON', 'CITY']);
+assert.equal(doc.token(3).annotations().entityType, 'GPE');
+assert.throws(() => doc.withEntities({ entities: [{ start: 3, end: 9, label: 'CITY' }] }), { code: 'SPARS_BOUNDS' });
+```
+
+The original `doc` still reports London as `GPE`. An interval outside the document, a reversed interval, a non-integer or negative index, or two intervals sharing a token (entities with an empty label are ignored) throws `SPARS_BOUNDS`. A label with an unpaired surrogate throws `SPARS_INVALID_TEXT`, and an `I` tag on the first token that the update leaves in place, which only an edited snapshot can contain, throws `SPARS_UNSUPPORTED`. An object of the wrong shape, an unknown `default`, or an undeclared property such as a misspelled `ents` or an unsupported `kbId` throws a native argument error (`InvalidArg`, `NumberExpected` or `StringExpected`), so a typo cannot silently become the default update. The update runs synchronously on the JavaScript thread, outside inference admission and input limits. It is checked before anything is copied, so an invalid update throws without copying; a valid one copies the whole document, including any contextual tensor. Token states, the repair of inside tags and the differences from spaCy are described in the [entity editing guide](ENTITIES.md).
+
 ## Vectors and similarity
 
 ```typescript
@@ -371,11 +450,11 @@ Lexical flag conditions use the model's language rules, so create the matcher wi
 ```typescript
 import assert from 'node:assert/strict';
 import { loadModel, TokenMatcher } from './index.js';
-import type { TokenPatternItem } from './index.js';
+import type { FlagAttribute, TokenPatternItem } from './index.js';
 
 const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 const matcher = new TokenMatcher(model);
-const flag = (attribute: string): TokenPatternItem => ({
+const flag = (attribute: FlagAttribute): TokenPatternItem => ({
   constraints: [{ attribute, predicate: { kind: 'flag', value: true } }],
   repetition: { kind: 'once' },
 });

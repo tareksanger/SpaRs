@@ -1,33 +1,41 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DependencyMatcher, loadModel, NativeDocument } from '../index.js';
-import type { DependencyPattern, DependencyNode, Model, TokenConstraint, TokenPredicate } from '../index.js';
+import type { DependencyPattern, DependencyNode } from '../index.js';
 import { array, modelPath, readJson, record, root } from './fixtures.mts';
+import { recordedConstraint, relation } from './vocabulary.mts';
+import type { Recorded } from './vocabulary.mts';
 
 function string(value: unknown): string { assert.ok(typeof value === 'string'); return value; }
-function constraint(value: unknown): TokenConstraint {
-  const c = record(value);
-  const p = record(c.predicate);
-  const predicate: TokenPredicate = { kind: string(p.kind) };
-  if (p.operator !== undefined && p.operator !== null) predicate.operator = string(p.operator);
-  if (typeof p.value === 'boolean' || typeof p.value === 'number') predicate.value = p.value;
-  else if (p.value !== undefined && p.value !== null) predicate.value = string(p.value);
-  if (p.values !== undefined && p.values !== null) {
-    const values = array(p.values);
-    predicate.values = values.length > 0 && values.every(item => typeof item === 'number') ? values.map(item => { assert.ok(Number.isSafeInteger(item)); return Number(item); }) : values.map(string);
-  }
-  return { attribute: string(c.attribute), predicate };
-}
-function pattern(value: unknown): DependencyPattern {
-  return { nodes: array(record(value).nodes).map(value => {
+function pattern(value: unknown): Recorded<DependencyPattern> {
+  const nodes = array(record(value).nodes).map(value => {
     const n = record(value);
-    const node: DependencyNode = { id: string(n.id), constraints: array(n.constraints).map(constraint) };
-    if (n.link !== null && n.link !== undefined) {
-      const link = record(n.link);
-      node.link = { left: string(link.left), relation: string(link.relation) };
+    const link = n.link === null || n.link === undefined ? undefined : record(n.link);
+    return {
+      id: string(n.id),
+      constraints: array(n.constraints).map(recordedConstraint),
+      ...(link === undefined ? {} : { link: { left: string(link.left), relation: relation(link.relation) } }),
+    };
+  });
+  const typed: DependencyNode[] = [];
+  for (const node of nodes) {
+    const constraints = node.constraints.flatMap(c => c.typed ? [c.constraint] : []);
+    if (constraints.length !== node.constraints.length) {
+      return { typed: false, pattern: { nodes: nodes.map(n => ({ ...n, constraints: n.constraints.map(c => c.constraint) })) } };
     }
-    return node;
-  }) };
+    typed.push({ ...node, constraints });
+  }
+  return { typed: true, pattern: { nodes: typed } };
+}
+/** Add recorded patterns, using an untyped call only for values the declarations deliberately exclude. */
+function addRecorded(matcher: DependencyMatcher, rule: string, patterns: Recorded<DependencyPattern>[]): number {
+  const typed = patterns.flatMap(p => p.typed ? [p.pattern] : []);
+  if (typed.length === patterns.length) {
+    matcher.add(rule, typed);
+    return 0;
+  }
+  Reflect.apply(matcher.add, matcher, [rule, patterns.map(p => p.pattern)]);
+  return 1;
 }
 function document(value: unknown): NativeDocument {
   const c = record(value);
@@ -53,6 +61,7 @@ test('all dependency relations, predicates and ordering match frozen official su
   let lengthMatches = 0;
   let setRules = 0;
   let setMatches = 0;
+  let setUntyped = 0;
   let normalizationRules = 0;
   let normalizationMatches = 0;
   for (const [suite, count] of [['dependency-match-v1', 6], ['dependency-match-regressions-v1', 2], ['dependency-match-lower-v1', 4], ['dependency-match-length-v1', 3], ['dependency-match-sets-v1', 3], ['dependency-match-morph-normalization-v1', 1]] as const) {
@@ -64,7 +73,7 @@ test('all dependency relations, predicates and ordering match frozen official su
       const c = record(value);
       const matcher = new DependencyMatcher();
       const rules = array(c.rules);
-      const registered = new Map<string, DependencyPattern[]>();
+      const registered = new Map<string, unknown[]>();
       if (suite === 'dependency-match-v1') assert.equal(rules.length, 52);
       if (suite === 'dependency-match-lower-v1') {
         lowerRules += rules.length;
@@ -85,14 +94,18 @@ test('all dependency relations, predicates and ordering match frozen official su
       for (const value of rules) {
         const rule = record(value);
         const patterns = array(rule.patterns).map(pattern);
-        for (const p of patterns) for (const node of p.nodes) if (node.link) relations.add(node.link.relation);
+        for (const raw of array(rule.patterns)) {
+          for (const node of array(record(raw).nodes).map(record)) if (node.link !== null && node.link !== undefined) relations.add(relation(record(node.link).relation));
+        }
         const name = string(rule.name);
-        matcher.add(name, patterns);
-        const expectedPatterns = [...(registered.get(name) ?? []), ...patterns];
+        const untyped = addRecorded(matcher, name, patterns);
+        if (suite === 'dependency-match-sets-v1') setUntyped += untyped;
+        else assert.equal(untyped, 0);
+        const expectedPatterns = [...(registered.get(name) ?? []), ...patterns.map(p => p.pattern)];
         registered.set(name, expectedPatterns);
         const actualPatterns = matcher.get(name);
         assert.ok(actualPatterns);
-        assert.deepEqual(actualPatterns.map(pattern), expectedPatterns);
+        assert.deepEqual(actualPatterns.map(p => pattern(p).pattern), expectedPatterns);
       }
       if (suite === 'dependency-match-v1') assert.equal(matcher.size, 51);
       const doc = document(c);
@@ -109,6 +122,8 @@ test('all dependency relations, predicates and ordering match frozen official su
   assert.equal(lengthMatches, 321);
   assert.equal(setRules, 546);
   assert.equal(setMatches, 587);
+  // Rules with POS values outside the universal tags; see vocabulary.mts.
+  assert.equal(setUntyped, 9);
   assert.equal(normalizationRules, 66);
   assert.equal(normalizationMatches, 80);
 });
@@ -127,7 +142,7 @@ test('lexical flags match the frozen official suite with a model lexicon', async
     const matcher = new DependencyMatcher(model);
     for (const raw of array(c.rules)) {
       const rule = record(raw);
-      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      assert.equal(addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern)), 0);
       rules++;
     }
     matches += array(c.expected).length;
@@ -143,7 +158,7 @@ test('lexical flags match the frozen official suite with a model lexicon', async
   const withModel = new DependencyMatcher(model);
   withModel.add('number', [flag]);
   assert.deepStrictEqual(withModel.get('number'), [flag]);
-  assert.throws(() => new DependencyMatcher({} as unknown as Model));
+  assert.throws(() => Reflect.construct(DependencyMatcher, [{}]));
 });
 
 test('remaining lexical flags match the frozen official suite', async () => {
@@ -158,7 +173,7 @@ test('remaining lexical flags match the frozen official suite', async () => {
     const matcher = new DependencyMatcher(model);
     for (const raw of array(c.rules)) {
       const rule = record(raw);
-      matcher.add(string(rule.name), array(rule.patterns).map(pattern));
+      assert.equal(addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern)), 0);
       rules++;
     }
     matches += array(c.expected).length;
@@ -195,7 +210,8 @@ test('rule lifecycle appends patterns and isolates returned objects', async () =
 test('invalid patterns and predicates fail atomically', () => {
   const matcher = new DependencyMatcher();
   matcher.add('good', [singleton]);
-  const invalid: DependencyPattern[] = [
+  // Deliberately malformed, so untyped; each is passed through Reflect.apply.
+  const invalid: unknown[] = [
     { nodes: [] },
     { nodes: [{ id: 'a', constraints: [], link: { left: 'a', relation: '>' } }] },
     { nodes: [{ id: 'a', constraints: [] }, { id: 'b', constraints: [] }] },
@@ -210,9 +226,9 @@ test('invalid patterns and predicates fail atomically', () => {
     { nodes: [{ id: 'a', constraints: [{ attribute: 'text', predicate: { kind: 'equals', value: 'a', values: ['a'] } }] }] },
   ];
   for (const p of invalid) {
-    assert.throws(() => matcher.add('bad', [singleton, p]));
+    assert.throws(() => Reflect.apply(matcher.add, matcher, ['bad', [singleton, p]]));
     assert.equal(matcher.contains('bad'), false);
-    assert.throws(() => matcher.add('good', [singleton, p]));
+    assert.throws(() => Reflect.apply(matcher.add, matcher, ['good', [singleton, p]]));
     assert.equal(matcher.get('good')?.length, 1);
   }
   assert.throws(() => matcher.add('\ud800', [singleton]), { code: 'SPARS_INVALID_TEXT' });

@@ -56,7 +56,7 @@ See [performance measurements](PERFORMANCE.md) for commands to measure loading t
 
 Dependency traversal, sentence access, the [typed DependencyMatcher](DEPENDENCY_MATCHER.md), and the [Token Matcher](TOKEN_MATCHER.md) are implemented. Token Matcher supports shared text, annotation, lexical flag and length conditions with repetition and overlapping results. DependencyMatcher verification covers all 20 relationships and its declared token-condition subset, including ordered results and supplementary morphology regressions. Wider matcher compatibility remains partial. The next capabilities, in priority order, are:
 
-1. Add checked annotation updates, EntityRuler, and SpanRuler (deliveries A1–A3).
+1. Add EntityRuler and SpanRuler (deliveries A2 and A3), building on the implemented entity annotation updates (A1).
 2. Add the remaining matcher selection options, regex and fuzzy predicates (deliveries M4 and M5).
 3. Add dependency-checked component selection, then measured neural batching.
 4. Add independent sentence segmentation: Sentencizer, then trainable senter.
@@ -68,7 +68,7 @@ The separate [Node binding](NODE.md) exposes loading, processing, batches, order
 
 ## Implementation sequence
 
-Deliveries M1, M2 and M3 are implemented; M4, M5 and the later milestones are planned, not implemented or verified. Rulers depend only on the verified token and phrase pattern subset, so A1–A3 follow M3 and precede M4 and M5, which add selection options and predicate kinds that rulers do not require. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
+Deliveries M1, M2, M3 and A1 are implemented; A2, A3, M4, M5 and the later milestones are planned, not implemented or verified. Rulers depend only on the verified token and phrase pattern subset, so A1–A3 follow M3 and precede M4 and M5, which add selection options and predicate kinds that rulers do not require. Complete each as a bounded change; do not combine a new annotation contract, a neural algorithm change, and model conversion into one acceptance result. Preserve the existing English sm/md/lg fixtures, exact discrete outputs, numerical tolerances, offline inference, and immutable reusable models throughout.
 
 ### 1. Shared matcher conditions and options
 
@@ -84,7 +84,7 @@ The three native matchers and their reference suites are described in the [match
 
 Share attribute extraction and predicate logic where semantics agree, while retaining each matcher's validation rules. Use concrete types for text, flags, numbers and morphology rather than converting every value to a string. Every added condition needs official positive, negative, missing-annotation, malformed-input and Unicode cases in each affected matcher, and existing matcher outputs must remain unchanged.
 
-Primary Rust paths are `crates/spars/src/dependency_matcher/predicates.rs`, `crates/spars/src/token_matcher/`, `crates/spars/src/phrase_matcher/`, and lexical resources. Inspect the pinned matcher source and tests before choosing each representation. Extend Node types and boundary tests for each exposed feature using the same frozen references. Callback invocation order and safe mutation are planned after the annotation-update contract in A1. Callbacks, custom extensions, spaCy pattern-JSON import and integer rule-ID interoperability remain outside this milestone and stay in the backlog; do not make them prerequisites for rulers.
+Primary Rust paths are `crates/spars/src/dependency_matcher/predicates.rs`, `crates/spars/src/token_matcher/`, `crates/spars/src/phrase_matcher/`, and lexical resources. Inspect the pinned matcher source and tests before choosing each representation. Extend Node types and boundary tests for each exposed feature using the same frozen references. Callback invocation order and safe mutation build on the annotation-update contract from A1. Callbacks, custom extensions, spaCy pattern-JSON import and integer rule-ID interoperability remain outside this milestone and stay in the backlog; do not make them prerequisites for rulers.
 
 ### 2. Checked annotations and rule-based annotation
 
@@ -92,7 +92,7 @@ Annotation updates are a prerequisite for rulers and independent sentence segmen
 
 | Delivery | Scope | Acceptance |
 |---|---|---|
-| A1 | Checked entity annotation replacement and the ownership contract for annotation updates | Entity spans, token entity types and IOB tags (inside, outside or beginning of an entity) remain consistent; distinguish missing, empty, blocked and outside states where supported; invalid bounds, overlaps and failed edits preserve the stated contract; text and offsets remain exact |
+| A1 (implemented) | Checked entity annotation replacement and the ownership contract for annotation updates | Entity spans, token entity types and IOB tags (inside, outside or beginning of an entity) remain consistent; distinguish missing, empty, blocked and outside states where supported; invalid bounds, overlaps and failed edits preserve the stated contract; text and offsets remain exact. Evidence: `entity-updates-v1` through Rust and Node, including one case of updates to `en_core_web_md` predictions, with every state recomputed without spaCy in the reference tool tests. Rust updates take exclusive access (`&mut Doc`); Node returns a new document and keeps existing handles valid. Knowledge-base and entity IDs are deferred to A2; see the [entity editing guide](ENTITIES.md#limits) |
 | A2 | EntityRuler applied after NER or on a document without entity predictions, using the verified token and phrase pattern subset | Official precedence, overlap filtering, overwrite policy, rule lifecycle and entity IDs; complete document comparisons and snapshot round-trips, including ID storage if required |
 | A3 | Named span groups, followed by SpanRuler | Overlapping spans, labels, IDs, group replacement/append behavior and filtering match the supported options; groups and annotations survive snapshots without losing metadata |
 | A4 | EntityRuler before NER, with preset-entity support in the native recognizer | Reference action traces and final annotations establish that NER respects existing entities and blocking; unsupported preset states fail explicitly |
@@ -171,7 +171,7 @@ Acceptance: official comparisons verify complete documents after rule applicatio
 
 For every increment, follow `docs/QUALITY.md` and obtain reference, test, documentation, and performance reviews. Run focused cases followed by `.venv/bin/python tools/verify.py`; CI must execute new parity tests with explicit denominators. Keep generated mismatch and timing reports under ignored `target/reports/` and update the compatibility inventory only for behavior actually verified.
 
-Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded deliveries are the annotation and ruler deliveries A1–A3. Later matcher features retain separate acceptance.
+Measure pattern compilation, removal, matching throughput, and memory separately. Cover small and large dictionaries, shared prefixes, short and long documents, Unicode, no-match inputs, and dense overlapping output. Record input size, pattern count/length, and output count; returning many matches has an unavoidable cost. Preserve baseline binaries for changes to existing matchers, compare under identical conditions without competing builds, and resolve measured regressions without weakening parity requirements. The next bounded deliveries are the ruler deliveries A2 and A3. Later matcher features retain separate acceptance.
 
 ## Model extensibility plan
 

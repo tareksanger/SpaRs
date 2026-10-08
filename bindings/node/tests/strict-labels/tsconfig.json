@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "./*.mts",
+    "../../index.d.ts",
+    "../../units.d.ts"
+  ],
+  "exclude": [],
+  "compilerOptions": {
+    "paths": {
+      "@spars/node": [
+        "../../index.d.ts"
+      ]
+    }
+  }
+}

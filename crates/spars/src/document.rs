@@ -1,7 +1,9 @@
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
+mod entities;
 mod traversal;
+pub use entities::{EntityDefault, EntityUpdate, TokenRange};
 pub use traversal::{Ancestors, Children, DependencyError, Subtree};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ByteOffset(pub usize);
@@ -81,6 +83,57 @@ impl Doc {
     pub fn text(&self) -> &str {
         &self.text
     }
+    /// Approximate heap memory owned by the document's text, tokens, spans and contextual
+    /// tensor, in bytes. It counts allocated capacity, not the inline size of `Doc` itself, and
+    /// excludes the dependency traversal index built on first use. It is a lower bound: the
+    /// allocator's per-allocation overhead, significant for short strings, is not counted. Bindings report it to
+    /// garbage-collected runtimes so they can account for native memory.
+    pub fn estimated_heap_bytes(&self) -> usize {
+        fn string(value: &Option<String>) -> usize {
+            value.as_ref().map_or(0, String::capacity)
+        }
+        fn spans(spans: &Option<Vec<Span>>) -> usize {
+            spans.as_ref().map_or(0, |spans| {
+                spans.capacity() * std::mem::size_of::<Span>()
+                    + spans
+                        .iter()
+                        .map(|span| span.label.capacity())
+                        .sum::<usize>()
+            })
+        }
+        let tokens = self.tokens.capacity() * std::mem::size_of::<Token>()
+            + self
+                .tokens
+                .iter()
+                .map(|token| {
+                    token.norm.capacity()
+                        + [
+                            &token.tag,
+                            &token.pos,
+                            &token.morphology,
+                            &token.lemma,
+                            &token.dep,
+                            &token.entity_iob,
+                            &token.entity_type,
+                        ]
+                        .into_iter()
+                        .map(string)
+                        .sum::<usize>()
+                })
+                .sum::<usize>();
+        let tensor = self.tensor.capacity() * std::mem::size_of::<Vec<f32>>()
+            + self
+                .tensor
+                .iter()
+                .map(|row| row.capacity() * std::mem::size_of::<f32>())
+                .sum::<usize>();
+        self.text.capacity()
+            + tokens
+            + spans(&self.entities)
+            + spans(&self.sentences)
+            + spans(&self.noun_chunks)
+            + tensor
+    }
     pub fn tokens(&self) -> &[Token] {
         &self.tokens
     }
@@ -122,6 +175,20 @@ impl Doc {
             .ok_or(Error::Bounds)
     }
 }
+/// spaCy 3.8.14's universal part-of-speech symbols (`spacy.parts_of_speech.IDS` without the
+/// empty value).
+pub(crate) const UNIVERSAL_POS: [&str; 20] = [
+    "ADJ", "ADP", "ADV", "AUX", "CCONJ", "CONJ", "DET", "EOL", "INTJ", "NOUN", "NUM", "PART",
+    "PRON", "PROPN", "PUNCT", "SCONJ", "SPACE", "SYM", "VERB", "X",
+];
+
+#[derive(Clone, Copy)]
+enum SpanKind {
+    Entity,
+    Sentence,
+    NounChunk,
+}
+
 impl Doc {
     /// Serialize an immutable document snapshot, preserving unavailable annotations.
     pub fn to_json(&self) -> Result<String> {
@@ -168,6 +235,25 @@ impl Doc {
                 return Err(Error::Model("invalid document tensor".into()));
             }
         }
+        for t in &s.tokens {
+            // Closed value sets, as spaCy stores them; `""` is spaCy's unset value.
+            if t.entity_iob
+                .as_deref()
+                .is_some_and(|v| !matches!(v, "" | "B" | "I" | "O"))
+            {
+                return Err(Error::Model(
+                    "snapshot entity IOB tags must be B, I, O or empty".into(),
+                ));
+            }
+            if t.pos
+                .as_deref()
+                .is_some_and(|v| !v.is_empty() && !UNIVERSAL_POS.contains(&v))
+            {
+                return Err(Error::Model(
+                    "snapshot POS tags must be spaCy universal POS tags".into(),
+                ));
+            }
+        }
         let mut end = 0;
         let mut cp = 0;
         for (i, t) in s.tokens.iter().enumerate() {
@@ -208,6 +294,25 @@ impl Doc {
                     return Err(Error::Bounds);
                 }
                 end = span.end.0;
+            }
+        }
+        let labels = [
+            (&s.entities, SpanKind::Entity),
+            (&s.sentences, SpanKind::Sentence),
+            (&s.noun_chunks, SpanKind::NounChunk),
+        ];
+        for (spans, kind) in labels {
+            for span in spans.iter().flatten() {
+                let valid = match kind {
+                    SpanKind::Entity => !span.label.is_empty(),
+                    SpanKind::Sentence => span.label.is_empty(),
+                    SpanKind::NounChunk => span.label == "NP",
+                };
+                if !valid {
+                    return Err(Error::Model(
+                        "snapshot entities need a label, sentences none and noun chunks NP".into(),
+                    ));
+                }
             }
         }
         Ok(Self {

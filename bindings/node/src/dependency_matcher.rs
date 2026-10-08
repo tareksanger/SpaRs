@@ -11,10 +11,17 @@ use napi::{
 use napi_derive::napi;
 use std::sync::Arc;
 
+/// Connects a pattern node to a node declared earlier in the same pattern.
+/// A match requires `relation` to hold from the `left` node's token to this node's token.
 #[napi(object)]
 pub struct DependencyLink {
+    /// The `id` of an earlier node in `DependencyPattern.nodes`. `add` throws
+    /// `SPARS_INVALID_PATTERN` if no earlier node has this `id`.
     pub left: Utf16String,
-    /// One of the twenty supported spaCy dependency relation symbols.
+    /// A spaCy `DependencyMatcher` operator (spaCy's `REL_OP`), read as "left RELATION this".
+    /// For example, `>` means this token is a direct child of `left`, `<` means it is the head of
+    /// `left`, and `.` means it immediately follows `left`.
+    #[napi(ts_type = "DependencyRelation")]
     pub relation: Utf16String,
 }
 

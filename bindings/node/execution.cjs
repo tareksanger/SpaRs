@@ -81,6 +81,25 @@ class Scheduler {
   }
 }
 
+const ERROR_CODES = new Set(['SPARS_IO', 'SPARS_INVALID_MODEL', 'SPARS_UNSUPPORTED', 'SPARS_INVALID_TEXT', 'SPARS_TEXT_TOO_LONG',
+  'SPARS_BOUNDS', 'SPARS_INFERENCE', 'SPARS_INVALID_PATTERN', 'SPARS_BUSY', 'SPARS_INPUT_LIMIT', 'SPARS_NATIVE_INCOMPATIBLE']);
+
+const OFFICIAL_MODEL_NAMES = new Set(['en_core_web_sm', 'en_core_web_md', 'en_core_web_lg']);
+
+/**
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isOfficialModelName(name) { return OFFICIAL_MODEL_NAMES.has(name); }
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isSparsError(error) {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string' && ERROR_CODES.has(error.code);
+}
+
 /** @returns {Promise<never>} */
 function busy() { return Promise.reject(Object.assign(new Error('Inference queue is full'), { code: 'SPARS_BUSY' })); }
 
@@ -289,4 +308,4 @@ function validatePatterns(value, kind) {
   }
 }
 
-module.exports = { Scheduler, configureExecution, configureInputLimits, install, installMatcher };
+module.exports = { ERROR_CODES, OFFICIAL_MODEL_NAMES, Scheduler, configureExecution, configureInputLimits, install, installMatcher, isOfficialModelName, isSparsError };

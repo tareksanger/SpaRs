@@ -56,6 +56,12 @@ pub(crate) fn resources(c: &Manifest) -> Result<()> {
                 return Err(bad("attribute index out of range"));
             }
         }
+        // spaCy refuses to store any other POS value, and snapshots reject one.
+        if let Some(pos) = r.attrs.get(&OutputAttribute::Pos) {
+            if !pos.is_empty() && !crate::document::UNIVERSAL_POS.contains(&pos.as_str()) {
+                return Err(bad("attribute rule POS must be a universal POS tag"));
+            }
+        }
     }
     for pos in ["noun", "verb", "adj", "adv", "punct"] {
         if !c.lemmas.lemma_index.contains_key(pos)

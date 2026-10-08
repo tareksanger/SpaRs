@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { loadModel, NativeDocument, PhraseMatcher } from '../index.js';
+import type { PhraseAttribute } from '../index.js';
 import { modelPath } from './fixtures.mts';
+import { member, PHRASE_ATTRIBUTES } from './vocabulary.mts';
 
 type Match = { rule: string; start: number; end: number };
 type Operation = { action: string; rule: string; patterns: string[][] };
@@ -54,7 +56,11 @@ function doc(words: string[], spaces: boolean[] = words.map(() => false), starts
 function hasCode(code: string): (error: unknown) => boolean {
   return (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === code;
 }
-async function checkCase(item: Case, starts: boolean[] = [], attribute: string = 'ORTH'): Promise<void> {
+/** Construct a matcher with a deliberately unsupported attribute name. */
+function construct(attribute: string): PhraseMatcher {
+  return Reflect.construct(PhraseMatcher, [attribute]);
+}
+async function checkCase(item: Case, starts: boolean[] = [], attribute: PhraseAttribute = 'ORTH'): Promise<void> {
   const input = NativeDocument.fromSnapshot(doc(item.words, item.spaces, starts).toSnapshot());
   const matcher = new PhraseMatcher(attribute);
   const labels = new Set<string>();
@@ -102,9 +108,9 @@ test('PhraseMatcher owns patterns, validates strings, and prevents pending mutat
   assert.equal(matcher.attribute, 'TEXT');
   assert.equal(new PhraseMatcher().attribute, 'ORTH');
   for (const attribute of ['lemma', 'SHAPE', 'ENT_TYPE', 'MORPHOLOGY']) {
-    assert.throws(() => new PhraseMatcher(attribute), hasCode('SPARS_UNSUPPORTED'));
+    assert.throws(() => construct(attribute), hasCode('SPARS_UNSUPPORTED'));
   }
-  assert.throws(() => new PhraseMatcher('\ud800'), hasCode('SPARS_INVALID_TEXT'));
+  assert.throws(() => construct('\ud800'), hasCode('SPARS_INVALID_TEXT'));
   for (const call of [() => matcher.contains('\ud800'), () => matcher.get('\ud800'), () => matcher.remove('\ud800'), () => matcher.add('\ud800', [])]) {
     assert.throws(call, hasCode('SPARS_INVALID_TEXT'));
   }
@@ -141,7 +147,7 @@ test('PhraseMatcher LOWER follows pinned Unicode reference lifecycle', async () 
 
 type AnnotatedToken = { word: string; space: boolean; norm: string; lemma: string | null; pos: string | null; tag: string | null; dep: string | null; morph: string | null };
 type AnnotatedCase = {
-  id: string; attribute: string; tokens: AnnotatedToken[];
+  id: string; attribute: PhraseAttribute; tokens: AnnotatedToken[];
   operations: { action: string; rule: string; patterns: AnnotatedToken[][] }[];
   states: { error: string | null; rules: string[]; patterns: string[][][]; matches: Match[] }[];
 };
@@ -156,7 +162,7 @@ function annotatedToken(value: unknown): AnnotatedToken {
 function parseAnnotatedCase(value: unknown): AnnotatedCase {
   const data = record(value);
   return {
-    id: string(data.id), attribute: string(data.attribute), tokens: array(data.tokens).map(annotatedToken),
+    id: string(data.id), attribute: member(PHRASE_ATTRIBUTES, data.attribute), tokens: array(data.tokens).map(annotatedToken),
     operations: array(data.operations).map(value => {
       const operation = record(value);
       return { action: string(operation.action), rule: string(operation.rule), patterns: array(operation.patterns).map(pattern => array(pattern).map(annotatedToken)) };
@@ -272,15 +278,17 @@ test('PhraseMatcher MORPH rejects noncanonical morphology with SPARS_UNSUPPORTED
   assert.deepEqual(await lemma.findMatches(noncanonical), [{ rule: 'r', start: 0, end: 1 }]);
 });
 
-const LEXICAL = ['IS_ALPHA', 'IS_ASCII', 'IS_DIGIT', 'IS_LOWER', 'IS_UPPER', 'IS_TITLE', 'IS_PUNCT', 'IS_SPACE', 'IS_BRACKET', 'IS_QUOTE',
+const LEXICAL: readonly PhraseAttribute[] = ['IS_ALPHA', 'IS_ASCII', 'IS_DIGIT', 'IS_LOWER', 'IS_UPPER', 'IS_TITLE', 'IS_PUNCT', 'IS_SPACE', 'IS_BRACKET', 'IS_QUOTE',
   'IS_LEFT_PUNCT', 'IS_RIGHT_PUNCT', 'IS_CURRENCY', 'IS_STOP', 'LIKE_NUM', 'LIKE_URL', 'LIKE_EMAIL', 'LENGTH'];
 
 test('PhraseMatcher accepts every supported attribute name and rejects the rest', () => {
-  for (const name of ['ORTH', 'TEXT', 'LOWER', 'NORM', 'LEMMA', 'POS', 'TAG', 'DEP', 'MORPH', ...LEXICAL]) {
+  // Every declared attribute is accepted and read back; the declared list is exhaustive (see vocabulary.mts).
+  for (const name of PHRASE_ATTRIBUTES) {
     assert.equal(new PhraseMatcher(name).attribute, name);
   }
+  assert.deepEqual(['ORTH', 'TEXT', 'LOWER', 'NORM', 'LEMMA', 'POS', 'TAG', 'DEP', 'MORPH', ...LEXICAL], [...PHRASE_ATTRIBUTES]);
   for (const name of ['is_alpha', 'ISALPHA', 'SHAPE', 'IS_SENT_START', 'SPACY', 'ENT_TYPE']) {
-    assert.throws(() => new PhraseMatcher(name), hasCode('SPARS_UNSUPPORTED'));
+    assert.throws(() => construct(name), hasCode('SPARS_UNSUPPORTED'));
   }
   const matcher = new PhraseMatcher('IS_ALPHA');
   assert.throws(() => matcher.add('r', [doc(['a'])]), hasCode('SPARS_INVALID_PATTERN'));
@@ -303,8 +311,7 @@ test('PhraseMatcher lexical flags and LENGTH match the pinned reference', async 
   let matches = 0;
   for (const value of cases) {
     const item = record(value);
-    const attribute = string(item.attribute);
-    assert.ok(LEXICAL.includes(attribute));
+    const attribute = member(LEXICAL, item.attribute);
     const input = doc(array(item.words).map(string), array(item.spaces).map(boolean));
     // LENGTH needs no model; the flags use the model's language rules.
     const matcher = attribute === 'LENGTH' ? new PhraseMatcher(attribute) : new PhraseMatcher(attribute, model);
