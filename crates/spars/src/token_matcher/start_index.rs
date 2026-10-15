@@ -15,9 +15,9 @@ use std::collections::HashMap;
 /// none when its first node requires a value from an empty set.
 #[derive(Default)]
 pub(super) struct StartIndex {
-    text: HashMap<Box<str>, Vec<usize>>,
-    lower: HashMap<Box<str>, Vec<usize>>,
-    norm: HashMap<Box<str>, Vec<usize>>,
+    text: HashMap<Box<str>, Positions>,
+    lower: HashMap<Box<str>, Positions>,
+    norm: HashMap<Box<str>, Positions>,
     // Patterns whose first node can match without an exact text value, or can be skipped.
     unindexed: Vec<usize>,
     // One more than the last position passed to `push`, reduced by `remove`.
@@ -60,7 +60,7 @@ impl StartIndex {
             match map.get_mut(value) {
                 Some(positions) => positions.push(position),
                 None => {
-                    map.insert(value.into(), vec![position]);
+                    map.insert(value.into(), Positions::One(position));
                 }
             }
         }
@@ -72,31 +72,22 @@ impl StartIndex {
         if removed.is_empty() {
             return;
         }
-        // Both lists ascend, so one merge pass renumbers a list; entries before the first
-        // removed position are unchanged and skipped.
-        let renumber = |positions: &mut Vec<usize>| {
-            let unchanged = positions.partition_point(|&position| position < removed[0]);
-            let mut kept = unchanged;
-            let mut before = 0;
-            for read in unchanged..positions.len() {
-                let position = positions[read];
-                while removed.get(before).is_some_and(|&gone| gone < position) {
-                    before += 1;
-                }
-                if removed.get(before) != Some(&position) {
-                    positions[kept] = position - before;
-                    kept += 1;
-                }
-            }
-            positions.truncate(kept);
-        };
         for map in [&mut self.text, &mut self.lower, &mut self.norm] {
-            map.retain(|_, positions| {
-                renumber(positions);
-                !positions.is_empty()
+            map.retain(|_, positions| match positions {
+                Positions::One(position) => match removed.binary_search(position) {
+                    Ok(_) => false,
+                    Err(before) => {
+                        *position -= before;
+                        true
+                    }
+                },
+                Positions::Many(positions) => {
+                    renumber(positions, removed);
+                    !positions.is_empty()
+                }
             });
         }
-        renumber(&mut self.unindexed);
+        renumber(&mut self.unindexed, removed);
         self.next = self.next.saturating_sub(removed.len());
     }
 
@@ -105,7 +96,7 @@ impl StartIndex {
     pub(super) fn indexed_positions(&self) -> std::collections::HashSet<usize> {
         [&self.text, &self.lower, &self.norm]
             .into_iter()
-            .flat_map(|map| map.values().flatten().copied())
+            .flat_map(|map| map.values().flat_map(Positions::as_slice).copied())
             .collect()
     }
 
@@ -147,9 +138,51 @@ impl StartIndex {
     }
 }
 
+/// The ascending positions indexed under one value. Most values start one pattern; storing
+/// that position inline lets `remove` renumber it without visiting a separate allocation.
+enum Positions {
+    One(usize),
+    Many(Vec<usize>),
+}
+
+impl Positions {
+    fn as_slice(&self) -> &[usize] {
+        match self {
+            Positions::One(position) => std::slice::from_ref(position),
+            Positions::Many(positions) => positions,
+        }
+    }
+    fn push(&mut self, position: usize) {
+        match self {
+            Positions::One(first) => *self = Positions::Many(vec![*first, position]),
+            Positions::Many(positions) => positions.push(position),
+        }
+    }
+}
+
+// Drop the ascending `removed` positions from the ascending `positions` and shift later ones
+// down. Entries before the first removed position are unchanged and skipped; one merge pass
+// handles the rest.
+fn renumber(positions: &mut Vec<usize>, removed: &[usize]) {
+    let unchanged = positions.partition_point(|&position| position < removed[0]);
+    let mut kept = unchanged;
+    let mut before = 0;
+    for read in unchanged..positions.len() {
+        let position = positions[read];
+        while removed.get(before).is_some_and(|&gone| gone < position) {
+            before += 1;
+        }
+        if removed.get(before) != Some(&position) {
+            positions[kept] = position - before;
+            kept += 1;
+        }
+    }
+    positions.truncate(kept);
+}
+
 // The patterns indexed under the token's value of `attribute`.
 fn lookup<'m>(
-    map: &'m HashMap<Box<str>, Vec<usize>>,
+    map: &'m HashMap<Box<str>, Positions>,
     attribute: TextAttribute,
     token: TokenView<'_>,
     values: &TokenValues<'_>,
@@ -158,5 +191,5 @@ fn lookup<'m>(
         return &[];
     }
     map.get(attribute.value(token, values).as_ref())
-        .map_or(&[], Vec::as_slice)
+        .map_or(&[], Positions::as_slice)
 }
