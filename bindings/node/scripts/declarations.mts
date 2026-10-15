@@ -15,9 +15,9 @@ export function restrictConstructor(source: string, name = 'Model'): string {
 
 const executionTypes = `
 /**
- * Limits on concurrent native work for every model and matcher in this JavaScript thread. They cover
- * \`process\`, \`processDocument\`, \`processBatch\`, \`pipe\` and \`findMatches\`, but not \`loadModel\` or
- * \`downloadModel\`.
+ * Limits on concurrent native work for every model, matcher and entity ruler in this JavaScript
+ * thread. They cover \`process\`, \`processDocument\`, \`processBatch\`, \`pipe\`, \`findMatches\` and
+ * \`EntityRuler.annotate\`, but not \`loadModel\` or \`downloadModel\`.
  */
 export interface ExecutionOptions {
   /** Calls running on Node's worker pool at once; a positive integer. */
@@ -35,7 +35,7 @@ export declare function configureExecution(options: ExecutionOptions | null): vo
  * \`SPARS_INPUT_LIMIT\`. Lengths count UTF-16 units (\`string.length\`). All fields are positive integers.
  */
 export interface InputLimits {
-  /** Per text in \`process\`, \`processDocument\` and \`processBatch\`, and per document in \`findMatches\`. */
+  /** Per text in \`process\`, \`processDocument\` and \`processBatch\`, and per document (\`utf16Length\`) in \`findMatches\` and \`EntityRuler.annotate\`. */
   maxTextLength: number
   /** Texts per \`processBatch\` call. */
   maxBatchSize: number
@@ -156,7 +156,7 @@ interface EntityPatternBase {
   /** The label of matched entities. An empty label is accepted, as in spaCy: its matches claim their tokens and remove overwritten entities, but add no entity. */
   label: EntityLabel | ''
   /**
-   * Written to matched entities and their tokens, and the key for \`EntityRuler.remove\`, which removes the ID's patterns under every label. Without one, matched entities have \`id\` \`''\`.
+   * Written to the entities this pattern's accepted matches create and to their tokens' \`entityId\`, and the key for \`EntityRuler.remove\`, which removes the ID's patterns under every label. Without one, as in spaCy, each matched token keeps its current \`entityId\`, so the entity reports its first token's earlier ID, which is \`''\` unless \`withEntities\` or an earlier \`annotate\` set one.
    * On a phrase, \`''\` is the same as no ID. On a token pattern, \`''\` also gives matches no ID, but as in spaCy \`EntityRuler.ids\` lists \`''\` and \`remove('')\` removes the pattern.
    */
   id?: string

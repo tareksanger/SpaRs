@@ -59,7 +59,9 @@ pub struct TokenAnnotations {
     pub entity_iob: Option<String>,
     #[napi(ts_type = "EntityLabel | ''")]
     pub entity_type: Option<String>,
-    /// spaCy's `Token.ent_id_`, or `''` without one.
+    /// spaCy's `Token.ent_id_`, or `''` without one. Set only by `withEntities` and
+    /// `EntityRuler.annotate`, never by the recognizer; a token keeps its ID when it stops being part
+    /// of an entity, as in spaCy.
     pub entity_id: String,
 }
 

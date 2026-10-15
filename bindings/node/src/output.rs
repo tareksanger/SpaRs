@@ -7,7 +7,8 @@ pub struct Document {
     pub text: String,
     pub tokens: Vec<Token>,
     #[napi(ts_type = "Array<Span<EntityLabel>>")]
-    /// Null until `Ner` runs.
+    /// Null until `Ner` runs, or until `NativeDocument.withEntities` or `EntityRuler.annotate` sets
+    /// entities; null again if an update leaves every token's entity annotation missing.
     pub entities: Option<Vec<Span>>,
     #[napi(ts_type = "Array<Span<'', ''>>")]
     /// Null until `Parser` runs.
@@ -59,8 +60,9 @@ pub struct Token {
     pub entity_iob: Option<String>,
     #[napi(ts_type = "EntityLabel | ''")]
     pub entity_type: Option<String>,
-    /// spaCy's `Token.ent_id_`, or `''` without one. A token keeps its ID when it stops being
-    /// part of an entity, as in spaCy.
+    /// spaCy's `Token.ent_id_`, or `''` without one. Set only by `withEntities` and
+    /// `EntityRuler.annotate`, never by the recognizer; a token keeps its ID when it stops being part
+    /// of an entity, as in spaCy.
     pub entity_id: String,
 }
 

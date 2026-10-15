@@ -79,7 +79,7 @@ export type DependencyLabel = LabelSet<DependencyLabels, 'dependency'>
 /** A registered model name, or any other name or directory path. */
 export type ModelName = RegisteredLabel<ModelNames> | (string & {})
 
-/** PhraseMatcher attributes, spelled as spaCy spells them. */
+/** Token values a `PhraseMatcher` or `EntityRuler` phrase compares, spelled as spaCy spells them (uppercase). */
 export type PhraseAttribute = 'ORTH' | 'TEXT' | 'LOWER' | 'NORM' | 'LEMMA' | 'POS' | 'TAG' | 'DEP' | 'MORPH'
   | 'IS_ALPHA' | 'IS_ASCII' | 'IS_DIGIT' | 'IS_LOWER' | 'IS_UPPER' | 'IS_TITLE' | 'IS_PUNCT' | 'IS_SPACE' | 'IS_BRACKET'
   | 'IS_QUOTE' | 'IS_LEFT_PUNCT' | 'IS_RIGHT_PUNCT' | 'IS_CURRENCY' | 'IS_STOP' | 'LIKE_NUM' | 'LIKE_URL' | 'LIKE_EMAIL' | 'LENGTH'

@@ -199,8 +199,10 @@ impl NativeDocument {
     }
 
     /// Restore a document from `toSnapshot` output; this is not spaCy's JSON format. Throws
-    /// `SPARS_INVALID_MODEL` for malformed JSON or invalid labels and tags, `SPARS_BOUNDS` for
-    /// inconsistent offsets or token indices, and `SPARS_UNSUPPORTED` for an unknown format version.
+    /// `SPARS_INVALID_MODEL` for malformed JSON, invalid labels and tags, an empty entity ID, or an
+    /// entity whose `id` differs from its first token's `entity_id`; `SPARS_BOUNDS` for inconsistent
+    /// offsets or token indices; and `SPARS_UNSUPPORTED` for an unknown format version or data the
+    /// stated version cannot hold (contextual vectors need version 2, entity IDs version 3).
     #[napi(factory, strict)]
     pub fn from_snapshot(env: Env, json: Utf16String) -> Result<Self> {
         let json = errors::text(&json).map_err(|error| error.into_napi(env))?;
@@ -222,7 +224,7 @@ impl NativeDocument {
 
     /// Return a new document with replaced entity annotation, like spaCy's `Doc.set_ents`.
     /// This document and its token and span views are unchanged. Invalid intervals throw
-    /// `SPARS_BOUNDS`, a label with an unpaired surrogate `SPARS_INVALID_TEXT`, an `I` tag left on the
+    /// `SPARS_BOUNDS`, a label or ID with an unpaired surrogate `SPARS_INVALID_TEXT`, an `I` tag left on the
     /// first token (only an edited snapshot has one) `SPARS_UNSUPPORTED`, and undeclared fields
     /// `InvalidArg`. Tokens no interval covers are set according to `default`.
     #[napi(strict, ts_args_type = "update: EntityUpdate")]
