@@ -150,7 +150,8 @@ impl TokenMatcher {
             .index
             .remove(name)
             .ok_or_else(|| Error::Pattern(format!("unknown token rule {name:?}")))?;
-        self.rules.remove(index);
+        // Each registered pattern has exactly one compiled pattern.
+        let count = self.rules.remove(index).patterns.len();
         // Visiting the values directly avoids hashing every later rule name.
         for position in self.index.values_mut() {
             if *position > index {
@@ -159,13 +160,18 @@ impl TokenMatcher {
         }
         let removed: Vec<usize> = (0..self.compiled.len())
             .filter(|&position| self.compiled[position].name == name)
+            .take(count)
             .collect();
         self.starts.remove(&removed);
-        let mut position = 0;
-        self.compiled.retain(|_| {
-            position += 1;
-            removed.binary_search(&(position - 1)).is_err()
-        });
+        if let [only] = removed[..] {
+            self.compiled.remove(only);
+        } else {
+            let mut position = 0;
+            self.compiled.retain(|_| {
+                position += 1;
+                removed.binary_search(&(position - 1)).is_err()
+            });
+        }
         Ok(())
     }
     /// Return overlapping matches in the reference state-machine emission order.
