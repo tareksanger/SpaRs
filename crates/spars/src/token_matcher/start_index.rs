@@ -11,7 +11,8 @@ use crate::TokenView;
 use std::collections::HashMap;
 
 /// Pattern positions in the matcher's compiled order, grouped by the value their first node
-/// requires. Every list is ascending, and each pattern with nodes is in exactly one group.
+/// requires. Every list is ascending. Each pattern with nodes is in at most one group, and in
+/// none when its first node requires a value from an empty set.
 #[derive(Default)]
 pub(super) struct StartIndex {
     text: HashMap<Box<str>, Vec<usize>>,
@@ -19,11 +20,18 @@ pub(super) struct StartIndex {
     norm: HashMap<Box<str>, Vec<usize>>,
     // Patterns whose first node can match without an exact text value, or can be skipped.
     unindexed: Vec<usize>,
+    // One more than the last position passed to `push`, reduced by `remove`.
+    next: usize,
 }
 
 impl StartIndex {
     /// Record the pattern at `position`, which must exceed every position recorded so far.
     pub(super) fn push(&mut self, position: usize, pattern: &CompiledPattern) {
+        debug_assert!(
+            position >= self.next,
+            "positions must be recorded in ascending order"
+        );
+        self.next = position + 1;
         let Some(first) = pattern.nodes.first() else {
             // A pattern without nodes never starts a state.
             return;
@@ -48,31 +56,39 @@ impl StartIndex {
         };
         // An empty set can never match, so the pattern needs no start state at all.
         for value in values {
-            map.entry(value.into()).or_default().push(position);
+            // Look up before inserting, so a repeated value does not allocate a new key.
+            match map.get_mut(value) {
+                Some(positions) => positions.push(position),
+                None => {
+                    map.insert(value.into(), vec![position]);
+                }
+            }
         }
     }
 
-    /// Keep the patterns whose old position `p` has `kept[p]`, renumbered as the matcher's
-    /// compiled list is after `Vec::retain` with the same decisions.
-    pub(super) fn retain(&mut self, kept: &[bool]) {
-        let mut next = 0;
-        let renumbered: Vec<Option<usize>> = kept
-            .iter()
-            .map(|&keep| {
-                keep.then(|| {
-                    next += 1;
-                    next - 1
-                })
-            })
-            .collect();
+    /// Drop the patterns at the ascending positions `removed` and shift later positions down,
+    /// as removing them from the matcher's compiled list does.
+    pub(super) fn remove(&mut self, removed: &[usize]) {
+        if removed.is_empty() {
+            return;
+        }
+        // Both lists ascend, so one merge pass renumbers a list; entries before the first
+        // removed position are unchanged and skipped.
         let renumber = |positions: &mut Vec<usize>| {
-            positions.retain_mut(|position| match renumbered[*position] {
-                Some(new) => {
-                    *position = new;
-                    true
+            let unchanged = positions.partition_point(|&position| position < removed[0]);
+            let mut kept = unchanged;
+            let mut before = 0;
+            for read in unchanged..positions.len() {
+                let position = positions[read];
+                while removed.get(before).is_some_and(|&gone| gone < position) {
+                    before += 1;
                 }
-                None => false,
-            });
+                if removed.get(before) != Some(&position) {
+                    positions[kept] = position - before;
+                    kept += 1;
+                }
+            }
+            positions.truncate(kept);
         };
         for map in [&mut self.text, &mut self.lower, &mut self.norm] {
             map.retain(|_, positions| {
@@ -81,6 +97,16 @@ impl StartIndex {
             });
         }
         renumber(&mut self.unindexed);
+        self.next = self.next.saturating_sub(removed.len());
+    }
+
+    /// Every position reached through a value lookup rather than at every token.
+    #[cfg(test)]
+    pub(super) fn indexed_positions(&self) -> std::collections::HashSet<usize> {
+        [&self.text, &self.lower, &self.norm]
+            .into_iter()
+            .flat_map(|map| map.values().flatten().copied())
+            .collect()
     }
 
     /// Replace `out` with the patterns that may start a match at `token`, in ascending order.

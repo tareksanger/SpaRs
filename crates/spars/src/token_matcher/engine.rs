@@ -114,6 +114,10 @@ fn run<const CACHE_SUFFIXES: bool>(
             Starts::Indexed(start_index) => start_index.candidates(token, values, &mut candidates),
             #[cfg(test)]
             Starts::All => {
+                // The reference also clears every pattern's cache, as before indexing.
+                for values in &mut cache {
+                    values.fill(None);
+                }
                 candidates.clear();
                 candidates.extend(
                     (0..patterns.len()).filter(|&pattern| !patterns[pattern].nodes.is_empty()),

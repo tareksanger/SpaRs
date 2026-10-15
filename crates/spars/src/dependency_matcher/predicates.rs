@@ -622,21 +622,24 @@ impl CompiledConstraint {
     }
     /// The only values a token can have when this constraint holds, if the constraint is an
     /// exact `Text`, `Lower` or `Norm` comparison: `Equals`, or `In` and its one-valued set
-    /// forms. Every listed value is distinct; an empty list means no token matches.
-    pub(crate) fn exact_values(&self) -> Option<(TextAttribute, Vec<&str>)> {
+    /// forms. The values are distinct; when there are none, no token matches.
+    pub(crate) fn exact_values(&self) -> Option<(TextAttribute, impl Iterator<Item = &str>)> {
         let attribute = match self.attribute {
             TokenAttribute::Text => TextAttribute::Text,
             TokenAttribute::Lower => TextAttribute::Lower,
             TokenAttribute::Norm => TextAttribute::Norm,
             _ => return None,
         };
-        let values = match &self.predicate {
-            CompiledPredicate::Equals(value) => vec![value.as_str()],
-            CompiledPredicate::In(values) => values.iter().map(String::as_str).collect(),
+        let (one, set) = match &self.predicate {
+            CompiledPredicate::Equals(value) => (Some(value.as_str()), None),
+            CompiledPredicate::In(values) => (None, Some(values)),
             CompiledPredicate::NotIn(_)
             | CompiledPredicate::Superset(_)
             | CompiledPredicate::Intersects(_) => return None,
         };
+        let values = one
+            .into_iter()
+            .chain(set.into_iter().flatten().map(String::as_str));
         Some((attribute, values))
     }
     pub(crate) fn validate_document(&self, doc: &Doc) -> Result<()> {

@@ -64,7 +64,6 @@ struct CompiledPattern {
     nodes: Vec<Node>,
 }
 struct Rule {
-    name: String,
     patterns: Vec<TokenPattern>,
 }
 /// Compile rules once and reuse them across independent document calls.
@@ -115,8 +114,8 @@ impl TokenMatcher {
         if let Some(&i) = self.index.get(&name) {
             self.rules[i].patterns.extend(patterns);
         } else {
-            self.index.insert(name.clone(), self.rules.len());
-            self.rules.push(Rule { name, patterns });
+            self.index.insert(name, self.rules.len());
+            self.rules.push(Rule { patterns });
         }
         // This order includes later additions to an already registered rule.
         for pattern in compiled {
@@ -152,16 +151,21 @@ impl TokenMatcher {
             .remove(name)
             .ok_or_else(|| Error::Pattern(format!("unknown token rule {name:?}")))?;
         self.rules.remove(index);
-        for later in &self.rules[index..] {
-            *self.index.get_mut(&later.name).expect("indexed rule") -= 1;
+        // Visiting the values directly avoids hashing every later rule name.
+        for position in self.index.values_mut() {
+            if *position > index {
+                *position -= 1;
+            }
         }
-        let kept: Vec<bool> = self
-            .compiled
-            .iter()
-            .map(|pattern| pattern.name != name)
+        let removed: Vec<usize> = (0..self.compiled.len())
+            .filter(|&position| self.compiled[position].name == name)
             .collect();
-        self.starts.retain(&kept);
-        self.compiled.retain(|pattern| pattern.name != name);
+        self.starts.remove(&removed);
+        let mut position = 0;
+        self.compiled.retain(|_| {
+            position += 1;
+            removed.binary_search(&(position - 1)).is_err()
+        });
         Ok(())
     }
     /// Return overlapping matches in the reference state-machine emission order.
