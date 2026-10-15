@@ -334,9 +334,16 @@ fn groups_built_for_another_document_are_checked_when_stored() {
     let before = doc.clone();
     assert!(matches!(doc.set_span_group("g", group), Err(Error::Bounds)));
     assert_eq!(doc, before);
-    let fits = SpanGroup::new("g", vec![Span::new(TokenIndex(1), TokenIndex(3), "")]);
-    doc.set_span_group("g", fits.concat(&SpanGroup::default()))
+    // A group from the other document whose spans fit is stored unchanged.
+    other
+        .set_span_group(
+            "fits",
+            SpanGroup::new("fits", vec![Span::new(TokenIndex(1), TokenIndex(3), "X")]),
+        )
         .unwrap();
+    let fits = other.span_groups().get("fits").unwrap().clone();
+    doc.set_span_group("fits", fits.clone()).unwrap();
+    assert_eq!(doc.span_groups().get("fits"), Some(&fits));
 }
 
 #[derive(Debug)]

@@ -229,3 +229,38 @@ fn heap_estimate_counts_labels_ids_and_attr_values() {
     assert!(estimate("", Some(&long), r#""""#) >= base + 1000);
     assert!(estimate("", None, &format!(r#""{long}""#)) >= base + 1000);
 }
+
+#[test]
+fn copies_and_snapshots_keep_empty_spans() {
+    let mut document = doc(3);
+    document
+        .set_span_group("g", group(&[(0, 0), (1, 1), (3, 3)]))
+        .unwrap();
+    let copy = document.clone();
+    assert_eq!(
+        copy.span_groups().get("g").unwrap().spans,
+        [span(0, 0), span(1, 1), span(3, 3)]
+    );
+    assert_eq!(
+        Doc::from_json(&document.to_json().unwrap()).unwrap(),
+        document
+    );
+}
+
+#[test]
+fn stored_groups_are_independent_values() {
+    let mut document = doc(3);
+    let shared = group(&[(0, 1)]);
+    document.set_span_group("a", shared.clone()).unwrap();
+    document.set_span_group("b", shared).unwrap();
+    // An edited copy changes nothing until stored, and storing it changes only its own key.
+    let mut edited = document.span_groups().get("a").unwrap().clone();
+    edited.spans.push(span(1, 2));
+    assert_eq!(document.span_groups().get("a").unwrap().spans, [span(0, 1)]);
+    document.set_span_group("a", edited).unwrap();
+    assert_eq!(
+        document.span_groups().get("a").unwrap().spans,
+        [span(0, 1), span(1, 2)]
+    );
+    assert_eq!(document.span_groups().get("b").unwrap().spans, [span(0, 1)]);
+}

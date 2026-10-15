@@ -58,17 +58,16 @@ These follow spaCy unless noted here or listed under [differences from spaCy](#d
 
 ## Differences from spaCy
 
-The first difference is [accepted](SPACY_DIFFERENCES.md#span-groups) as SpaRs's intended behavior. The others are compatibility gaps tracked in the [compatibility inventory](COMPATIBILITY.md).
+These differences are [accepted](SPACY_DIFFERENCES.md#span-groups) as SpaRs's intended behavior; that page gives the reason and effect of each.
 
-- **Removing a span by index.** spaCy 3.8.14's `del group[i]` removes the span before index `i` (and `del group[0]` is undefined behavior); this is an upstream bug described in [accepted differences](SPACY_DIFFERENCES.md#deleting-a-span-by-index). Here `group.spans.remove(i)` removes the span at index `i`.
-- **Groups are values.** In spaCy, `doc.spans[key]` returns the stored object, so editing it changes the document, and assigning one group object to two keys shares it between them. Here `Doc::span_groups` lends read-only groups, edits are made on a copy that `Doc::set_span_group` stores, and each key holds its own group.
-- **Copies with empty spans.** spaCy's `Doc.copy()` rebuilds spans from character offsets and fails for a group containing an empty span, with `ValueError` E1052, or `RuntimeError` E865 when the token before the span has no trailing space. `Doc::clone` copies them.
-- **Saved key order.** spaCy's `Doc.to_bytes` writes groups with identical content once, so loading moves a later key next to the first. SpaRs snapshots keep the key order.
-- **Attribute equality.** spaCy compares `attrs` as Python dicts, so key order and spelling such as `1` versus `1.0` do not matter. Here attrs, and therefore groups and documents, are equal only when their keys are in the same order and their values have the same JSON text.
-- **Attribute values.** spaCy accepts any value its msgpack serializer can save, such as bytes; SpaRs stores only JSON values.
-- **Spans from another document.** spaCy raises `ValueError` E855 when a span or group belongs to another document. SpaRs spans are token ranges with no document, so a group built for another document is accepted when its spans fit; `Doc::set_span_group` still returns `Error::Bounds` for spans outside the document.
-- **Knowledge-base IDs.** spaCy span group members carry a `kb_id`; SpaRs spans do not store one.
-- **Extending a group with itself.** spaCy's `group.extend(group)` and `group += group` insert a vector range into itself, which is undefined behavior in C++. Here `extend_group` with a copy of the group appends its spans once.
+- **Removing a span by index.** spaCy 3.8.14's `del group[i]` removes the span before index `i` (an upstream bug). Here `group.spans.remove(i)` removes the span at index `i`.
+- **Groups are values.** spaCy returns the stored group object, so editing it changes the document. Here callers edit a copy and store it with `Doc::set_span_group`, and each key holds its own group.
+- **Copies keep empty spans.** spaCy's `Doc.copy()` raises E1052 for an empty span at the start or end of the document or after a token with trailing whitespace. `Doc::clone` copies them.
+- **Snapshots keep key order.** spaCy's `Doc.to_bytes` can reorder keys whose groups have identical content. SpaRs snapshots keep the key order.
+- **Attributes are JSON values compared as text.** spaCy accepts any value msgpack can save and compares attrs as dicts. SpaRs stores JSON values and compares their keys in order and their text.
+- **Spans and groups from another document.** spaCy rejects them. SpaRs accepts a group whose spans fit the document.
+- **No knowledge-base IDs.** spaCy group members carry a `kb_id`; SpaRs spans do not.
+- **Extending a group with itself.** spaCy's `group.extend(group)` is undefined behavior in C++. `extend_group` with a copy appends its spans once.
 
 ## Verification
 

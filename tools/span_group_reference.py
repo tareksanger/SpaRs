@@ -149,7 +149,7 @@ def run(doc: Doc, step: Step) -> Doc:
 
 def check_storage(doc: Doc, expected: State) -> None:
     """Saving and copying keep every group; SpaRs snapshots must do the same. Doc.copy rebuilds spans from
-    character offsets and fails for empty spans (E1052 or E865), so copying is checked only without them."""
+    character offsets and raises E1052 for most empty spans, so copying is checked only without them."""
     # spaCy saves groups with identical content as one entry listing their keys, so loading moves a later key
     # next to the first; only the key order changes.
     restored = make_doc(doc.vocab, words=[]).from_bytes(doc.to_bytes())
