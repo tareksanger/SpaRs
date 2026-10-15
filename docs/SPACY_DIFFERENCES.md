@@ -91,3 +91,34 @@ matcher(nlp("a b"))  # raises ValueError [E155], although no rule compares LEMMA
 ```
 
 The recorded set is `Matcher._seen_attrs` in `spacy/matcher/matcher.pyx`: `add` inserts into it and `remove` does not change it.
+
+## Span groups
+
+These apply to Rust [span groups](SPAN_GROUPS.md). The [span groups guide](SPAN_GROUPS.md#differences-from-spacy) lists other differences, which remain compatibility gaps.
+
+### Deleting a span by index
+
+- **spaCy:** `del group[i]` erases the span at position `i - 1` after normalizing a negative index, so `del group[1]` removes the first span, `del group[-1]` removes the second-to-last, and `del group[0]` erases the position before the first span, which is undefined behavior in C++. This is a bug in spaCy 3.8.14 (`SpanGroup.__delitem__` in `spacy/tokens/span_group.pyx`), and the code is unchanged on spaCy's `master` branch at commit `c2dabfce56ad` (2026-09-30). spaCy's own `test_span_doc_delitem` passes despite it, because it checks only the length and the spans from index `i` onward, which are the same whichever of the two spans was removed. The [reproduction](#reproducing-the-span-deletion-bug) below shows it.
+- **SpaRs:** a group's spans are a `Vec`, so `group.spans.remove(i)` removes the span at index `i` and panics for an index out of range, as Rust's `Vec::remove` does.
+- **Reason:** the documented purpose of `del group[i]` is to delete the span at index `i`, and the upstream behavior cannot be reproduced safely for index 0.
+- **Effect:** code that deletes spans by index removes a different span than spaCy 3.8.14 does. The fixture contains no deletion by index.
+- **Tests:** none; Rust's `Vec::remove` defines the behavior.
+
+## Reproducing the span deletion bug
+
+With spaCy 3.8.14, using a blank English pipeline:
+
+```python
+import spacy
+
+nlp = spacy.blank("en")
+doc = nlp("a b c d")
+doc.spans["g"] = [doc[0:1], doc[1:2], doc[2:3]]
+del doc.spans["g"][1]
+print([s.text for s in doc.spans["g"]])  # ['b', 'c'], expected ['a', 'c']
+doc.spans["g"] = [doc[0:1], doc[1:2], doc[2:3]]
+del doc.spans["g"][-1]
+print([s.text for s in doc.spans["g"]])  # ['a', 'c'], expected ['a', 'b']
+```
+
+The cause is `self.c.erase(self.c.begin() + i - 1)` in `SpanGroup.__delitem__`; erasing `self.c.begin() + i` fixes it.
