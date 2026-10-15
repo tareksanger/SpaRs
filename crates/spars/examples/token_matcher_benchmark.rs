@@ -1,17 +1,20 @@
 //! Token Matcher workloads with many rules: registration, matching, and removal are timed
 //! separately, and a hash of the ordered matches lets two builds be compared for identical output.
 //!
-//! Usage: `token_matcher_benchmark TOKENS PATTERNS MIX REPEATS`. Documents use a vocabulary of 200
-//! words, and each pattern is registered as its own rule. `MIX` is `indexed` (every pattern starts
-//! with an exact `Text` or `Lower` value), `mixed` (half of the patterns start with an exact value)
-//! or `unindexed` (no pattern starts with an exact value). Matching reports the median, minimum and
-//! maximum of `REPEATS` calls after one warmup call; removal deletes every tenth rule.
+//! Usage: `token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY]`. Patterns and documents
+//! use words from a vocabulary of `VOCABULARY` words (default 200); documents use at most the first
+//! 9,973 of them. Each pattern is registered as its own rule. `MIX` is `indexed` (every pattern
+//! starts with an exact `Text` or `Lower` value), `mixed` (half of the patterns start with an exact
+//! value) or `unindexed` (no pattern starts with an exact value). Matching reports the median,
+//! minimum and maximum of `REPEATS` calls after one warmup call; removal deletes every tenth rule.
 use serde::Serialize;
 use spars::{
     ByteOffset, CodePointOffset, Doc, Predicate, Repetition, Token, TokenAttribute,
     TokenConstraint, TokenMatch, TokenMatcher, TokenPattern, TokenPatternItem,
 };
-use std::{hint::black_box, time::Instant};
+use std::{hint::black_box, sync::OnceLock, time::Instant};
+
+static VOCABULARY: OnceLock<usize> = OnceLock::new();
 
 #[derive(Serialize)]
 struct Snapshot<'a> {
@@ -58,7 +61,7 @@ fn doc(words: &[String]) -> Doc {
 }
 
 fn word(i: usize) -> String {
-    format!("w{}", i % 200)
+    format!("w{}", i % VOCABULARY.get().copied().unwrap_or(200))
 }
 
 fn item(
@@ -140,9 +143,15 @@ fn unindexed(i: usize) -> TokenPattern {
     TokenPattern { tokens }
 }
 
+// The middle sample, or the mean of the two middle samples for an even count.
 fn median(samples: &mut [f64]) -> f64 {
     samples.sort_by(f64::total_cmp);
-    samples[samples.len() / 2]
+    let middle = samples.len() / 2;
+    if samples.len() % 2 == 0 {
+        (samples[middle - 1] + samples[middle]) / 2.0
+    } else {
+        samples[middle]
+    }
 }
 
 // FNV-1a over the ordered matches, so two builds can be checked for identical output.
@@ -164,9 +173,20 @@ fn fingerprint(matches: &[TokenMatch]) -> String {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [length, count, mix, repeats] = &args[..] else {
-        return Err("usage: token_matcher_benchmark TOKENS PATTERNS MIX REPEATS".into());
+    let usage = "usage: token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY]";
+    let (length, count, mix, repeats, vocabulary) = match &args[..] {
+        [length, count, mix, repeats] => (length, count, mix, repeats, 200),
+        [length, count, mix, repeats, vocabulary] => {
+            (length, count, mix, repeats, vocabulary.parse()?)
+        }
+        _ => return Err(usage.into()),
     };
+    if vocabulary == 0 {
+        return Err("VOCABULARY must be positive".into());
+    }
+    VOCABULARY
+        .set(vocabulary)
+        .map_err(|_| "vocabulary already set")?;
     let (length, count, repeats): (usize, usize, usize) =
         (length.parse()?, count.parse()?, repeats.parse()?);
     let mix = match mix.as_str() {
@@ -219,6 +239,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{}",
         serde_json::json!({
             "tokens": length, "patterns": count, "mix": args[2], "repeats": repeats,
+            "vocabulary": vocabulary,
             "matches": matches.len(), "fingerprint": fingerprint(&matches),
             "matches_after_removal": after_removal.len(),
             "fingerprint_after_removal": fingerprint(&after_removal),
