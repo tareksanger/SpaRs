@@ -303,6 +303,10 @@ fn version_four_also_holds_entity_ids_and_contextual_rows() {
         serde_json::from_str(&document(&words, &[true, false]).to_json().unwrap()).unwrap();
     snapshot["format_version"] = 3.into();
     snapshot["document"]["tokens"][0]["entity_id"] = "q".into();
+    // Snapshot entities must agree with the token IOB tags and types.
+    snapshot["document"]["tokens"][0]["entity_iob"] = "B".into();
+    snapshot["document"]["tokens"][0]["entity_type"] = "X".into();
+    snapshot["document"]["tokens"][1]["entity_iob"] = "O".into();
     snapshot["document"]["entities"] =
         serde_json::json!([{"start": 0, "end": 1, "label": "X", "id": "q"}]);
     snapshot["document"]["tensor"] = serde_json::json!([[1.0], [2.0]]);
