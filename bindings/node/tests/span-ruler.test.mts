@@ -200,9 +200,9 @@ test('SpanRuler options default like spaCy and reject invalid settings', () => {
   for (const name of ['spansKey', 'spansFilter', 'entitiesFilter', 'phraseAttribute']) {
     assert.throws(() => Reflect.construct(SpanRuler, [{ [name]: '\uD800' }]), hasCode('SPARS_INVALID_TEXT'), name);
   }
-  // Unknown options, such as spaCy's own names, and values of the wrong type are rejected.
+  // Unknown options, such as spaCy's own names, values of the wrong type and arrays are rejected.
   for (const options of [{ spans_key: 'x' }, { annotateEnts: true }, { spansKey: 1 }, { spansKey: true }, { spansFilter: 1 }, { entitiesFilter: 1 },
-    { phraseAttribute: 1 }, { overwrite: 'yes' }, { annotateEntities: 1 }, ['x']]) {
+    { phraseAttribute: 1 }, { overwrite: 'yes' }, { annotateEntities: 1 }, [], ['x']]) {
     assert.throws(() => Reflect.construct(SpanRuler, [options]), hasCode('InvalidArg'), JSON.stringify(options));
   }
   // Lexical flag phrases need a model; without one every phrase addition fails.

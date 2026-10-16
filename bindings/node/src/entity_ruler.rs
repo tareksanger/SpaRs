@@ -2,7 +2,7 @@
 //! `entity_ruler`.
 use crate::{document::NativeDocument, errors, phrase_matcher, token_matcher::TokenPattern};
 use napi::{
-    bindgen_prelude::{AsyncTask, ClassInstance, JsObjectValue, Object, Utf16String},
+    bindgen_prelude::{AsyncTask, ClassInstance, JsObjectValue, JsValue, Object, Utf16String},
     Env, Result, Status, Task,
 };
 use napi_derive::napi;
@@ -35,8 +35,14 @@ pub struct RulerPattern {
 }
 
 /// napi objects ignore undeclared properties; reject them so a misspelled field such as `pattern`
-/// cannot silently drop a rule.
+/// cannot silently drop a rule. Arrays are objects to napi but are never valid here.
 pub(crate) fn known_fields(object: &Object, kind: &str, allowed: &[&str]) -> Result<()> {
+    if object.is_array()? {
+        return Err(napi::Error::new(
+            Status::InvalidArg,
+            format!("expected a {kind} object, not an array"),
+        ));
+    }
     let names = object.get_property_names()?;
     for i in 0..names.get_array_length()? {
         let name: String = names.get_element(i)?;

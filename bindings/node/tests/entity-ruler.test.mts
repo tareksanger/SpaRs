@@ -166,7 +166,7 @@ test('EntityRuler options default like spaCy and reject invalid settings', () =>
   assert.throws(() => Reflect.construct(EntityRuler, [{ phraseAttribute: 'lower' }]), hasCode('SPARS_UNSUPPORTED'));
   assert.throws(() => new EntityRuler({ idSeparator: '\uD800' }), hasCode('SPARS_INVALID_TEXT'));
   // Unknown options, such as spaCy's own names, and values of the wrong type are rejected.
-  for (const options of [{ overwrite_ents: true }, { overwriteEnts: true }, { overwriteEntities: 'yes' }, { idSeparator: 5 }]) {
+  for (const options of [{ overwrite_ents: true }, { overwriteEnts: true }, { overwriteEntities: 'yes' }, { idSeparator: 5 }, [], ['x']]) {
     assert.throws(() => Reflect.construct(EntityRuler, [options]), hasCode('InvalidArg'), JSON.stringify(options));
   }
   // Lexical flag phrases need a model; without one every phrase addition fails.
