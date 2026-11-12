@@ -4,12 +4,16 @@ import os
 import re
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
+from json_types import json_object, parse_json
 from node_docs import examples as node_examples
 from node_docs import run_example
 from report_paths import portable_text
+
+LIBRARY_CRATE = 'spars'
 
 
 class DocumentationResult(TypedDict):
@@ -18,6 +22,40 @@ class DocumentationResult(TypedDict):
     passed: bool
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True, slots=True)
+class RustLibrary:
+    """Where Cargo wrote the library the guide examples link against."""
+    rlib: Path
+    dependency_directories: tuple[Path, ...]
+
+
+def rust_library(build_messages: str) -> RustLibrary:
+    """Locate the built library from the output of `cargo build --message-format=json`.
+
+    Cargo's build directory layout is not a stable interface, so every path comes from the
+    artifacts Cargo reports rather than from a fixed folder.
+    """
+    rlib: Path | None = None
+    directories: dict[Path, None] = {}
+    for line in build_messages.splitlines():
+        if not line.startswith('{'):
+            continue
+        message = json_object(parse_json(line))
+        if message.get('reason') != 'compiler-artifact':
+            continue
+        filenames = message.get('filenames')
+        if not isinstance(filenames, list):
+            raise ValueError('Cargo reported a compiler artifact without a list of file names.')
+        paths = [Path(name) for name in filenames if isinstance(name, str)]
+        for path in paths:
+            directories[path.parent] = None
+        if json_object(message.get('target')).get('name') == LIBRARY_CRATE:
+            rlib = next((path for path in paths if path.suffix == '.rlib'), rlib)
+    if rlib is None:
+        raise RuntimeError(f'Cargo did not report an rlib for the {LIBRARY_CRATE} library.')
+    return RustLibrary(rlib, tuple(directories))
 
 
 def rust_examples(text: str) -> int:
@@ -54,7 +92,9 @@ def rustdoc_passed(returncode: int, stdout: str, count: int) -> bool:
 
 
 def check_documents(root: Path, store: Path) -> None:
-    subprocess.run(['cargo', 'build', '--release', '--offline', '--lib'], cwd=root, check=True)
+    built = subprocess.run(['cargo', 'build', '--release', '--offline', '--lib', '--message-format=json'],
+                           cwd=root, check=True, stdout=subprocess.PIPE, text=True)
+    library = rust_library(built.stdout)
     subprocess.run(['cargo', 'build', '--release', '--offline', '--manifest-path',
                     'crates/spars-model/Cargo.toml', '--bin', 'spars'], cwd=root, check=True)
     installed = subprocess.run([
@@ -80,8 +120,9 @@ def check_documents(root: Path, store: Path) -> None:
         if not count:
             continue
         cmd = ['rustdoc', '--test', str(path.relative_to(root)), '--edition', '2021',
-               '--extern', 'spars=target/release/libspars.rlib',
-               '-L', 'dependency=target/release/deps',
+               '--extern', f'{LIBRARY_CRATE}={library.rlib}',
+               *(flag for directory in library.dependency_directories
+                 for flag in ('-L', f'dependency={directory}')),
                '--test-run-directory', '.']
         result = subprocess.run(cmd, cwd=root, text=True, capture_output=True)
         print(result.stdout, end='')
