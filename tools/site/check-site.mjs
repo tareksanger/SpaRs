@@ -5,8 +5,10 @@
 // titles, the version menu, and the files written for language models.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { BASE, SITE_DIRECTORY, SITE_VERSIONS, siteVersionUrl } from './paths.mjs';
+import { BASE, SITE_DIRECTORY, SITE_VERSION, SITE_VERSIONS, siteVersionUrl } from './paths.mjs';
 
+// The copy named by SPARS_SITE_VERSION is the one checked; unset checks the root copy.
+const COPY = `${SITE_VERSION ?? 'root'} copy`;
 const problems = [];
 
 function read(name) {
@@ -53,7 +55,7 @@ for (const name of ['llms-full.txt', 'index.md']) {
 }
 
 if (problems.length > 0) {
-  console.error(problems.join('\n'));
+  console.error(problems.map((problem) => `${COPY}: ${problem}`).join('\n'));
   process.exit(1);
 }
-console.log(`Checked ${pages.length} pages: links stay inside the site, tabs are titled, llms files are present.`);
+console.log(`Checked ${pages.length} pages of the ${COPY}: links stay inside the site, tabs are titled, llms files are present.`);

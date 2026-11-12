@@ -95,19 +95,22 @@ class WorkflowTests(unittest.TestCase):
             self.assertLess(job.index('Swatinem/rust-cache@'), job.index('cargo fetch'))
             self.assertNotIn('cache-hit', job)
 
-    def test_documentation_site_publishes_only_from_main(self) -> None:
+    def test_documentation_site_publishes_only_from_main_and_release_tags(self) -> None:
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/docs.yml').read_text()
         build, deploy = workflow.split('\n  deploy:\n')
-        # Pull requests and pushes watch the same paths, and only main pushes are watched.
-        self.assertIn('\n  push:\n    branches: [main]\n    paths: &site-paths\n', build)
+        # Pull requests and pushes watch the same paths; only main and release tags are pushed.
+        self.assertIn("\n  push:\n    branches: [main]\n    tags: ['v*']\n    paths: &site-paths\n", build)
         self.assertIn('\n  pull_request:\n    paths: *site-paths\n', build)
         self.assertNotIn('pull_request_target', workflow)
         # The build job reads the repository and nothing more.
         self.assertIn('\npermissions:\n  contents: read\n', build)
         self.assertNotIn('write', build)
-        self.assertIn('run: node tools/site/check-site.mjs', build)
+        # The builder needs every release tag, and it checks each copy it builds.
+        self.assertIn('          fetch-depth: 0\n', build)
+        self.assertIn('run: node tools/site/build-versions.mjs', build)
         # Only the deploy job may publish, and it never runs for a pull request or another branch.
-        self.assertIn("    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'\n", deploy)
+        self.assertIn("    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || "
+                      "startsWith(github.ref, 'refs/tags/v'))\n", deploy)
         self.assertIn('    needs: build\n', deploy)
         self.assertIn('    permissions:\n      pages: write\n      id-token: write\n', deploy)
 

@@ -1,4 +1,4 @@
-// Build every published copy of the documentation site into target/site.
+// Build every published copy of the documentation site into target/site, and check each one.
 //
 // The root copy holds the latest release, each release has a copy under its tag, and `main` has a
 // copy under "next". Until a release contains this builder, the root copy holds the checkout and
@@ -13,6 +13,7 @@ import { isReleaseTag, NEXT_VERSION, REPOSITORY_DIRECTORY } from './paths.mjs';
 // build a versioned copy. This file's presence in the tag is that knowledge.
 const BUILDER_PATH = 'tools/site/build-versions.mjs';
 const SITE_FOLDER = 'target/site';
+const SITE_CHECK = join(REPOSITORY_DIRECTORY, 'tools/site/check-site.mjs');
 // Each release is unpacked here, built with its own tools, and removed.
 const RELEASES_DIRECTORY = join(REPOSITORY_DIRECTORY, 'target/site-releases');
 const CHECKOUT = 'checkout';
@@ -61,14 +62,24 @@ function run(command, args, directory, env = process.env) {
   if (done.status !== 0) throw new Error(`${command} ${args.join(' ')} failed in ${directory}.`);
 }
 
-// Build one copy with the site settings and tools in `directory`, into that directory's target/site.
-function build(copy, menu, directory) {
+// The variables that tell the site settings and the site check which copy they are working on.
+function copyEnvironment(copy, menu) {
   const env = { ...process.env };
   delete env.SPARS_SITE_VERSION;
   delete env.SPARS_SITE_VERSIONS;
   if (copy.version !== undefined) env.SPARS_SITE_VERSION = copy.version;
   if (menu.length > 0) env.SPARS_SITE_VERSIONS = menu.join(',');
-  run(join(directory, 'tools/node_modules/.bin/vitepress'), ['build', 'tools/site'], directory, env);
+  return env;
+}
+
+// Build one copy with the site settings and tools in `directory`, into that directory's target/site.
+function build(copy, menu, directory) {
+  run(join(directory, 'tools/node_modules/.bin/vitepress'), ['build', 'tools/site'], directory, copyEnvironment(copy, menu));
+}
+
+// Check a copy where it is published, with this checkout's check, whichever release built it.
+function check(copy, menu) {
+  run(process.execPath, [SITE_CHECK], REPOSITORY_DIRECTORY, copyEnvironment(copy, menu));
 }
 
 // Unpack a release's files, as committed, and install the tools its lock file pins.
@@ -101,12 +112,13 @@ function main() {
       console.log(`Building the ${describe(copy)}.`);
       if (copy.source === CHECKOUT) {
         build(copy, plan.menu, REPOSITORY_DIRECTORY);
-        continue;
+      } else {
+        if (!unpacked.has(copy.source)) unpacked.set(copy.source, unpackRelease(copy.source));
+        const releaseDirectory = unpacked.get(copy.source);
+        build(copy, plan.menu, releaseDirectory);
+        publish(copy, releaseDirectory);
       }
-      if (!unpacked.has(copy.source)) unpacked.set(copy.source, unpackRelease(copy.source));
-      const releaseDirectory = unpacked.get(copy.source);
-      build(copy, plan.menu, releaseDirectory);
-      publish(copy, releaseDirectory);
+      check(copy, plan.menu);
     }
   } finally {
     rmSync(RELEASES_DIRECTORY, { recursive: true, force: true });
