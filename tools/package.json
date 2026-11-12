@@ -2,9 +2,11 @@
   "name": "spars-development-tools",
   "private": true,
   "version": "0.0.0",
-  "description": "Type checking for SpaRs development tools; not a runtime dependency",
+  "description": "Development tools for SpaRs: type checking, release preparation and the documentation site; not a runtime dependency",
   "devDependencies": {
     "pyright": "1.1.414",
-    "release-please": "17.11.2"
+    "release-please": "17.11.2",
+    "vitepress": "1.6.4",
+    "vitepress-plugin-llms": "1.14.0"
   }
 }

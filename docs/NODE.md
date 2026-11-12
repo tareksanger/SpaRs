@@ -26,13 +26,21 @@ The following executable example uses the official wheel acquired by the referen
 
 ```typescript
 import assert from 'node:assert/strict';
-import { downloadModel, loadModel } from './index.js';
+import { downloadModel, loadModel } from '@spars/node';
 
+// Install the small English model into the model folder. A model is the set of files
+// SpaRs needs to understand a language. The `archive` option installs it from a file
+// already on disk, so this step needs no internet connection.
 await downloadModel('en_core_web_sm', {
   archive: 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
 });
-const model = await loadModel('en_core_web_sm');
-assert.equal((await model.process('Alice visits London.')).tokens[0]?.text, 'Alice');
+
+// Load the installed model by its name. Loading reads files only; it never downloads.
+const nlp = await loadModel('en_core_web_sm');
+
+// Process a sentence and check its first token. A token is one piece of the text,
+// such as a word or a punctuation mark. Here the first token is the word "Alice".
+assert.equal((await nlp.process('Alice visits London.')).tokens[0]?.text, 'Alice');
 ```
 
 `downloadModel(name, {path?, version?, archive?})` resolves to the installed directory. Existing installations are verified and reused. `loadModel(name, {path?})` loads by name; an explicit directory such as `./models/export` remains supported. Bare names select installed models even if a same-named directory exists in the working directory. Missing models reject with a download hint. Async calls capture environment and relative paths when called, before work is queued. Downloads use Node's worker pool and share the Rust installer's checksum verification, archive limits, staging, and locking; cancellation and progress callbacks are not implemented.
@@ -43,17 +51,38 @@ Save this example as `bindings/node/analyze.mts`, then run `node bindings/node/a
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.process('Alice works in London.');
+import { loadModel } from '@spars/node';
+
+// Load the model once. It uses the name in the SPARS_MODEL environment variable,
+// or the large English model when that variable is not set.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process a sentence. The result holds the text split into tokens (words and
+// punctuation marks) plus what the model worked out about them.
+const doc = await nlp.process('Alice works in London.');
+
+// The tokens are: Alice(0) works(1) in(2) London(3) .(4)
 assert.equal(doc.tokens[0]?.text, 'Alice');
+
+// An entity is a real-world thing named in the text, such as a person or a place.
+// Check that the model produced a list of them before reading it.
 assert.ok(doc.entities);
+
+// Keep only the entities labeled GPE, the label for countries, cities and similar
+// places, and turn each one back into text.
 const places = doc.entities.filter(entity => entity.label === 'GPE').map(entity => {
+  // An entity says which tokens it covers. `end` is exclusive, so the last token
+  // of the entity is at `end - 1`.
   const first = doc.tokens[entity.start];
   const last = doc.tokens[entity.end - 1];
   assert.ok(first && last);
+
+  // Cut the entity out of the original text. UTF-16 offsets are positions counted
+  // the way JavaScript strings count them, so they work directly with `slice`.
   return doc.text.slice(first.utf16Start, last.utf16End);
 });
+
+// The only place named in the sentence is London.
 assert.deepEqual(places, ['London']);
 console.log(places);
 ```
@@ -70,22 +99,39 @@ Entity labels (`EntityLabel`), fine-grained tags (`FineGrainedTag`), dependency 
 
 ```typescript
 import assert from 'node:assert/strict';
-import { isSparsError, NativeDocument, PhraseMatcher } from './index.js';
-import type { EntityLabel, TokenConstraint } from './index.js';
+import { isSparsError, NativeDocument, PhraseMatcher } from '@spars/node';
+import type { EntityLabel, TokenConstraint } from '@spars/node';
 
-declare module './index.js' {
+// Register a custom entity label. An entity label names the kind of thing a piece
+// of text refers to, such as PERSON. Adding PRODUCT_CODE to this interface makes
+// the editor offer it as a completion alongside the labels of the official models.
+declare module '@spars/node' {
   interface EntityLabels { PRODUCT_CODE: true }
 }
 
+// The registered label is accepted as an EntityLabel.
 const label: EntityLabel = 'PRODUCT_CODE';
+
+// A token condition: "this token looks like a number". `like_num` is a lexical
+// flag, a yes-or-no fact about a word, so the types allow only a `flag` predicate.
 const number: TokenConstraint = { attribute: 'like_num', predicate: { kind: 'flag', value: true } };
+
+// 'LOWER' is one of the attributes a PhraseMatcher can compare, so this compiles
+// and the matcher reports the attribute it was given.
 assert.equal(new PhraseMatcher('LOWER').attribute, 'LOWER');
+
+// A misspelled attribute is a compile error. The line below tells TypeScript to
+// expect that error, and the assertion shows the mistake also fails when run.
 // @ts-expect-error 'LOWERR' is not a PhraseMatcher attribute
 assert.throws(() => new PhraseMatcher('LOWERR'));
+
+// Cause an error on purpose: '{}' is not a valid saved document.
 try {
   NativeDocument.fromSnapshot('{}');
   assert.fail('expected an error');
 } catch (error) {
+  // A caught value could be anything. `isSparsError` confirms it is a SpaRs error,
+  // so TypeScript knows `error.code` is one of the SPARS_* codes.
   assert.ok(isSparsError(error));
   console.log(label, number.attribute, error.code);
 }
@@ -95,42 +141,73 @@ This prints `PRODUCT_CODE like_num SPARS_INVALID_MODEL`. `isSparsError(error)` n
 
 ## Batches, stages, and vectors
 
-This example can also be saved beside `index.js` and run from the repository root:
+This example can also be saved in `bindings/node` and run from the repository root:
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-assert.equal(model.maxLength, 1_000_000);
-assert.equal(model.batchSize, 256);
-model.maxLength = 100_000;
-model.batchSize = 64;
+// Load the model once and reuse it for every text.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Each model starts with two settings. `maxLength` is the longest text it accepts,
+// counted in characters (Unicode code points). `batchSize` is how many texts are
+// handed to the background worker in one group; such a group is called a batch.
+assert.equal(nlp.maxLength, 1_000_000);
+assert.equal(nlp.batchSize, 256);
+
+// Both settings can be changed while the model is not processing anything.
+nlp.maxLength = 100_000;
+nlp.batchSize = 64;
+
+// `pipe` reads texts a few at a time and hands back each result as it is ready.
+// A stage is one step of the model's pipeline. Stopping at 'Tokenizer' only splits
+// the text into tokens (words and punctuation marks) and skips the later steps.
 const streamed: string[] = [];
-for await (const doc of model.pipe(['😀 café', ''], { batchSize: 2, stage: 'Tokenizer' })) {
+for await (const doc of nlp.pipe(['😀 café', ''], { batchSize: 2, stage: 'Tokenizer' })) {
   streamed.push(doc.text);
 }
+
+// The results arrive in the same order as the inputs. Empty text is allowed.
 assert.deepEqual(streamed, ['😀 café', '']);
-const docs = await model.processBatch(streamed, 'Tokenizer');
+
+// `processBatch` takes a whole list of texts and returns all the results together.
+const docs = await nlp.processBatch(streamed, 'Tokenizer');
+
+// The first token is the emoji. Its end position depends on the unit used to count:
+// JavaScript strings store this emoji as 2 UTF-16 units, and UTF-8 stores it as 4 bytes.
 assert.equal(docs[0]?.tokens[0]?.utf16End, 2);
 assert.equal(docs[0]?.tokens[0]?.byteEnd, 4);
+
+// Entities are the named things in a text, such as people and places. The tokenizer
+// stage does not look for them, so the list is `null`, meaning "not computed".
 assert.equal(docs[0]?.entities, null);
-assert.deepEqual((await model.process('')).entities, []);
-const vector = model.vector('dog');
+
+// The full pipeline does look for entities. Empty text has none, so the list is
+// empty: computed, with nothing found.
+assert.deepEqual((await nlp.process('')).entities, []);
+
+// A vector is a list of numbers that stands for a word's meaning. Words with
+// similar meanings have similar numbers.
+const vector = nlp.vector('dog');
 assert.ok(vector instanceof Float32Array);
+
+// The medium and large English models store 300 numbers for each word.
 assert.equal(vector.length, 300);
-assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
+
+// A word the model has no stored vector for gives `null`.
+assert.equal(nlp.vector('spars_unknown_🙂_lexeme'), null);
 ```
 
 `process(text, stage?)` and `processBatch(texts, stage?)` return promises. The default runs the full pipeline. A stage selects an ordered prefix: `Tokenizer`, `Tagger`, `Parser`, `AttributeRuler`, `Lemmatizer`, or `Ner`. Later annotations remain `null`; computed empty lists remain `[]`. The early-stage unavailable-value contract follows SpaRs and does not reproduce every default value in a partially processed Python Doc.
 
-`model.maxLength` defaults to 1,000,000 Unicode code points, following spaCy 3.8.14's `Language.max_length`. An emoji such as `😀` counts as one code point; `e` followed by a combining accent counts as two. Equality is allowed. The native worker checks the limit before tokenization; exceeding it rejects with `SPARS_TEXT_TOO_LONG` and an `[E088]` message. Set `model.maxLength` to a nonnegative unsigned 32-bit integer; zero permits only empty text. This Node setting does not change Rust's direct `Model::process` API. Invalid UTF-16 remains unsupported.
+`nlp.maxLength` defaults to 1,000,000 Unicode code points, following spaCy 3.8.14's `Language.max_length`. An emoji such as `😀` counts as one code point; `e` followed by a combining accent counts as two. Equality is allowed. The native worker checks the limit before tokenization; exceeding it rejects with `SPARS_TEXT_TOO_LONG` and an `[E088]` message. Set `nlp.maxLength` to a nonnegative unsigned 32-bit integer; zero permits only empty text. This Node setting does not change Rust's direct `Model::process` API. Invalid UTF-16 remains unsupported.
 
-`model.batchSize` reads the exported `[nlp] batch_size`: 256 for the supported official sm/md/lg releases. When that setting is absent, it uses spaCy's `Language` constructor default of 1,000. Set a positive unsigned 32-bit integer to override it per model. This is a processing chunk size, not a maximum number of input documents. Both model settings throw for invalid values or changes while any inference is pending in this package instance and JavaScript isolate. This stricter validation and idle-only mutation are Node contracts; Python permits direct attribute assignment.
+`nlp.batchSize` reads the exported `[nlp] batch_size`: 256 for the supported official sm/md/lg releases. When that setting is absent, it uses spaCy's `Language` constructor default of 1,000. Set a positive unsigned 32-bit integer to override it per model. This is a processing chunk size, not a maximum number of input documents. Both model settings throw for invalid values or changes while any inference is pending in this package instance and JavaScript isolate. This stricter validation and idle-only mutation are Node contracts; Python permits direct attribute assignment.
 
-`processBatch` snapshots the entire input array, processes consecutive chunks of at most `model.batchSize`, and resolves to all documents in input order. Each chunk uses a background task that performs sequential document inference. A failure rejects the whole call. The call retains a single admission slot across chunks, including result creation, and returns that slot on success or failure. All input strings and completed results remain in memory until the call finishes. Concurrent calls share immutable model weights and own their processing state.
+`processBatch` snapshots the entire input array, processes consecutive chunks of at most `nlp.batchSize`, and resolves to all documents in input order. Each chunk uses a background task that performs sequential document inference. A failure rejects the whole call. The call retains a single admission slot across chunks, including result creation, and returns that slot on success or failure. All input strings and completed results remain in memory until the call finishes. Concurrent calls share immutable model weights and own their processing state.
 
-`model.pipe(texts, {batchSize?, stage?})` returns an async generator over a synchronous or asynchronous iterable of strings. No input is consumed until iteration starts. It resolves the buffering size from its option or `model.batchSize` on the first iteration, processes one buffer, yields documents in order, then reads the next buffer. The final buffer may be smaller. Breaking iteration closes the source; a source or processing failure rejects iteration and stops it. Earlier buffers may already have been yielded. The initial buffering size stays fixed for that iterator; changes to model settings while idle apply when the next buffer is submitted. Avoid retaining yielded documents if bounded memory is required.
+`nlp.pipe(texts, {batchSize?, stage?})` returns an async generator over a synchronous or asynchronous iterable of strings. No input is consumed until iteration starts. It resolves the buffering size from its option or `nlp.batchSize` on the first iteration, processes one buffer, yields documents in order, then reads the next buffer. The final buffer may be smaller. Breaking iteration closes the source; a source or processing failure rejects iteration and stops it. Earlier buffers may already have been yielded. The initial buffering size stays fixed for that iterator; changes to model settings while idle apply when the next buffer is submitted. Avoid retaining yielded documents if bounded memory is required.
 
 These buffers are not spaCy's component-level neural batching, and there is no `n_process` multiprocessing, `as_tuples`, per-component pipe configuration, or cancellation support. `pipe` accepts only `batchSize` and `stage` options; unknown options reject during iteration. Buffer failure timing need not match spaCy for every pipeline, especially tokenizer-only processing. Both input copying and result creation run on the JavaScript thread, so large documents or buffers can still delay the event loop. The default maximum length follows spaCy; it does not promise that all accepted text fits in memory or avoids native regex/inference limits.
 
@@ -142,28 +219,41 @@ The published `@spars/node@0.2.0` package has no package-level admission queue, 
 | --- | --- | --- |
 | More than 34 unfinished inference calls across models in one package instance and JavaScript isolate | Two calls can be active and 32 wait; further calls reject with `SPARS_BUSY`. A synchronous burst of 35 calls previously reached the native pool without package-level rejection. | Bound submissions, consume `pipe` incrementally, or use `processBatch` when retaining all results is acceptable. Configure larger finite `maxActive`/`maxQueued` values during startup only when the service has capacity. |
 | A service relying on more than two concurrent native inference tasks | Admission now limits active jobs to two, regardless of a larger libuv pool. Requests can wait longer and application deadlines may expire. | Measure the workload and tune `configureExecution`, keeping application backpressure. Increasing `UV_THREADPOOL_SIZE` alone does not change package admission. |
-| Any document longer than 1,000,000 Unicode code points | The worker rejects with the new `SPARS_TEXT_TOO_LONG` code before tokenization, including within `processBatch`. The released package had no separate document-length policy. | Set `model.maxLength` to an intentional larger bound on each loaded model while inference is idle, or split input when losing cross-boundary NLP context is acceptable. Handle the new error; raising the limit does not guarantee enough memory or successful inference. |
+| Any document longer than 1,000,000 Unicode code points | The worker rejects with the new `SPARS_TEXT_TOO_LONG` code before tokenization, including within `processBatch`. The released package had no separate document-length policy. | Set `nlp.maxLength` to an intentional larger bound on each loaded model while inference is idle, or split input when losing cross-boundary NLP context is acceptable. Handle the new error; raising the limit does not guarantee enough memory or successful inference. |
 | JavaScript callers matching native argument-error codes or messages | Wrapper validation of invalid `process`/`processBatch` arguments and unknown stages throws `TypeError`. Examples that previously reported native `InvalidArg` or `StringExpected` no longer carry those codes; a full queue may reject a batch with `SPARS_BUSY` before checking its elements. | Validate inputs and handle `TypeError` for argument mistakes. Catch documented `SPARS_*` processing errors separately; do not rely on native conversion messages. |
 | Hand-edited or third-party model manifests with previously ignored `config` data | The loader now reads `[nlp] batch_size`; a null/non-string config, malformed or duplicate processing fields, or interpolation can reject loading with `SPARS_INVALID_MODEL`. This loader change also affects direct Rust consumers. | Use an unmodified official export or regenerate compatible model assets. For deliberately maintained manifests, supply the actual literal positive integer batch size in the preserved config; see [model format](MODEL_FORMAT.md). Normal supported official exports need no re-export. |
 | Deployments with `NAPI_RS_NATIVE_LIBRARY_PATH` pointing to an older addon, or manually mixed wrapper and native versions | Package import throws `SPARS_NATIVE_INCOMPATIBLE` when required native settings accessors are absent. This check prevents silently returning empty batches with an older addon. | Remove the override to use the matching packaged addon, or update it to a compatible build. Reinstall the root and platform packages together; do not combine an old binary with a new wrapper. |
 
 A rejected `Promise.all` does not cancel calls already admitted. Do not retry the entire original collection blindly: account for completed and still-running work. The limit is shared across models, so creating another model in the same isolate does not create a separate queue. `configureExecution(null)` restores two active jobs and 32 queued; it does not restore the published package's unbounded submission behavior.
 
-For a collection that previously used `Promise.all(texts.map(text => model.process(text)))`, this example submits one buffer at a time and verifies that all 100 documents are consumed. It assumes no competing producers saturate the shared queue. Configure settings during startup before starting other inference:
+For a collection that previously used `Promise.all(texts.map(text => nlp.process(text)))`, this example submits one buffer at a time and verifies that all 100 documents are consumed. It assumes no competing producers saturate the shared queue. Configure settings during startup before starting other inference:
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model once, during startup.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// `maxLength` is the longest text the model accepts, counted in characters
+// (Unicode code points). The default is 1,000,000.
 // Only raise this if the application intentionally accepts larger documents.
-model.maxLength = 2_000_000;
+nlp.maxLength = 2_000_000;
+
+// Build a list of 100 texts to process.
 const texts = Array.from({ length: 100 }, () => 'Alice visits London.');
+
+// `pipe` sends the texts to the model one buffer at a time: here 64 texts, then
+// the remaining 36. Only one buffer waits for the model at once, so the 100 texts
+// do not all ask for a turn at the same moment.
 let completed = 0;
-for await (const doc of model.pipe(texts, { batchSize: 64 })) {
+for await (const doc of nlp.pipe(texts, { batchSize: 64 })) {
+  // Each result comes back in input order and keeps its original text.
   assert.equal(doc.text, 'Alice visits London.');
   completed++;
 }
+
+// Every one of the 100 texts was processed.
 assert.equal(completed, texts.length);
 ```
 
@@ -189,14 +279,29 @@ Inference admission defaults to two active jobs and 32 queued jobs per package i
 
 ```typescript
 import assert from 'node:assert/strict';
-import { configureExecution, configureInputLimits, loadModel } from './index.js';
+import { configureExecution, configureInputLimits, loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model during startup, before any text is processed.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Limit how much work runs at once. Processing happens on worker threads, which are
+// background helpers that keep the main program responsive. At most 2 jobs run at
+// a time, and up to 32 more wait in a queue (a line). Any call beyond that is
+// rejected with the SPARS_BUSY error instead of piling up.
 configureExecution({ maxActive: 2, maxQueued: 32 });
+
+// Limit how big the input may be. Lengths are counted in UTF-16 units, the same
+// count as JavaScript's `string.length`. One text may have at most 32,768 units,
+// one batch (a list of texts sent together) at most 128 texts, and all the texts
+// of one batch together at most 65,536 units.
 configureInputLimits({ maxTextLength: 32_768, maxBatchSize: 128, maxBatchTextLength: 65_536 });
+
 // Keep pipe buffers within the explicit maxBatchSize policy.
-model.batchSize = 128;
-assert.equal((await model.process('Hello.')).text, 'Hello.');
+nlp.batchSize = 128;
+
+// A short text fits inside every limit, so it is processed as usual.
+assert.equal((await nlp.process('Hello.')).text, 'Hello.');
+
 // Demonstration only: restore default admission and remove additional input caps.
 // Omit these resets in a server that should retain its custom policies.
 configureExecution(null);
@@ -219,31 +324,44 @@ Processing failures reach a caller in two ways. Invalid configuration values and
 
 ```typescript
 import assert from 'node:assert/strict';
-import { configureExecution, configureInputLimits, loadModel } from './index.js';
-import type { Document, InputLimits, Model } from './index.js';
+import { configureExecution, configureInputLimits, loadModel } from '@spars/node';
+import type { Document, InputLimits, Model } from '@spars/node';
 
+// Read the `code` of an error, such as 'SPARS_BUSY'. It returns `undefined` when
+// the value is not an error or has no text code.
 // Caught values are unknown
 function errorCode(error: unknown): string | undefined {
   return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
 }
 
-async function processWithRetry(model: Model, text: string, attempts = 3): Promise<Document> {
+// Process one text, trying again a few times when the package is too busy.
+async function processWithRetry(nlp: Model, text: string, attempts = 3): Promise<Document> {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await model.process(text);
+      return await nlp.process(text);
     } catch (error) {
+      // SPARS_BUSY means the text was fine but there was no free place to run it.
+      // Any other error, or running out of attempts, is passed on to the caller.
       if (errorCode(error) !== 'SPARS_BUSY' || attempt >= attempts) throw error;
+
+      // Wait before the next attempt, a little longer each time: 50 ms, then 100 ms.
       await new Promise(resolve => setTimeout(resolve, 50 * attempt));
     }
   }
 }
 
+// Split a list of separate texts into batches (groups sent together) that each fit
+// the input limits. It never cuts a single text into pieces.
 function planBatches(texts: readonly string[], limits: InputLimits): string[][] {
   const batches: string[][] = [];
   let current: string[] = [];
   let length = 0;
   for (const text of texts) {
+    // A text that is too long by itself cannot fit in any batch, so report it.
     if (text.length > Math.min(limits.maxTextLength, limits.maxBatchTextLength)) throw new RangeError('Document exceeds the input policy');
+
+    // Close the current batch when it is full, or when adding this text would make
+    // its total length too large. Then start an empty one.
     if (current.length > 0 && (current.length === limits.maxBatchSize || length + text.length > limits.maxBatchTextLength)) {
       batches.push(current);
       current = [];
@@ -252,58 +370,109 @@ function planBatches(texts: readonly string[], limits: InputLimits): string[][] 
     current.push(text);
     length += text.length;
   }
+
+  // Keep the last batch if it holds any texts.
   if (current.length > 0) batches.push(current);
   return batches;
 }
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model once, during startup.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
 
+// Error case 1: a wrong setting or a wrong argument throws straight away, on the
+// line that made the call. Zero active jobs is not allowed, and 42 is not a string.
 assert.throws(() => configureExecution({ maxActive: 0, maxQueued: 0 }), RangeError);
-assert.throws(() => model.processBatch(['ok', 42 as unknown as string]), TypeError);
+assert.throws(() => nlp.processBatch(['ok', 42 as unknown as string]), TypeError);
 
+// Error case 2: too much work at once. Allow one running job and no queue (the
+// line where extra jobs wait), then start a job without waiting for it to finish.
 configureExecution({ maxActive: 1, maxQueued: 0 });
-const running = model.process('Alice visits London.', 'Tokenizer');
-await assert.rejects(model.process('Overflow.'), { code: 'SPARS_BUSY' });
-await assert.rejects(model.processBatch(['ok', 42 as unknown as string]), { code: 'SPARS_BUSY' });
+const running = nlp.process('Alice visits London.', 'Tokenizer');
+
+// While that job holds the only place, another call is rejected with SPARS_BUSY.
+await assert.rejects(nlp.process('Overflow.'), { code: 'SPARS_BUSY' });
+
+// The busy check comes before the arguments are looked at, so the same bad batch
+// that threw a TypeError above is rejected with SPARS_BUSY here.
+await assert.rejects(nlp.processBatch(['ok', 42 as unknown as string]), { code: 'SPARS_BUSY' });
+
+// Let the first job finish, then restore the default limits: 2 running, 32 waiting.
 await running;
 configureExecution(null);
-assert.equal((await processWithRetry(model, 'Recovered.')).text, 'Recovered.');
 
+// With a free place again, the same kind of call succeeds.
+assert.equal((await processWithRetry(nlp, 'Recovered.')).text, 'Recovered.');
+
+// Error case 3: input that is too big. Set small limits: 20 UTF-16 units (the
+// count `string.length` gives) per text, 2 texts per batch, 30 units per batch.
 // Oversize rejection the big batch
 const limits: InputLimits = { maxTextLength: 20, maxBatchSize: 2, maxBatchTextLength: 30 };
 configureInputLimits(limits);
-await assert.rejects(model.processBatch(['Short.', 'x'.repeat(21)]), { code: 'SPARS_INPUT_LIMIT' });
+
+// One text of 21 units is over the limit, so the whole batch is rejected.
+await assert.rejects(nlp.processBatch(['Short.', 'x'.repeat(21)]), { code: 'SPARS_INPUT_LIMIT' });
+
+// The planning helper refuses the same oversized text before anything is sent.
 assert.throws(() => planBatches(['x'.repeat(21)], limits), RangeError);
+
+// Three short texts are 10, 11 and 10 units long. The first two fit in one batch
+// (21 units). That batch then holds 2 texts, the most allowed, so the helper puts
+// the third text in a second batch.
 const texts = ['Dogs bark.', 'Cats sleep.', 'Birds fly.'];
 const docs: Document[] = [];
-for (const batch of planBatches(texts, limits)) docs.push(...await model.processBatch(batch));
+for (const batch of planBatches(texts, limits)) docs.push(...await nlp.processBatch(batch));
+
+// Every text was processed, and the results are in the original order.
 assert.deepEqual(docs.map(doc => doc.text), texts);
+
+// Remove the extra input limits.
 configureInputLimits(null);
 
-await assert.rejects(processWithRetry(model, '\ud800'), { code: 'SPARS_INVALID_TEXT' });
-assert.equal((await model.process('Still works.')).text, 'Still works.');
+// Error case 4: text the model cannot read. '\ud800' is half of a two-part UTF-16
+// character with its other half missing. The error is not SPARS_BUSY, so the retry
+// helper passes it on at once.
+await assert.rejects(processWithRetry(nlp, '\ud800'), { code: 'SPARS_INVALID_TEXT' });
+
+// A failed call does not break anything: the next valid call succeeds.
+assert.equal((await nlp.process('Still works.')).text, 'Still works.');
 ```
 
 For `process`, `processBatch`, `pipe`, and `findMatches`, `SPARS_BUSY` means every active slot is in use and the waiting queue is full; it does not indicate a problem with the input. (Matcher `add` and `remove` also throw `SPARS_BUSY` synchronously while a search on that matcher is pending; see [token matching](#token-matching).) Retrying immediately and without a limit adds calls to a queue that is already full and prolongs the overload. Use a bounded policy instead: a few delayed attempts, as `processWithRetry` shows, or reject the request (for example with HTTP 503) and let the client retry later. The same call can fail differently depending on load. While the queue has room, `processBatch(['ok', 42])` throws `TypeError`; while the queue is full, it rejects with `SPARS_BUSY`, because admission is checked before batch elements are inspected. A retried call that is admitted can therefore still throw `TypeError`, so validate arguments before retrying.
 
-`SPARS_INPUT_LIMIT` means an input exceeded the policy set with `configureInputLimits`. A batch is rejected as a whole when its element count, total length, or any single element exceeds the policy; no documents from that call are returned. Either reject the input, or group separate, independent documents into smaller batches, as `planBatches` does. Do not cut one document into arbitrary pieces to fit a limit: each piece is processed without the surrounding text, so tokens, sentences, entities, and dependencies near a cut can change, and offsets start again at zero in each piece. The per-model `model.maxLength` limit is separate: it counts Unicode code points and rejects with `SPARS_TEXT_TOO_LONG` after admission, also failing the whole batch. With `pipe`, a rejection stops iteration after earlier buffers may already have been yielded, so account for consumed documents instead of restarting the source.
+`SPARS_INPUT_LIMIT` means an input exceeded the policy set with `configureInputLimits`. A batch is rejected as a whole when its element count, total length, or any single element exceeds the policy; no documents from that call are returned. Either reject the input, or group separate, independent documents into smaller batches, as `planBatches` does. Do not cut one document into arbitrary pieces to fit a limit: each piece is processed without the surrounding text, so tokens, sentences, entities, and dependencies near a cut can change, and offsets start again at zero in each piece. The per-model `nlp.maxLength` limit is separate: it counts Unicode code points and rejects with `SPARS_TEXT_TOO_LONG` after admission, also failing the whole batch. With `pipe`, a rejection stops iteration after earlier buffers may already have been yielded, so account for consumed documents instead of restarting the source.
 
 Handle only the codes that the application's policy understands, and rethrow the rest, as `processWithRetry` does with `SPARS_INVALID_TEXT`. A rejected call does not leave the package unusable: later valid calls succeed after busy, input-limit, and processing rejections. The defaults remain two active jobs, 32 queued jobs, and no additional input caps. Both policies apply per package instance and JavaScript isolate. They bound admission and input size, not the JavaScript-thread cost of converting large accepted results into objects.
 
 ## Retain and restore native documents
 
-`model.processDocument(text, stage?)` runs the same pipeline as `process` and retains an immutable native document. It shares the inference queue, optional text input limit, and per-model `maxLength`. Existing `process` and `processBatch` results remain plain JavaScript objects. Call `toObject()` when you need that output shape; each call returns an independent copy.
+`nlp.processDocument(text, stage?)` runs the same pipeline as `process` and retains an immutable native document. It shares the inference queue, optional text input limit, and per-model `maxLength`. Existing `process` and `processBatch` results remain plain JavaScript objects. Call `toObject()` when you need that output shape; each call returns an independent copy.
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, NativeDocument } from './index.js';
+import { loadModel, NativeDocument } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Alice visits London.');
+// Load the model once.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process a sentence and keep the result as a native document. A native document
+// stays in the fast Rust part of the library instead of being copied into plain
+// JavaScript objects, and it cannot be changed.
+const doc = await nlp.processDocument('Alice visits London.');
+
+// A snapshot is the whole document saved as a JSON string. Save the document,
+// then build a second document from that string.
 const restored = NativeDocument.fromSnapshot(doc.toSnapshot());
+
+// `toObject` copies a native document into plain JavaScript objects. The restored
+// document gives exactly the same output as the original, so nothing was lost.
 assert.deepEqual(restored.toObject(), doc.toObject());
+
+// Each `toObject` call returns its own separate copy. Emptying the token list of
+// one copy changes only that copy.
 const output = restored.toObject();
 output.tokens.length = 0;
+
+// The native document still has all its tokens (words and punctuation marks).
 assert.ok(restored.toObject().tokens.length > 0);
 ```
 
@@ -315,14 +484,27 @@ A native document's text, tokens, spans and contextual tensor live outside the J
 
 ```typescript
 import assert from 'node:assert/strict';
-import { NativeDocument, reportedNativeMemory } from './index.js';
+import { NativeDocument, reportedNativeMemory } from '@spars/node';
 
+// Note how much native memory has been reported so far, in bytes. Native memory is
+// memory used outside JavaScript's own storage, here by the Rust part of the library.
 const before = reportedNativeMemory();
+
+// Build a document from a snapshot, a document saved as a JSON string. This one is
+// written by hand, so no model is needed. It holds the text and two tokens (pieces
+// of the text): "Hello" at bytes 0 to 5 and "world" at bytes 6 to 11. `idx` is where
+// each token starts counted in characters, `whitespace` says whether a space
+// follows it, and `norm` is its normalized (here lowercase) form.
 const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { text: 'Hello world', tokens: [
   { start: 0, end: 5, idx: 0, whitespace: true, norm: 'hello' },
   { start: 6, end: 11, idx: 6, whitespace: false, norm: 'world' },
 ] } }));
+
+// Creating the document reported its memory, so the total went up.
 assert.ok(reportedNativeMemory() > before);
+
+// "Hello world" is 11 UTF-16 units long, the same count as JavaScript's
+// `string.length` gives.
 assert.equal(doc.utf16Length, 11);
 ```
 
@@ -330,16 +512,27 @@ assert.equal(doc.utf16Length, 11);
 
 ## Lexical attributes
 
-`model.lexeme(text)` returns an owned record of the existing native lexical attributes, including normalization, shape, prefix/suffix, lexical flags, and static-vector availability. It runs synchronously and does not change the vocabulary.
+`nlp.lexeme(text)` returns an owned record of the existing native lexical attributes, including normalization, shape, prefix/suffix, lexical flags, and static-vector availability. It runs synchronously and does not change the vocabulary.
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const lexeme = model.lexeme('London');
+// Load the model once.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Look up a lexeme. A lexeme is a word seen by itself, outside any sentence. It
+// holds the facts that are true wherever the word appears, such as its spelling.
+const lexeme = nlp.lexeme('London');
+
+// "London" is made of letters only.
 assert.equal(lexeme.isAlpha, true);
+
+// The suffix is the last three characters of the word.
 assert.equal(lexeme.suffix, 'don');
+
+// `orth` is a number that identifies the exact spelling. It can be too large for
+// an ordinary JavaScript number, so it is a `bigint`, which stays exact.
 assert.equal(typeof lexeme.orth, 'bigint');
 ```
 
@@ -354,15 +547,27 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ModelStore } from './index.js';
+import { ModelStore } from '@spars/node';
 
+// Create an empty temporary folder to act as the model store. A model store is
+// the folder where installed models are kept.
 const directory = mkdtempSync(join(tmpdir(), 'spars-store-'));
 try {
+  // Open the store on that folder.
   const store = new ModelStore(directory);
+
+  // Make a folder directly inside the store to stand in for an installed model.
   const installed = join(directory, 'example-installation');
   mkdirSync(installed);
+
+  // Tell the store that this folder is the installation for the name
+  // 'en_core_web_sm'. Registering does not check that the folder holds a real model.
   await store.register('en_core_web_sm', installed);
+
+  // Asking the store for that name gives back the full path of the same folder.
   assert.equal(await store.resolve('en_core_web_sm'), realpathSync(installed));
+
+// Delete the temporary folder at the end, even if a step above failed.
 } finally { rmSync(directory, { recursive: true, force: true }); }
 ```
 
@@ -374,16 +579,35 @@ Native documents expose checked token and span views that retain the document. I
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Alice runs.');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process a sentence and keep it as a native document, which can be explored with
+// views. The tokens (words and punctuation marks) are: Alice(0) runs(1) .(2)
+const doc = await nlp.processDocument('Alice runs.');
+
+// A token view is a small object that points at one token of the document.
 const alice = doc.token(0);
 assert.equal(alice.text, 'Alice');
+
+// The model links every word to the word it depends on, called its head. "Alice"
+// is the one doing the running, so the head of "Alice" is "runs".
 assert.equal(alice.head()?.text, 'runs');
+
+// Ancestors are the head, then the head's head, and so on. "runs" is the main word
+// of the sentence, so the chain stops there.
 assert.deepEqual(alice.ancestors().map(token => token.text), ['runs']);
+
+// A token can report the sentence it belongs to.
 assert.equal(alice.sentence().text, 'Alice runs.');
+
+// A span is a run of tokens in a row. The end index is exclusive, so span(0, 2)
+// covers tokens 0 and 1.
 assert.equal(doc.span(0, 2).text, 'Alice runs');
+
+// The document contains one sentence.
 assert.equal(doc.sentenceViews()?.length, 1);
 ```
 
@@ -395,16 +619,37 @@ assert.equal(doc.sentenceViews()?.length, 1);
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Tim Cook visited London.');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process a sentence. The tokens (words and punctuation marks) are:
+// Tim(0) Cook(1) visited(2) London(3) .(4)
+// The model finds two entities, which are named real-world things: "Tim Cook" with
+// the label PERSON and "London" with the label GPE (a country, city or similar place).
+const doc = await nlp.processDocument('Tim Cook visited London.');
+
+// Relabel "London" as CITY. The entity covers token 3; `end` is exclusive.
+// `default: 'unmodified'` leaves every other token as the model labeled it.
 const edited = doc.withEntities({ entities: [{ start: 3, end: 4, label: 'CITY' }], default: 'unmodified' });
+
+// The edited copy keeps the PERSON entity and has CITY in place of GPE.
 assert.deepEqual(edited.toObject().entities?.map(entity => entity.label), ['PERSON', 'CITY']);
+
+// An entity can also carry an ID, a name of your choice for the thing it refers to.
+// Set the "Tim Cook" entity again, this time with the ID 'tim-cook'.
 const named = doc.withEntities({ entities: [{ start: 0, end: 2, label: 'PERSON', id: 'tim-cook' }], default: 'unmodified' });
+
+// The ID is written to each token of the entity, and the entity reports it too.
 assert.equal(named.token(1).annotations().entityId, 'tim-cook');
 assert.equal(named.toObject().entities?.[0]?.id, 'tim-cook');
+
+// Editing always makes a copy. The original document still labels "London" GPE.
 assert.equal(doc.token(3).annotations().entityType, 'GPE');
+
+// Error case: the document has only 5 tokens, so an entity ending at token 9
+// does not fit and is refused with the SPARS_BOUNDS error.
 assert.throws(() => doc.withEntities({ entities: [{ start: 3, end: 9, label: 'CITY' }] }), { code: 'SPARS_BOUNDS' });
 ```
 
@@ -416,21 +661,49 @@ Span groups are named lists of spans, like spaCy's `Doc.spans`: the spans of a g
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Tim Cook visited New York City.', 'Tokenizer');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Split a sentence into tokens (words and punctuation marks). A stage is one step
+// of the model's pipeline; 'Tokenizer' runs only the splitting step, which is all
+// span groups need. The tokens are:
+// Tim(0) Cook(1) visited(2) New(3) York(4) City(5) .(6)
+const doc = await nlp.processDocument('Tim Cook visited New York City.', 'Tokenizer');
+
+// A span is a run of tokens in a row, and a span group is a named list of spans.
+// Store a group called 'places' with two spans that overlap: "New York City"
+// (tokens 3 to 5) and "New York" (tokens 3 and 4). `end` is exclusive. The second
+// span has the ID 'nyc'. `attrs` holds extra information of your choice about the group.
 const edited = doc.withSpanGroup('places', {
   attrs: { source: 'gazetteer', confidence: [0.9, 0.7] },
   spans: [{ start: 3, end: 6, label: 'GPE' }, { start: 3, end: 5, label: 'GPE', id: 'nyc' }],
 });
+
+// Read the groups back as plain JavaScript objects and take the first one.
 const [places] = edited.toObject().spanGroups;
+
+// No name was given, so the group's name is the same as its key.
 assert.equal(places?.name, 'places');
+
+// The extra information comes back unchanged.
 assert.deepEqual(places?.attrs, { source: 'gazetteer', confidence: [0.9, 0.7] });
+
+// Both spans were kept, in the order given. A span without an ID reports ''.
 assert.deepEqual(places?.spans.map(span => [span.start, span.end, span.id]), [[3, 6, ''], [3, 5, 'nyc']]);
+
+// Storing a group makes a copy, so the original document still has no groups.
 assert.deepEqual(doc.toObject().spanGroups, []);
+
+// Removing the group also returns a copy, this one without the group.
 assert.deepEqual(edited.withoutSpanGroup('places').toObject().spanGroups, []);
+
+// Error case: the document has only 7 tokens, so a span ending at token 9 does not
+// fit and is refused with the SPARS_BOUNDS error.
 assert.throws(() => doc.withSpanGroup('places', { spans: [{ start: 3, end: 9 }] }), { code: 'SPARS_BOUNDS' });
+
+// Error case: `attrs` may hold only plain values such as text, numbers and lists.
 // TypeScript rejects a Date in attrs at compile time; untyped JavaScript gets a TypeError when called.
 assert.throws(() => Reflect.apply(doc.withSpanGroup, doc, ['places', { attrs: { when: new Date() }, spans: [] }]), TypeError);
 ```
@@ -445,15 +718,31 @@ Group keys are typed `SpanGroupKey`, which offers spaCy's default keys `ruler` a
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel } from './index.js';
+import { loadModel } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('dog cat');
-assert.ok(model.documentVector(doc) instanceof Float32Array);
-assert.ok(model.tokenVector(doc, 0) instanceof Float32Array);
-assert.ok(model.spanVector(doc, 0, 1) instanceof Float32Array);
-assert.equal(model.similarity(doc, doc), 1);
-assert.equal(model.spanSimilarity(doc, 0, 1, doc, 0, 1), 1);
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process two words. The tokens (pieces of the text) are: dog(0) cat(1)
+const doc = await nlp.processDocument('dog cat');
+
+// A vector is a list of numbers that stands for meaning. Texts with similar
+// meanings have similar numbers. The model can give one vector for the whole document.
+assert.ok(nlp.documentVector(doc) instanceof Float32Array);
+
+// It can also give the vector of one token, here token 0, "dog".
+assert.ok(nlp.tokenVector(doc, 0) instanceof Float32Array);
+
+// And the vector of a span, a run of tokens in a row. The end index is exclusive,
+// so the span from 0 to 1 holds only "dog".
+assert.ok(nlp.spanVector(doc, 0, 1) instanceof Float32Array);
+
+// Similarity is a score for how alike two vectors are. A document compared with
+// itself scores 1, the score for identical meaning.
+assert.equal(nlp.similarity(doc, doc), 1);
+
+// The same holds for a span compared with itself.
+assert.equal(nlp.spanSimilarity(doc, 0, 1, doc, 0, 1), 1);
 ```
 
 The receiving model selects vector behavior: md/lg use their static vocabulary, while sm uses contextual rows retained in the supplied document. Documents do not record model identity; when comparing contextual documents, callers should use the same model and processing stage. Token vectors return `null` when unavailable; unavailable document/span vectors are empty arrays. All returned vectors are independent copies. Similarity preserves identical-token and zero-vector shortcuts, then rejects incompatible nonzero vector dimensions with `SPARS_UNSUPPORTED`; this check is stricter than the current Rust similarity helpers, which truncate unequal dimensions during their dot product.
@@ -466,35 +755,65 @@ These methods run synchronously. Mean vectors and similarities scan the selected
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, TokenMatcher } from './index.js';
+import { loadModel, TokenMatcher } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Alice visits London.', 'Tokenizer');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Split a sentence into tokens (words and punctuation marks). The 'Tokenizer' stage
+// runs only that first step of the model, which is enough to match on text.
+// The tokens are: Alice(0) visits(1) London(2) .(3)
+const doc = await nlp.processDocument('Alice visits London.', 'Tokenizer');
+
+// A matcher holds named rules. Each rule is a list of patterns to look for.
 const matcher = new TokenMatcher();
+
+// The rule 'place' has one pattern, and the pattern describes one token: its text
+// must equal "London", and it must appear exactly once.
 matcher.add('place', [{ tokens: [{
   constraints: [{ attribute: 'text', predicate: { kind: 'equals', value: 'London' } }],
   repetition: { kind: 'once' },
 }] }]);
+
+// Search the document. One match is found: it starts at token 2 and stops before
+// token 3. The end is exclusive, so the match covers only "London".
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'place', start: 2, end: 3 }]);
 ```
 
 Supported token attributes are `text`, `lower`, `norm`, `lemma`, `pos`, `tag`, `dep`, `morphology`, the lexical flags `is_alpha`, `is_digit`, `is_space`, `is_punct`, `like_num`, `is_lower`, `is_upper`, `is_title`, `is_ascii`, `is_currency`, `is_stop`, `is_bracket`, `is_quote`, `is_left_punct`, `is_right_punct`, `like_url` and `like_email`, and `length`. `lower` compares the token's pinned Unicode 15.0.0 lowercase text, as in spaCy's `LOWER`, and needs no model annotations; pattern values are compared as written, so write them in lowercase. Predicates are `equals` with a string `value`, `flag` with a boolean `value`, `compare` with an `operator` (`==`, `!=`, `>=`, `<=`, `>` or `<`) and a finite number `value`, `in`, `not_in`, `is_subset`, `is_superset`, `intersects`, `morph_superset`, and `morph_intersects` with string `values`, or `in_integers`, `not_in_integers`, `is_subset_integers`, `is_superset_integers` and `intersects_integers` with integer `values`. `is_subset`, `is_superset` and `intersects` follow spaCy's set operators on any string attribute (see [Compare with a set of values](TOKEN_MATCHER.md#compare-with-a-set-of-values)); `morph_superset` and `morph_intersects` require morphology; `flag` is the only predicate for lexical flags; `length` accepts only `compare` and the integer predicates and counts Unicode code points. Integer `values` must be safe JavaScript integers (whole numbers up to 2^53−1 in magnitude); other numbers are rejected rather than rounded. A `compare` value may be any finite number, including a fraction such as `2.5`; NaN and infinities are rejected. For example, `{ attribute: 'length', predicate: { kind: 'compare', operator: '>=', value: 7 } }` matches tokens of at least seven code points. Repetition kinds are `once`, `optional`, `zero_or_more`, `one_or_more`, `negated`, and `range`; a range requires `min` and accepts an optional inclusive `max`. An `equals` condition on `lemma`, `pos`, `tag`, `dep` or `morphology` rejects with `SPARS_INFERENCE` when no token of a nonempty document has that annotation; a token without the annotation compares as the empty string, with special rules for missing morphology, as in spaCy (see [missing annotations](TOKEN_MATCHER.md#missing-annotations)). See the [token matcher guide](TOKEN_MATCHER.md) for native semantics and unsupported options.
 
-Lexical flag conditions use the model's language rules, so create the matcher with a model: `new TokenMatcher(model)` or `new DependencyMatcher(model)`. A matcher created without a model rejects flag conditions with `SPARS_INVALID_PATTERN`. This example finds a number followed by a word:
+Lexical flag conditions use the model's language rules, so create the matcher with a model: `new TokenMatcher(nlp)` or `new DependencyMatcher(nlp)`. A matcher created without a model rejects flag conditions with `SPARS_INVALID_PATTERN`. This example finds a number followed by a word:
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, TokenMatcher } from './index.js';
-import type { FlagAttribute, TokenPatternItem } from './index.js';
+import { loadModel, TokenMatcher } from '@spars/node';
+import type { FlagAttribute, TokenPatternItem } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const matcher = new TokenMatcher(model);
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// A lexical flag is a yes-or-no fact about a word, such as "looks like a number".
+// The answers depend on the language, so the matcher is given the model.
+const matcher = new TokenMatcher(nlp);
+
+// A small helper that builds one pattern item: a single token for which the given
+// flag is true.
 const flag = (attribute: FlagAttribute): TokenPatternItem => ({
   constraints: [{ attribute, predicate: { kind: 'flag', value: true } }],
   repetition: { kind: 'once' },
 });
+
+// The rule 'quantity' describes two tokens in a row: one that looks like a number,
+// then one made of letters only.
 matcher.add('quantity', [{ tokens: [flag('like_num'), flag('is_alpha')] }]);
-const doc = await model.processDocument('Ten people paid 1,000 dollars.', 'Tokenizer');
+
+// Split a sentence into tokens (words and punctuation marks). The 'Tokenizer' stage
+// runs only that first step of the model. The tokens are:
+// Ten(0) people(1) paid(2) 1,000(3) dollars(4) .(5)
+const doc = await nlp.processDocument('Ten people paid 1,000 dollars.', 'Tokenizer');
+
+// Two matches are found: "Ten people" and "1,000 dollars". A number written as a
+// word counts as number-like too. Each `end` is exclusive.
 assert.deepEqual(await matcher.findMatches(doc), [
   { rule: 'quantity', start: 0, end: 2 },
   { rule: 'quantity', start: 3, end: 5 },
@@ -509,31 +828,63 @@ Matcher instances support `size`, `contains(rule)`, `get(rule)`, `add(rule, patt
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, DependencyMatcher } from './index.js';
+import { loadModel, DependencyMatcher } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// A dependency matcher looks for words by how they are linked in the sentence's
+// grammar, not by where they sit in the text.
 const matcher = new DependencyMatcher();
+
+// The rule 'subject' describes two linked tokens. Each one is a node with a name.
 matcher.add('subject', [{ nodes: [
+  // First node, named 'verb': no conditions, so any token can fill it.
   { id: 'verb', constraints: [] },
+  // Second node, named 'subject': its dependency label must be `nsubj`, the label
+  // for the subject of a sentence. The link says how it relates to 'verb': the
+  // relation '>' means the 'verb' token is the direct head of this token, the word
+  // this token depends on.
   { id: 'subject', constraints: [{ attribute: 'dep', predicate: { kind: 'equals', value: 'nsubj' } }], link: { left: 'verb', relation: '>' } },
 ] }]);
-const doc = await model.processDocument('Alice runs.');
+
+// Process a sentence with the full pipeline, because the matcher needs the links
+// between words. The tokens (words and punctuation marks) are: Alice(0) runs(1) .(2)
+const doc = await nlp.processDocument('Alice runs.');
+
+// One match is found. Its tokens are listed in the order of the pattern's nodes:
+// token 1, "runs", fills 'verb' and token 0, "Alice", fills 'subject'.
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'subject', tokens: [1, 0] }]);
 ```
 
 ## Phrase matching on text, lowercase, annotations, lexical flags or length
 
-`PhraseMatcher` accepts native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, `ORTH`/`TEXT` for exact token text, `NORM` for token norms, `LEMMA`, `POS`, `TAG`, `DEP` or `MORPH` for linguistic annotations, a lexical flag such as `IS_ALPHA` or `LIKE_NUM`, or `LENGTH`. Lexical flags need the model as a second argument, `new PhraseMatcher('LIKE_NUM', model)`, for its language rules; adding a rule to a flag matcher without one throws `SPARS_INVALID_PATTERN`. `LENGTH` needs no model, and a model passed for any other attribute has no effect. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
+`PhraseMatcher` accepts native documents as patterns. Choose `LOWER` for Python-compatible lowercase matching, `ORTH`/`TEXT` for exact token text, `NORM` for token norms, `LEMMA`, `POS`, `TAG`, `DEP` or `MORPH` for linguistic annotations, a lexical flag such as `IS_ALPHA` or `LIKE_NUM`, or `LENGTH`. Lexical flags need the model as a second argument, `new PhraseMatcher('LIKE_NUM', nlp)`, for its language rules; adding a rule to a flag matcher without one throws `SPARS_INVALID_PATTERN`. `LENGTH` needs no model, and a model passed for any other attribute has no effect. It follows the same asynchronous matching, rule mutation, and admission contracts as the other matchers.
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, PhraseMatcher } from './index.js';
+import { loadModel, PhraseMatcher } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// A phrase matcher finds whole phrases. 'LOWER' tells it to compare the lowercase
+// form of each token (word or punctuation mark), so capital letters do not matter.
 const matcher = new PhraseMatcher('LOWER');
-matcher.add('hotel', [await model.processDocument('the ritz', 'Tokenizer')]);
-const doc = await model.processDocument('The Ritz', 'Tokenizer');
+
+// Add the rule 'hotel'. A phrase pattern is itself a document, so the phrase is
+// processed first. The 'Tokenizer' stage, which only splits text into tokens, is
+// enough for comparing text.
+matcher.add('hotel', [await nlp.processDocument('the ritz', 'Tokenizer')]);
+
+// Split the text to search in the same way. The tokens are: The(0) Ritz(1)
+const doc = await nlp.processDocument('The Ritz', 'Tokenizer');
+
+// "The Ritz" matches "the ritz" despite the capitals. The match starts at token 0
+// and stops before token 2; the end is exclusive.
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'hotel', start: 0, end: 2 }]);
+
+// `get` shows the values the rule compares: the lowercase text of each pattern token.
 assert.deepEqual(matcher.get('hotel'), [['the', 'ritz']]);
 ```
 
@@ -543,15 +894,32 @@ Annotation attributes need pattern documents processed by the model rather than 
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, PhraseMatcher } from './index.js';
+import { loadModel, PhraseMatcher } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// 'LEMMA' tells the matcher to compare lemmas. The lemma is the dictionary form of
+// a word, so "dogs" has the lemma "dog" and "ran" has the lemma "run".
 const matcher = new PhraseMatcher('LEMMA');
-matcher.add('dog-runs', [await model.processDocument('the dog runs')]);
-const doc = await model.processDocument('The dogs ran home.');
+
+// Add the rule 'dog-runs'. The phrase goes through the full pipeline, because the
+// model has to work out the lemma of each token (word or punctuation mark).
+matcher.add('dog-runs', [await nlp.processDocument('the dog runs')]);
+
+// Process the text to search. The tokens are: The(0) dogs(1) ran(2) home(3) .(4)
+const doc = await nlp.processDocument('The dogs ran home.');
+
+// "The dogs ran" has the same lemmas as "the dog runs", so it matches even though
+// the words differ. The match covers tokens 0 to 2; the end is exclusive.
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'dog-runs', start: 0, end: 3 }]);
-const tokensOnly = await model.processDocument('the dog', 'Tokenizer');
+
+// Error case: a phrase that was only split into tokens has no lemmas to compare.
+// A stage is one step of the pipeline, and 'Tokenizer' stops after the first one.
+const tokensOnly = await nlp.processDocument('the dog', 'Tokenizer');
 assert.throws(() => matcher.add('tokens-only', [tokensOnly]), { code: 'SPARS_INVALID_PATTERN' });
+
+// The failed call added nothing, so the matcher has no rule with that name.
 assert.equal(matcher.contains('tokens-only'), false);
 ```
 
@@ -561,13 +929,29 @@ Lexical flags compare whether each token has a property, so a pattern matches an
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, PhraseMatcher } from './index.js';
+import { loadModel, PhraseMatcher } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const matcher = new PhraseMatcher('LIKE_NUM', model);
-matcher.add('count', [await model.processDocument('3 apples', 'Tokenizer')]);
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// 'LIKE_NUM' is a lexical flag, a yes-or-no fact about a word: does it look like a
+// number? The answer depends on the language, so the matcher is given the model.
+const matcher = new PhraseMatcher('LIKE_NUM', nlp);
+
+// Add the rule 'count' from the phrase "3 apples". The 'Tokenizer' stage, the step
+// that splits text into tokens (words and punctuation marks), is enough for flags.
+matcher.add('count', [await nlp.processDocument('3 apples', 'Tokenizer')]);
+
+// The rule stores only the flag of each pattern token: "3" looks like a number
+// ('true') and "apples" does not ('false'). The words themselves are not compared.
 assert.deepEqual(matcher.get('count'), [['true', 'false']]);
-const doc = await model.processDocument('I ate 3 apples and ten pears.', 'Tokenizer');
+
+// Split the text to search. The tokens are:
+// I(0) ate(1) 3(2) apples(3) and(4) ten(5) pears(6) .(7)
+const doc = await nlp.processDocument('I ate 3 apples and ten pears.', 'Tokenizer');
+
+// Any number-like token followed by one that is not matches: "3 apples" and also
+// "ten pears", because "ten" counts as number-like. Each `end` is exclusive.
 assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'count', start: 2, end: 4 }, { rule: 'count', start: 5, end: 7 }]);
 ```
 
@@ -577,35 +961,63 @@ assert.deepEqual(await matcher.findMatches(doc), [{ rule: 'count', start: 2, end
 
 ```typescript
 import assert from 'node:assert/strict';
-import { EntityRuler, loadModel } from './index.js';
-import type { EntityPattern } from './index.js';
+import { EntityRuler, loadModel } from '@spars/node';
+import type { EntityPattern } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('Tim Cook opened Apple Park in Cupertino.');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Process a sentence with the full pipeline. The tokens (words and punctuation
+// marks) are: Tim(0) Cook(1) opened(2) Apple(3) Park(4) in(5) Cupertino(6) .(7)
+// The model's recognizer finds entities, which are named real-world things. Each
+// has a label for its kind: PERSON, FAC (a building or facility), GPE (a country,
+// city or similar place).
+const doc = await nlp.processDocument('Tim Cook opened Apple Park in Cupertino.');
+
+// Two patterns for the ruler, each with the label to give its matches.
 const patterns: EntityPattern[] = [
-  { label: 'FAC', id: 'apple-park', phrase: await model.processDocument('Apple Park') },
+  // A phrase pattern: the exact words "Apple Park" get the label FAC and the ID
+  // 'apple-park'. The phrase is processed the same way as the document above.
+  { label: 'FAC', id: 'apple-park', phrase: await nlp.processDocument('Apple Park') },
+  // A token pattern: one token whose lowercase text is "cupertino" gets the label CITY.
   { label: 'CITY', tokens: { tokens: [{ constraints: [{ attribute: 'lower', predicate: { kind: 'equals', value: 'cupertino' } }], repetition: { kind: 'once' } }] } },
 ];
+
+// A small helper that reduces each entity to its label and ID, to keep the
+// checks below short.
 const labelsAndIds = (entities: { label: string; id: string }[] | null) => entities?.map(({ label, id }) => [label, id]);
 
 // The recognizer already labeled Apple Park FAC and Cupertino GPE. By default the ruler skips
 // matches on tokens that already belong to an entity, so both matches are skipped.
 const ruler = new EntityRuler();
 ruler.add(patterns);
+
+// The entities are still the model's own three, and none has an ID ('').
 assert.deepEqual(labelsAndIds((await ruler.annotate(doc)).toObject().entities), [['PERSON', ''], ['FAC', ''], ['GPE', '']]);
 
 // With overwriting, matches replace the entities they overlap.
 const overwriting = new EntityRuler({ overwriteEntities: true });
 overwriting.add(patterns);
+
+// `annotate` returns a copy of the document with the ruler's entities added.
 const annotated = await overwriting.annotate(doc);
+
+// Apple Park carries the ID from its pattern, and Cupertino is labeled CITY
+// instead of GPE. The PERSON entity matched no pattern, so it is unchanged.
 assert.deepEqual(labelsAndIds(annotated.toObject().entities), [['PERSON', ''], ['FAC', 'apple-park'], ['CITY', '']]);
+
+// The ID is also written to the entity's tokens. Token 3 is "Apple".
 assert.equal(annotated.token(3).annotations().entityId, 'apple-park');
+
+// The ruler can list the labels its patterns use.
 assert.deepEqual(overwriting.labels, ['CITY', 'FAC']);
+
+// Remove every pattern that has the ID 'apple-park'. No IDs are left afterwards.
 overwriting.remove('apple-park');
 assert.deepEqual(overwriting.ids, []);
 ```
 
-The options are spaCy's settings: `overwriteEntities` (`overwrite_ents`, default `false`), `phraseAttribute` (`phrase_matcher_attr`, the [phrase attribute](#phrase-matching-on-text-lowercase-annotations-lexical-flags-or-length) phrases compare, default `'ORTH'`) and `idSeparator` (`ent_id_sep`, default `'||'`). Pass a model as the second argument, `new EntityRuler(options, model)`, to use lexical flag conditions or a lexical flag phrase attribute. The read-only properties `size`, `labels`, `ids` and `patterns` report the added patterns like spaCy's `len(ruler)`, `labels`, `ent_ids` and `patterns`, and `overwriteEntities`, `phraseAttribute` and `idSeparator` report the options. As with `PhraseMatcher`, attribute names must be uppercase, where spaCy also accepts lowercase. `patterns` lists phrases by their text and leaves `id` out for a pattern without one or with an empty one; as in spaCy, a token pattern added with `id: ''` is still listed by `ids` as `''` and removed by `remove('')`. `remove(id)` removes every pattern with that ID, and `clear()` removes every pattern and keeps the options and model. How matches become entities, how rule names combine labels and IDs, and the accepted differences from spaCy are described in the [EntityRuler guide](ENTITY_RULER.md).
+The options are spaCy's settings: `overwriteEntities` (`overwrite_ents`, default `false`), `phraseAttribute` (`phrase_matcher_attr`, the [phrase attribute](#phrase-matching-on-text-lowercase-annotations-lexical-flags-or-length) phrases compare, default `'ORTH'`) and `idSeparator` (`ent_id_sep`, default `'||'`). Pass a model as the second argument, `new EntityRuler(options, nlp)`, to use lexical flag conditions or a lexical flag phrase attribute. The read-only properties `size`, `labels`, `ids` and `patterns` report the added patterns like spaCy's `len(ruler)`, `labels`, `ent_ids` and `patterns`, and `overwriteEntities`, `phraseAttribute` and `idSeparator` report the options. As with `PhraseMatcher`, attribute names must be uppercase, where spaCy also accepts lowercase. `patterns` lists phrases by their text and leaves `id` out for a pattern without one or with an empty one; as in spaCy, a token pattern added with `id: ''` is still listed by `ids` as `''` and removed by `remove('')`. `remove(id)` removes every pattern with that ID, and `clear()` removes every pattern and keeps the options and model. How matches become entities, how rule names combine labels and IDs, and the accepted differences from spaCy are described in the [EntityRuler guide](ENTITY_RULER.md).
 
 `add` checks every pattern before changing the ruler. A pattern with an unknown field, with a `label` or `id` that is not a string, with both or neither of `tokens` and `phrase`, with a `phrase` that is not a native document, with an invalid token pattern, with a lexical flag condition or flag phrase attribute on a ruler created without a model, or with a phrase lacking the annotation the phrase attribute compares throws `SPARS_INVALID_PATTERN` and adds nothing. `remove` of an ID that was never added or whose patterns were already removed throws `SPARS_INVALID_PATTERN`. When the ruler is created, an empty `idSeparator` throws `SPARS_INVALID_PATTERN`, an unknown `phraseAttribute` `SPARS_UNSUPPORTED`, and an undeclared option, such as spaCy's own `overwrite_ents`, or a value of the wrong type throws `InvalidArg`. A search over a nonempty document in which no token has the annotation an `equals` token condition reads, such as a lemma condition on a tokenizer-only document, rejects with `SPARS_INFERENCE`. `add`, `remove` and `clear` throw `SPARS_BUSY` while a `findMatches` or `annotate` call on the same ruler is queued or running, and passing anything other than a native document to `findMatches` or `annotate` throws a `TypeError`. Loading or saving patterns, spaCy's pattern dictionaries, fuzzy matching and running the ruler before the recognizer are not provided.
 
@@ -615,39 +1027,66 @@ The options are spaCy's settings: `overwriteEntities` (`overwrite_ents`, default
 
 ```typescript
 import assert from 'node:assert/strict';
-import { loadModel, SpanRuler } from './index.js';
-import type { Document, SpanPattern } from './index.js';
+import { loadModel, SpanRuler } from '@spars/node';
+import type { Document, SpanPattern } from '@spars/node';
 
-const model = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
-const doc = await model.processDocument('New York City is in New York State.', 'Tokenizer');
+// Load the model once. It is reused for every step below.
+const nlp = await loadModel(process.env.SPARS_MODEL ?? 'en_core_web_lg');
+
+// Split a sentence into tokens (words and punctuation marks). The 'Tokenizer' stage
+// runs only that first step of the model. The tokens are:
+// New(0) York(1) City(2) is(3) in(4) New(5) York(6) State(7) .(8)
+const doc = await nlp.processDocument('New York City is in New York State.', 'Tokenizer');
+
+// Two phrase patterns, both with the label GPE (a country, city or similar place).
+// The first also has the ID 'nyc'. Each phrase is split the same way as the document.
 const patterns: SpanPattern[] = [
-  { label: 'GPE', id: 'nyc', phrase: await model.processDocument('New York City', 'Tokenizer') },
-  { label: 'GPE', phrase: await model.processDocument('New York', 'Tokenizer') },
+  { label: 'GPE', id: 'nyc', phrase: await nlp.processDocument('New York City', 'Tokenizer') },
+  { label: 'GPE', phrase: await nlp.processDocument('New York', 'Tokenizer') },
 ];
+
+// Two small helpers to keep the checks below short. A span is a run of tokens in a
+// row, and a span group is a named list of spans. `bounds` reduces each span to its
+// start, its exclusive end and its ID. `group` finds the spans of one group by key.
 const bounds = (spans: { start: number; end: number; id: string }[] | null | undefined) => spans?.map(({ start, end, id }) => [start, end, id]);
 const group = (document: Document, key: string) => document.spanGroups.find(entry => entry.key === key)?.spans;
 
 // By default every match goes into the 'ruler' group, including overlapping ones.
 const ruler = new SpanRuler();
 ruler.add(patterns);
+
+// Three spans: "New York" (tokens 0 and 1), "New York City" (tokens 0 to 2, with
+// the ID 'nyc') and the second "New York" (tokens 5 and 6). The first two overlap.
 assert.deepEqual(bounds(group((await ruler.annotate(doc)).toObject(), 'ruler')), [[0, 2, ''], [0, 3, 'nyc'], [5, 7, '']]);
 
+// An entity is a named real-world thing in the text. Unlike spans in a group,
+// entities cannot overlap.
 // With spansKey null the ruler writes only entities; the default entity filter keeps the longest match.
 const entities = new SpanRuler({ spansKey: null, annotateEntities: true });
 entities.add(patterns);
 const annotated = (await entities.annotate(doc)).toObject();
+
+// No span group was written.
 assert.deepEqual(annotated.spanGroups, []);
+
+// Where the two matches overlapped, only the longer "New York City" became an entity.
 assert.deepEqual(bounds(annotated.entities), [[0, 3, 'nyc'], [5, 7, '']]);
 
 // A span filter resolves overlaps in the group too.
 const filtered = new SpanRuler({ spansKey: 'places', spansFilter: 'first_longest' });
 filtered.add(patterns);
+
+// This ruler stores its group under the key 'places', and the shorter overlapping
+// "New York" span is gone.
 assert.deepEqual(bounds(group((await filtered.annotate(doc)).toObject(), 'places')), [[0, 3, 'nyc'], [5, 7, '']]);
+
+// Remove the pattern that was added with the ID 'nyc'. One pattern is left, it has
+// no ID, and the ruler still knows the label GPE.
 filtered.removeById('nyc');
 assert.deepEqual([filtered.size, filtered.ids, filtered.contains('GPE')], [1, [], true]);
 ```
 
-The options are spaCy's `span_ruler` settings with its factory defaults: `spansKey` (`spans_key`, default `'ruler'`; `null` or `''` writes no span group), `spansFilter` (`spans_filter`, default `null`, which keeps every match), `annotateEntities` (`annotate_ents`, default `false`), `entitiesFilter` (`ents_filter`, default `'first_longest'`), `phraseAttribute` (`phrase_matcher_attr`, default `'ORTH'`) and `overwrite` (default `true`). An omitted or `undefined` `spansKey` keeps the default; only `null` turns the group off. Filters, listed by the `SpanFilter` type, are short forms of spaCy's registered names, such as `'first_longest'` for `spacy.first_longest_spans_filter.v1`: `'first_longest'` keeps the longest non-overlapping spans, treating existing spans and matches alike; `'prioritize_new'` lets matches replace the existing spans they overlap; and `'prioritize_existing'` keeps every existing span and drops matches that overlap one. With the default `overwrite: true`, `annotate` replaces the group under `spansKey` and, with `annotateEntities`, discards the document's existing entities, including the recognizer's, before filtering; the EntityRuler keeps them by default. With `overwrite: false`, an existing group is extended and keeps its name and attrs, and existing entities compete with the matches. Pattern labels are typed `SpanLabel` and the entities written are `EntityLabel`, so under `StrictLabelSets` register a custom label in both `SpanLabels` and `EntityLabels` (see [types and autocomplete](#types-and-autocomplete)). Pass a model as the second argument, `new SpanRuler(options, model)`, to use lexical flag conditions or a lexical flag phrase attribute. The read-only properties report the options and the patterns: `size`, `labels`, `ids` and `patterns` behave like spaCy's `len(ruler)`, `labels`, `ids` and `patterns`, and `patterns` keeps each `id` exactly as added, including `''`. `contains(label)` reports whether a label was ever added, which stays true after its patterns are removed, as in spaCy. `remove(label)` removes a label's patterns, `removeById(id)` removes the patterns added with an ID, and `clear()` removes every pattern and keeps the options and model. The [SpanRuler guide](SPAN_RULER.md) describes the filters, overwriting, match order and the [differences from spaCy](SPAN_RULER.md#differences-from-spacy).
+The options are spaCy's `span_ruler` settings with its factory defaults: `spansKey` (`spans_key`, default `'ruler'`; `null` or `''` writes no span group), `spansFilter` (`spans_filter`, default `null`, which keeps every match), `annotateEntities` (`annotate_ents`, default `false`), `entitiesFilter` (`ents_filter`, default `'first_longest'`), `phraseAttribute` (`phrase_matcher_attr`, default `'ORTH'`) and `overwrite` (default `true`). An omitted or `undefined` `spansKey` keeps the default; only `null` turns the group off. Filters, listed by the `SpanFilter` type, are short forms of spaCy's registered names, such as `'first_longest'` for `spacy.first_longest_spans_filter.v1`: `'first_longest'` keeps the longest non-overlapping spans, treating existing spans and matches alike; `'prioritize_new'` lets matches replace the existing spans they overlap; and `'prioritize_existing'` keeps every existing span and drops matches that overlap one. With the default `overwrite: true`, `annotate` replaces the group under `spansKey` and, with `annotateEntities`, discards the document's existing entities, including the recognizer's, before filtering; the EntityRuler keeps them by default. With `overwrite: false`, an existing group is extended and keeps its name and attrs, and existing entities compete with the matches. Pattern labels are typed `SpanLabel` and the entities written are `EntityLabel`, so under `StrictLabelSets` register a custom label in both `SpanLabels` and `EntityLabels` (see [types and autocomplete](#types-and-autocomplete)). Pass a model as the second argument, `new SpanRuler(options, nlp)`, to use lexical flag conditions or a lexical flag phrase attribute. The read-only properties report the options and the patterns: `size`, `labels`, `ids` and `patterns` behave like spaCy's `len(ruler)`, `labels`, `ids` and `patterns`, and `patterns` keeps each `id` exactly as added, including `''`. `contains(label)` reports whether a label was ever added, which stays true after its patterns are removed, as in spaCy. `remove(label)` removes a label's patterns, `removeById(id)` removes the patterns added with an ID, and `clear()` removes every pattern and keeps the options and model. The [SpanRuler guide](SPAN_RULER.md) describes the filters, overwriting, match order and the [differences from spaCy](SPAN_RULER.md#differences-from-spacy).
 
 `add` checks every pattern before changing the ruler and throws `SPARS_INVALID_PATTERN` for a non-array argument and for the same malformed patterns as the EntityRuler's `add`; a failed `add` adds nothing. A label, ID or option string with an unpaired surrogate throws `SPARS_INVALID_TEXT`, and a `MORPH` phrase with noncanonical morphology `SPARS_UNSUPPORTED`. `remove` of a label that was never added, and `removeById` of an ID no current pattern has, throw `SPARS_INVALID_PATTERN`. When the ruler is created, an unknown filter or `phraseAttribute` throws `SPARS_UNSUPPORTED`, and an undeclared option, such as spaCy's own `spans_key`, or a value of the wrong type throws `InvalidArg`. Searches reject with `SPARS_INFERENCE` for an `equals` token condition on annotation the document lacks, as for the EntityRuler. `add`, `remove`, `removeById` and `clear` throw `SPARS_BUSY` while a `findMatches` or `annotate` call on the same ruler is queued or running, and passing anything other than a native document to `findMatches` or `annotate` throws a `TypeError`. Custom filter functions, loading or saving patterns, spaCy's pattern dictionaries and fuzzy matching are not provided.
 

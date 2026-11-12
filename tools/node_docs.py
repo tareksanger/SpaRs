@@ -28,7 +28,8 @@ def examples(text: str) -> list[str]:
 
 
 def run_example(root: Path, source: str) -> subprocess.CompletedProcess[str]:
-    # The temporary source sits beside index.js so guide imports work unchanged.
+    # The temporary source sits inside the package, whose `exports` field lets the guides'
+    # `@spars/node` imports resolve to this checkout.
     with tempfile.NamedTemporaryFile(mode='w', suffix='.mts', prefix='.spars-doc-',
                                      dir=root/'bindings/node', delete=False) as handle:
         handle.write(source)

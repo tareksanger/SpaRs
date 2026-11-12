@@ -4,36 +4,131 @@
 
 `set_entities` itself needs no model. The example below processes text first, so it needs the `en_core_web_md` export at `assets/en_core_web_md-3.8.0`, relative to the repository root, from the [development setup](DEVELOPMENT.md) or the [model installer](MODEL_INSTALLATION.md).
 
+::: code-group
+
 ```rust
 use spars::{EntityDefault, EntityUpdate, Model, Span, TokenIndex, TokenRange};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load the model once. It holds everything SpaRs learned about English.
     let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // Read the sentence. The model splits it into tokens (words and punctuation
+    // marks) and finds the entities: stretches of tokens that name a real-world
+    // thing. A token index is a token's position, counting from 0.
+    // The tokens are: Tim(0) Cook(1) visited(2) London(3) .(4)
     let mut doc = nlp.process("Tim Cook visited London.")?;
+
+    // A small helper that lists the label of every entity in a document, in order.
+    // An entity label says what kind of thing the entity names.
     let labels = |doc: &spars::Doc| -> Vec<String> {
         doc.entities().unwrap().iter().map(|e| e.label.clone()).collect()
     };
+
+    // The model found two entities: "Tim Cook" is a PERSON, and "London" is a GPE,
+    // the label for countries, cities and states.
     assert_eq!(labels(&doc), ["PERSON", "GPE"]);
 
     // Relabel London and keep the other predictions.
+    // An update lists the entities to write. Each one is a span: a run of tokens
+    // from a start index up to an end index. The end is exclusive, so 3 to 4
+    // covers only token 3, "London". `Unmodified` tells the update to leave every
+    // token it does not mention as it was, which keeps "Tim Cook" a PERSON.
     doc.set_entities(&EntityUpdate {
         entities: vec![Span::new(TokenIndex(3), TokenIndex(4), "CITY")],
         default: EntityDefault::Unmodified,
         ..EntityUpdate::default()
     })?;
+
+    // London carries the CITY label, and "Tim Cook" is still a PERSON.
     assert_eq!(labels(&doc), ["PERSON", "CITY"]);
+
+    // Each token also has an IOB tag: B for the token that begins an entity, I for
+    // a token inside one, and O for a token outside any entity. "London" is the
+    // first (and only) token of its entity, so its tag is B.
     assert_eq!(doc.tokens()[3].entity_iob.as_deref(), Some("B"));
 
     // Spans that share a token are rejected and the document is unchanged.
+    // This update is a mistake on purpose. It says tokens 0 and 1 ("Tim Cook") are
+    // an ORG entity, and also that tokens 1 and 2 ("Cook visited") are outside any
+    // entity. Token 1, "Cook", cannot be both.
     let overlapping = EntityUpdate {
         entities: vec![Span::new(TokenIndex(0), TokenIndex(2), "ORG")],
         outside: vec![TokenRange { start: TokenIndex(1), end: TokenIndex(3) }],
         ..EntityUpdate::default()
     };
+
+    // Applying it returns an error instead of changing anything.
     assert!(matches!(doc.set_entities(&overlapping), Err(spars::Error::Bounds)));
+
+    // The entities are the same as before the failed update.
     assert_eq!(labels(&doc), ["PERSON", "CITY"]);
+
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel } from '@spars/node';
+import type { NativeDocument } from '@spars/node';
+
+// Load the model once. It holds everything SpaRs learned about English.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// Read the sentence. The model splits it into tokens (words and punctuation
+// marks) and finds the entities: stretches of tokens that name a real-world
+// thing. A token index is a token's position, counting from 0.
+// `processDocument` returns a native document, the kind that has `withEntities`.
+// The tokens are: Tim(0) Cook(1) visited(2) London(3) .(4)
+const doc = await nlp.processDocument('Tim Cook visited London.');
+
+// A small helper that lists the label of every entity in a document, in order.
+// An entity label says what kind of thing the entity names. `toObject` copies
+// the document into plain JavaScript values that are easy to read.
+const labels = (document: NativeDocument): string[] =>
+  (document.toObject().entities ?? []).map((entity) => entity.label);
+
+// The model found two entities: "Tim Cook" is a PERSON, and "London" is a GPE,
+// the label for countries, cities and states.
+assert.deepEqual(labels(doc), ['PERSON', 'GPE']);
+
+// Relabel London and keep the other predictions.
+// An update lists the entities to write. Each one is a span: a run of tokens
+// from a start index up to an end index. The end is exclusive, so 3 to 4
+// covers only token 3, "London". 'unmodified' tells the update to leave every
+// token it does not mention as it was, which keeps "Tim Cook" a PERSON.
+// A native document never changes: `withEntities` returns an edited copy.
+const relabeled = doc.withEntities({
+  entities: [{ start: 3, end: 4, label: 'CITY' }],
+  default: 'unmodified',
+});
+
+// London carries the CITY label, and "Tim Cook" is still a PERSON.
+assert.deepEqual(labels(relabeled), ['PERSON', 'CITY']);
+
+// Each token also has an IOB tag: B for the token that begins an entity, I for
+// a token inside one, and O for a token outside any entity. "London" is the
+// first (and only) token of its entity, so its tag is B.
+assert.equal(relabeled.token(3).annotations().entityIob, 'B');
+
+// Spans that share a token are rejected and the document is unchanged.
+// This update is a mistake on purpose. It says tokens 0 and 1 ("Tim Cook") are
+// an ORG entity, and also that tokens 1 and 2 ("Cook visited") are outside any
+// entity. Token 1, "Cook", cannot be both.
+const overlapping = {
+  entities: [{ start: 0, end: 2, label: 'ORG' }],
+  outside: [{ start: 1, end: 3 }],
+};
+
+// Applying it throws an error with the code SPARS_BOUNDS and returns no copy.
+assert.throws(() => relabeled.withEntities(overlapping), { code: 'SPARS_BOUNDS' });
+
+// `relabeled` is untouched, as a native document always is.
+assert.deepEqual(labels(relabeled), ['PERSON', 'CITY']);
+```
+
+:::
 
 With `Unmodified`, "Tim Cook" keeps its predicted `PERSON` label while London becomes `CITY`. The second update would mark "Cook" both as part of an `ORG` entity and as outside any entity, so it is rejected and `CITY` stays in place.
 
@@ -81,31 +176,109 @@ An entity can carry an ID in addition to its label. The ID is a string you choos
 
 This example needs no model: it builds a three-token document from a minimal native snapshot (see `Doc::from_json`). Documents from `Model::process` work the same way.
 
+::: code-group
+
 ```rust
 use spars::{Doc, EntityUpdate, Span, TokenIndex};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // A snapshot is a document saved as JSON text. This one describes the text
+    // "Tim Cook spoke" and where each of its three tokens starts and ends, so no
+    // model is needed to split the text.
+    // The tokens are: Tim(0) Cook(1) spoke(2)
     let snapshot = r#"{"format_version":1,"document":{"text":"Tim Cook spoke","tokens":[
         {"start":0,"end":3,"idx":0,"whitespace":true,"norm":"tim"},
         {"start":4,"end":8,"idx":4,"whitespace":true,"norm":"cook"},
         {"start":9,"end":14,"idx":9,"whitespace":false,"norm":"spoke"}]}}"#;
+
+    // Turn the snapshot into a document.
     let mut doc = Doc::from_json(snapshot)?;
+
+    // Describe a PERSON entity over tokens 0 and 1, "Tim Cook". A span runs from
+    // a start token index up to an end index that is exclusive, so 0 to 2 stops
+    // before token 2.
     let mut person = Span::new(TokenIndex(0), TokenIndex(2), "PERSON");
+
+    // Give the entity an ID: a name you choose for the thing it refers to.
     person.id = Some("tim-cook".into());
+
+    // Write the entity to the document.
     doc.set_entities(&EntityUpdate { entities: vec![person], ..EntityUpdate::default() })?;
+
+    // The document's first entity reports the ID.
     assert_eq!(doc.entities().unwrap()[0].id.as_deref(), Some("tim-cook"));
 
     // An entity without an ID keeps the ID its tokens already have, as in spaCy.
+    // Here the same two tokens get the label CEO, and no ID is given.
     let relabeled = Span::new(TokenIndex(0), TokenIndex(2), "CEO");
     doc.set_entities(&EntityUpdate { entities: vec![relabeled], ..EntityUpdate::default() })?;
+
+    // The relabeled entity still reports "tim-cook".
     assert_eq!(doc.entities().unwrap()[0].id.as_deref(), Some("tim-cook"));
 
     // Tokens that stop being part of an entity keep their ID too.
+    // An update that lists nothing marks every token as outside any entity.
     doc.set_entities(&EntityUpdate::default())?;
+
+    // The document has no entities left.
     assert_eq!(doc.entities().unwrap().len(), 0);
+
+    // Token 0, "Tim", still remembers the ID it was given earlier.
     assert_eq!(doc.tokens()[0].entity_id.as_deref(), Some("tim-cook"));
+
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { NativeDocument } from '@spars/node';
+
+// A snapshot is a document saved as JSON text. This one describes the text
+// "Tim Cook spoke" and where each of its three tokens starts and ends, so no
+// model is needed to split the text.
+// The tokens are: Tim(0) Cook(1) spoke(2)
+const snapshot = `{"format_version":1,"document":{"text":"Tim Cook spoke","tokens":[
+    {"start":0,"end":3,"idx":0,"whitespace":true,"norm":"tim"},
+    {"start":4,"end":8,"idx":4,"whitespace":true,"norm":"cook"},
+    {"start":9,"end":14,"idx":9,"whitespace":false,"norm":"spoke"}]}}`;
+
+// Turn the snapshot into a document.
+const doc = NativeDocument.fromSnapshot(snapshot);
+
+// Describe a PERSON entity over tokens 0 and 1, "Tim Cook". A span runs from
+// a start token index up to an end index that is exclusive, so 0 to 2 stops
+// before token 2. Give the entity an ID as well: a name you choose for the
+// thing it refers to.
+const person = { start: 0, end: 2, label: 'PERSON', id: 'tim-cook' };
+
+// Write the entity. A native document never changes, so `withEntities` returns
+// an edited copy and leaves `doc` as it was.
+const named = doc.withEntities({ entities: [person] });
+
+// The document's first entity reports the ID. `toObject` copies the document
+// into plain JavaScript values that are easy to read.
+assert.equal(named.toObject().entities?.[0]?.id, 'tim-cook');
+
+// An entity without an ID keeps the ID its tokens already have, as in spaCy.
+// Here the same two tokens get the label CEO, and no ID is given.
+const relabeled = named.withEntities({ entities: [{ start: 0, end: 2, label: 'CEO' }] });
+
+// The relabeled entity still reports "tim-cook".
+assert.equal(relabeled.toObject().entities?.[0]?.id, 'tim-cook');
+
+// Tokens that stop being part of an entity keep their ID too.
+// An update that lists nothing marks every token as outside any entity.
+const cleared = relabeled.withEntities({});
+
+// The document has no entities left.
+assert.equal(cleared.toObject().entities?.length, 0);
+
+// Token 0, "Tim", still remembers the ID it was given earlier.
+assert.equal(cleared.token(0).annotations().entityId, 'tim-cook');
+```
+
+:::
 
 IDs follow spaCy's rules, including two that can surprise:
 
