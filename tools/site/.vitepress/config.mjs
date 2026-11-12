@@ -1,9 +1,18 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { defineConfig } from 'vitepress';
 import llmstxt from 'vitepress-plugin-llms';
-import { BASE, DOCS_DIRECTORY, REPOSITORY_URL, SITE_DIRECTORY } from '../paths.mjs';
+import {
+  BASE,
+  DOCS_DIRECTORY,
+  REPOSITORY_URL,
+  SITE_CACHE_DIRECTORY,
+  SITE_DIRECTORY,
+  SITE_VERSION,
+  SITE_VERSIONS,
+  siteVersionUrl,
+} from '../paths.mjs';
 
 const VUE_PACKAGE_DIRECTORY = dirname(createRequire(import.meta.url).resolve('vue/package.json'));
 const SPACY_URL = 'https://spacy.io';
@@ -133,13 +142,35 @@ function requireSidebarToListEveryPage() {
 
 requireSidebarToListEveryPage();
 
+// A menu of every published copy, titled with the copy being read. A link to another copy is a
+// full address, which the theme would otherwise open in a new tab and mark as leaving the site.
+const versionMenu =
+  SITE_VERSIONS.length === 0
+    ? []
+    : [
+        {
+          text: SITE_VERSION ?? 'Versions',
+          items: SITE_VERSIONS.map((version) => ({
+            text: version,
+            link: siteVersionUrl(version),
+            target: '_self',
+            noIcon: true,
+          })),
+        },
+      ];
+
+console.log(
+  `Building the ${SITE_VERSION ?? 'root'} copy: prefix ${BASE}, folder ${relative(process.cwd(), SITE_DIRECTORY)}, ` +
+    `version menu ${SITE_VERSIONS.join(', ') || 'off'}`,
+);
+
 export default defineConfig({
   title: 'SpaRs',
   description: 'Native Rust NLP using official spaCy pretrained models, for Rust and Node.js.',
   base: BASE,
   srcDir: DOCS_DIRECTORY,
   outDir: SITE_DIRECTORY,
-  cacheDir: join(SITE_DIRECTORY, '../site-cache'),
+  cacheDir: SITE_CACHE_DIRECTORY,
   markdown: {
     config(md) {
       linkRepositoryFiles(md);
@@ -151,6 +182,7 @@ export default defineConfig({
   },
   themeConfig: {
     nav: [
+      ...versionMenu,
       { text: 'spaCy', link: SPACY_URL },
       { text: 'docs.rs', link: 'https://docs.rs/spars-nlp' },
       { text: 'npm', link: 'https://www.npmjs.com/package/@spars/node' },

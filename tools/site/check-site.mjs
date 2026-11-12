@@ -2,10 +2,10 @@
 //
 // The build itself fails on a link to a guide that does not exist. This checks what the build
 // does not: links to anything else inside the site, links that still point outside it, the tab
-// titles, and the files written for language models.
+// titles, the version menu, and the files written for language models.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { BASE, SITE_DIRECTORY } from './paths.mjs';
+import { BASE, SITE_DIRECTORY, SITE_VERSIONS, siteVersionUrl } from './paths.mjs';
 
 const problems = [];
 
@@ -41,6 +41,9 @@ for (const page of pages) {
 const home = read('index.html');
 for (const title of ['Rust', 'Node.js']) {
   if (!home.includes(`data-title="${title}"`)) problems.push(`index.html: no code tab titled "${title}"`);
+}
+for (const version of SITE_VERSIONS) {
+  if (!home.includes(`href="${siteVersionUrl(version)}"`)) problems.push(`index.html: the version menu has no link to ${version}`);
 }
 
 read('llms.txt');
