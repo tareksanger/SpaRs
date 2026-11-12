@@ -47,9 +47,7 @@ fn contextual_token_and_span_vectors_match_independent_reference() {
         assert_eq!(doc.tokens().len(), case.tokens.len());
         for (i, expected) in case.tokens.iter().enumerate() {
             close(
-                nlp
-                    .token_vector(doc.token(TokenIndex(i)).unwrap())
-                    .unwrap(),
+                nlp.token_vector(doc.token(TokenIndex(i)).unwrap()).unwrap(),
                 expected,
                 &case.text,
             );
@@ -57,16 +55,13 @@ fn contextual_token_and_span_vectors_match_independent_reference() {
         close(&nlp.document_vector(&doc), &case.document, &case.text);
         let count = doc.tokens().len();
         close(
-            &nlp
-                .span_vector(&doc, TokenIndex(1.min(count)), TokenIndex(3.min(count)))
+            &nlp.span_vector(&doc, TokenIndex(1.min(count)), TokenIndex(3.min(count)))
                 .unwrap(),
             &case.span,
             &case.text,
         );
         close(
-            &nlp
-                .span_vector(&doc, TokenIndex(0), TokenIndex(0))
-                .unwrap(),
+            &nlp.span_vector(&doc, TokenIndex(0), TokenIndex(0)).unwrap(),
             &case.empty_span,
             &case.text,
         );
@@ -156,9 +151,7 @@ fn contextual_vectors_preserve_empty_and_unavailable_states() {
         .span_vector(&doc, TokenIndex(1), TokenIndex(1))
         .unwrap()
         .is_empty());
-    assert!(nlp
-        .document_vector(&nlp.process("").unwrap())
-        .is_empty());
+    assert!(nlp.document_vector(&nlp.process("").unwrap()).is_empty());
 }
 
 #[test]

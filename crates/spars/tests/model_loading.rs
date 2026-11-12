@@ -72,10 +72,7 @@ fn model_identity_is_independent_of_native_capabilities() {
         "Alice visited London.",
         "Wait—didn't we meet yesterday?",
     ] {
-        assert_eq!(
-            nlp.process(text).unwrap(),
-            baseline.process(text).unwrap()
-        );
+        assert_eq!(nlp.process(text).unwrap(), baseline.process(text).unwrap());
     }
 }
 

@@ -565,8 +565,7 @@ fn long_unicode_and_alternating_calls_preserve_results() {
         }
     }
     assert_eq!(
-        nlp
-            .pipe(texts.iter().map(String::as_str))
+        nlp.pipe(texts.iter().map(String::as_str))
             .collect::<Result<Vec<_>, _>>()
             .unwrap(),
         expected
