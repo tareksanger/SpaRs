@@ -153,9 +153,8 @@ impl DependencyMatcher {
         let mut seen = vec![false; doc.tokens().len()];
         // Official Matcher emits token matches in document order. A root bucket
         // is inserted on its first match against any node in any rule.
-        for index in 0..doc.tokens().len() {
+        for (index, &root) in graph.roots.iter().enumerate() {
             let token = doc.token(TokenIndex(index))?;
-            let root = graph.roots[index];
             for (pattern, positions) in patterns.iter().zip(&mut candidates) {
                 for (node_index, node) in pattern.nodes.iter().enumerate() {
                     let mut matches =
