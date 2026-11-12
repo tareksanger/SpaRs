@@ -76,8 +76,8 @@ function observed(doc: NativeDocument): State {
   return { error: null, tokens: output.tokens.map(t => ({ iob: t.entityIob, type: t.entityType })), entities };
 }
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 test('withEntities matches every frozen spaCy Doc.set_ents update', () => {
   let count = 0;
@@ -103,7 +103,7 @@ test('withEntities matches every frozen spaCy Doc.set_ents update', () => {
 });
 
 test('withEntities returns a copy and leaves the document and its views unchanged', async () => {
-  const doc = await model.processDocument('Tim Cook visited London.');
+  const doc = await nlp.processDocument('Tim Cook visited London.');
   const token = doc.token(3);
   const span = doc.span(0, 2);
   const before = doc.toSnapshot();
@@ -128,7 +128,7 @@ test('withEntities returns a copy and leaves the document and its views unchange
 });
 
 test('withEntities rejects invalid intervals, defaults and labels', async () => {
-  const doc = await model.processDocument('Tim Cook visited London.');
+  const doc = await nlp.processDocument('Tim Cook visited London.');
   for (const bad of [-1, 0.5, Number.NaN, Infinity, 2 ** 32]) {
     assert.throws(() => doc.withEntities({ entities: [{ start: bad, end: 1, label: 'X' }] }), { code: 'SPARS_BOUNDS' });
     assert.throws(() => doc.withEntities({ outside: [{ start: 0, end: bad }] }), { code: 'SPARS_BOUNDS' });

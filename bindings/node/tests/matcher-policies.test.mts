@@ -3,8 +3,8 @@ import { before, test } from 'node:test';
 import { configureExecution, configureInputLimits, DependencyMatcher, loadModel, Model, NativeDocument, PhraseMatcher, TokenMatcher } from '../index.js';
 import { modelPath } from './fixtures.mts';
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 interface Matcher {
   findMatches(document: NativeDocument): Promise<unknown>;
@@ -23,18 +23,18 @@ function matchers(doc: NativeDocument): Case[] {
 }
 
 test('all matchers protect queued rules, share admission and recover after completion', async () => {
-  const doc = await model.processDocument('Alice runs.');
+  const doc = await nlp.processDocument('Alice runs.');
   for (const { matcher, add } of matchers(doc)) {
     add();
     configureExecution({ maxActive: 1, maxQueued: 1 });
-    const active = model.processDocument('Alice visits London.');
+    const active = nlp.processDocument('Alice visits London.');
     const queued = matcher.findMatches(doc);
     const settled = Promise.allSettled([active, queued]);
     try {
       assert.throws(add, { code: 'SPARS_BUSY' });
       assert.throws(() => matcher.remove('r'), { code: 'SPARS_BUSY' });
       const matcherOverflow = assert.rejects(matcher.findMatches(doc), { code: 'SPARS_BUSY' });
-      const inferenceOverflow = assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+      const inferenceOverflow = assert.rejects(nlp.process('overflow'), { code: 'SPARS_BUSY' });
       await Promise.all([matcherOverflow, inferenceOverflow]);
       await queued;
       matcher.remove('r');
@@ -45,11 +45,11 @@ test('all matchers protect queued rules, share admission and recover after compl
 });
 
 test('failed searches release queued admission and matcher mutation protection', async () => {
-  const raw = await model.processDocument('Alice', 'Tokenizer');
+  const raw = await nlp.processDocument('Alice', 'Tokenizer');
   const matcher = new DependencyMatcher();
   matcher.add('r', [{ nodes: [{ id: 'a', constraints: [] }] }]);
   configureExecution({ maxActive: 1, maxQueued: 1 });
-  const active = model.process('start');
+  const active = nlp.process('start');
   const failed = matcher.findMatches(raw);
   const settled = Promise.allSettled([active, failed]);
   try {
@@ -61,7 +61,7 @@ test('failed searches release queued admission and matcher mutation protection',
 });
 
 test('matcher input limits reject before admission and validate receivers and documents', async () => {
-  const doc = await model.processDocument('😀', 'Tokenizer');
+  const doc = await nlp.processDocument('😀', 'Tokenizer');
   configureInputLimits({ maxTextLength: 1, maxBatchSize: 1, maxBatchTextLength: 1 });
   try {
     for (const { matcher, add } of matchers(doc)) {

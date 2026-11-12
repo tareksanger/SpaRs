@@ -65,17 +65,14 @@ fn manifest() -> Value {
 #[ignore = "requires official export; mandatory acceptance test"]
 fn model_identity_is_independent_of_native_capabilities() {
     let directory = Export::from_manifest(&manifest());
-    let model = Model::load(&directory.0).unwrap();
+    let nlp = Model::load(&directory.0).unwrap();
     let baseline = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     for text in [
         "",
         "Alice visited London.",
         "Wait—didn't we meet yesterday?",
     ] {
-        assert_eq!(
-            model.process(text).unwrap(),
-            baseline.process(text).unwrap()
-        );
+        assert_eq!(nlp.process(text).unwrap(), baseline.process(text).unwrap());
     }
 }
 
@@ -92,13 +89,13 @@ fn component_order_comes_from_configuration() {
         "lemmatizer"
     ]);
     let directory = Export::from_manifest(&config);
-    let model = Model::load(&directory.0).unwrap();
+    let nlp = Model::load(&directory.0).unwrap();
     let baseline = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     assert_eq!(
-        model.process("Alice visited London.").unwrap(),
+        nlp.process("Alice visited London.").unwrap(),
         baseline.process("Alice visited London.").unwrap()
     );
-    let doc = model
+    let doc = nlp
         .process_until("Alice visited London.", spars::Stage::Ner)
         .unwrap();
     assert!(doc.entities().is_some());
@@ -111,7 +108,7 @@ fn component_order_comes_from_configuration() {
     assert_eq!(config["pipeline"], json!(reference.reordered_pipeline));
     assert_eq!(reference.reordered.len(), 3);
     for case in reference.reordered {
-        let doc = model.process(&case.text).unwrap();
+        let doc = nlp.process(&case.text).unwrap();
         assert_eq!(doc.tokens(), case.tokens, "{}", case.text);
         assert_eq!(doc.entities(), Some(case.entities.as_slice()));
         assert_eq!(doc.sentences(), Some(case.sentences.as_slice()));
@@ -164,12 +161,12 @@ fn absent_component_keeps_annotations_unavailable_and_stage_request_fails() {
     let mut config = manifest();
     config["pipeline"] = json!(["tok2vec", "tagger"]);
     let directory = Export::from_manifest(&config);
-    let model = Model::load(&directory.0).unwrap();
-    let doc = model.process("Alice visited London.").unwrap();
+    let nlp = Model::load(&directory.0).unwrap();
+    let doc = nlp.process("Alice visited London.").unwrap();
     assert!(doc.tokens()[0].tag.is_some());
     assert!(doc.tokens()[0].head.is_none());
     assert!(doc.entities().is_none());
-    assert!(model
+    assert!(nlp
         .process_until("hello", spars::Stage::Ner)
         .err()
         .unwrap()

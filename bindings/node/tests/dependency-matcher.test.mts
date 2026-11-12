@@ -131,7 +131,7 @@ test('all dependency relations, predicates and ordering match frozen official su
 const FLAG_RULES = 42;
 const FLAG_MATCHES = 376;
 test('lexical flags match the frozen official suite with a model lexicon', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const fixture = record(readJson(`${root}fixtures/dependency-match-flags-v1.expected.json`));
   const cases = array(fixture.cases);
   assert.equal(cases.length, 3);
@@ -139,7 +139,7 @@ test('lexical flags match the frozen official suite with a model lexicon', async
   let matches = 0;
   for (const value of cases) {
     const c = record(value);
-    const matcher = new DependencyMatcher(model);
+    const matcher = new DependencyMatcher(nlp);
     for (const raw of array(c.rules)) {
       const rule = record(raw);
       assert.equal(addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern)), 0);
@@ -155,14 +155,14 @@ test('lexical flags match the frozen official suite with a model lexicon', async
   const plain = new DependencyMatcher();
   assert.throws(() => plain.add('number', [flag]), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'SPARS_INVALID_PATTERN');
   assert.equal(plain.size, 0);
-  const withModel = new DependencyMatcher(model);
+  const withModel = new DependencyMatcher(nlp);
   withModel.add('number', [flag]);
   assert.deepStrictEqual(withModel.get('number'), [flag]);
   assert.throws(() => Reflect.construct(DependencyMatcher, [{}]));
 });
 
 test('remaining lexical flags match the frozen official suite', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const fixture = record(readJson(`${root}fixtures/dependency-match-more-flags-v1.expected.json`));
   const cases = array(fixture.cases);
   assert.equal(cases.length, 3);
@@ -170,7 +170,7 @@ test('remaining lexical flags match the frozen official suite', async () => {
   let matches = 0;
   for (const value of cases) {
     const c = record(value);
-    const matcher = new DependencyMatcher(model);
+    const matcher = new DependencyMatcher(nlp);
     for (const raw of array(c.rules)) {
       const rule = record(raw);
       assert.equal(addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern)), 0);

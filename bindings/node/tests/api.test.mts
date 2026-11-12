@@ -7,8 +7,8 @@ import type { Document, Stage } from '../index.js';
 import { corpus, modelPath, root, snapshot, readJson, record, array } from './fixtures.mts';
 import type { ReferenceDocument } from './fixtures.mts';
 
-let model: Model;
-before(async () => { assert.equal(__napiBindingTarget, 'native'); model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { assert.equal(__napiBindingTarget, 'native'); nlp = await loadModel(modelPath); });
 
 test('every full-pipeline annotation matches the frozen official suites', async () => {
   const differences: { suite: string; expected: ReferenceDocument; actual: ReferenceDocument }[] = [];
@@ -16,7 +16,7 @@ test('every full-pipeline annotation matches the frozen official suites', async 
   let tokens = 0;
   for (const suite of ['development', 'holdout', 'regression', 'evaluation-v1', 'tokenizer-boundaries-v1', 'unseen-v1']) {
     for (const expected of corpus(suite)) {
-      const result = await model.process(expected.text);
+      const result = await nlp.process(expected.text);
       checkOffsets(result);
       const actual = snapshot(result);
       documents++;
@@ -51,7 +51,7 @@ function checkOffsets(doc: Document): void {
 
 test('Unicode and whitespace have exact byte, code-point, and UTF-16 offsets', async () => {
   for (const text of ['😀 Café e\u0301.  ', '\r\n\t A\u00a0B 👩‍🔬!', 'a\0b', '😀😀a', '', '  \t\n']) {
-    const doc = await model.process(text);
+    const doc = await nlp.process(text);
     assert.equal(doc.text, text);
     checkOffsets(doc);
   }
@@ -60,7 +60,7 @@ test('Unicode and whitespace have exact byte, code-point, and UTF-16 offsets', a
 test('ordered stages distinguish unavailable annotations from empty results', async () => {
   const stages: Stage[] = ['Tokenizer', 'Tagger', 'Parser', 'AttributeRuler', 'Lemmatizer', 'Ner'];
   for (const [index, stage] of stages.entries()) {
-    const doc = await model.process('Dogs run.', stage);
+    const doc = await nlp.process('Dogs run.', stage);
     const first = doc.tokens[0];
     assert.ok(first);
     assert.equal(first.tag !== null, index >= 1);
@@ -74,23 +74,23 @@ test('ordered stages distinguish unavailable annotations from empty results', as
     assert.equal(first.entityIob !== null, index >= 5);
     assert.equal(doc.entities !== null, index >= 5);
   }
-  assert.deepEqual(await model.process(''), { text: '', tokens: [], entities: [], sentences: [], nounChunks: [], spanGroups: [] });
-  assert.deepEqual(await model.process('', 'Tokenizer'), { text: '', tokens: [], entities: null, sentences: null, nounChunks: null, spanGroups: [] });
+  assert.deepEqual(await nlp.process(''), { text: '', tokens: [], entities: [], sentences: [], nounChunks: [], spanGroups: [] });
+  assert.deepEqual(await nlp.process('', 'Tokenizer'), { text: '', tokens: [], entities: null, sentences: null, nounChunks: null, spanGroups: [] });
 });
 
 test('repeated, batched and concurrent calls remain independent', async () => {
   const texts = ['Alice works in London.', '', '😀 Café e\u0301.', 'They did not leave.'];
-  const expected = await model.processBatch(texts);
-  assert.deepEqual(await model.processBatch([]), []);
-  assert.deepEqual(await model.processBatch(texts), expected);
-  assert.deepEqual(await Promise.all(texts.map(text => model.process(text))), expected);
-  assert.deepEqual(await model.processBatch(texts, 'Tokenizer'), await Promise.all(texts.map(text => model.process(text, 'Tokenizer'))));
-  const changed = await model.process('Alice works in London.');
+  const expected = await nlp.processBatch(texts);
+  assert.deepEqual(await nlp.processBatch([]), []);
+  assert.deepEqual(await nlp.processBatch(texts), expected);
+  assert.deepEqual(await Promise.all(texts.map(text => nlp.process(text))), expected);
+  assert.deepEqual(await nlp.processBatch(texts, 'Tokenizer'), await Promise.all(texts.map(text => nlp.process(text, 'Tokenizer'))));
+  const changed = await nlp.process('Alice works in London.');
   const first = changed.tokens[0];
   assert.ok(first);
   first.lemma = 'mutated';
   changed.tokens.length = 0;
-  assert.deepEqual(await model.process('Alice works in London.'), expected[0]);
+  assert.deepEqual(await nlp.process('Alice works in London.'), expected[0]);
 });
 
 test('workers retain the model through garbage collection and leave the event loop responsive', async () => {
@@ -118,7 +118,7 @@ test('static vectors are independent Float32Array values with explicit absence',
     const row = record(value);
     assert.ok(typeof row.text === 'string');
     assert.ok(typeof row.has_vector === 'boolean');
-    const actual = model.vector(row.text);
+    const actual = nlp.vector(row.text);
     if (!row.has_vector) assert.equal(actual, null);
     else {
       assert.ok(actual instanceof Float32Array);
@@ -126,14 +126,14 @@ test('static vectors are independent Float32Array values with explicit absence',
       assert.deepEqual(Array.from(actual), expected);
     }
   }
-  const vector = model.vector('dog');
+  const vector = nlp.vector('dog');
   assert.ok(vector instanceof Float32Array);
   assert.equal(vector.length, 300);
   const first = vector[0];
   vector[0] = 999;
-  assert.equal(model.vector('dog')?.[0], first);
-  assert.equal(model.vector('spars_unknown_🙂_lexeme'), null);
-  assert.equal(model.vector(''), null);
+  assert.equal(nlp.vector('dog')?.[0], first);
+  assert.equal(nlp.vector('spars_unknown_🙂_lexeme'), null);
+  assert.equal(nlp.vector(''), null);
 });
 
 test('a separate Node consumer works with an empty PATH', () => {
@@ -146,18 +146,18 @@ test('a separate Node consumer works with an empty PATH', () => {
 
 test('invalid UTF-16 is rejected without replacing original text', async () => {
   for (const text of ['\ud800', '\udc00', 'a\ud800b']) {
-    await assert.rejects(model.process(text), { code: 'SPARS_INVALID_TEXT' });
-    await assert.rejects(model.processBatch(['ok', text]), { code: 'SPARS_INVALID_TEXT' });
+    await assert.rejects(nlp.process(text), { code: 'SPARS_INVALID_TEXT' });
+    await assert.rejects(nlp.processBatch(['ok', text]), { code: 'SPARS_INVALID_TEXT' });
     await assert.rejects(loadModel(text), { code: 'SPARS_INVALID_TEXT' });
-    assert.throws(() => model.vector(text), { code: 'SPARS_INVALID_TEXT' });
+    assert.throws(() => nlp.vector(text), { code: 'SPARS_INVALID_TEXT' });
   }
-  assert.equal((await model.process('still usable')).text, 'still usable');
+  assert.equal((await nlp.process('still usable')).text, 'still usable');
 });
 
 test('JavaScript argument types and stages are validated at the native boundary', () => {
   assert.throws(() => Reflect.construct(Model, []), /constructor/);
   // Deliberately bypass TypeScript only for malformed external input tests.
-  const invoke = (name: 'process' | 'processBatch' | 'vector', args: unknown[]): unknown => Reflect.apply(model[name], model, args);
+  const invoke = (name: 'process' | 'processBatch' | 'vector', args: unknown[]): unknown => Reflect.apply(nlp[name], nlp, args);
   for (const bad of [null, undefined, 42, {}, ['text']]) {
     assert.throws(() => invoke('process', [bad]));
     assert.throws(() => invoke('vector', [bad]));

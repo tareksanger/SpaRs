@@ -1,19 +1,35 @@
 # Add spans with rules
 
-`SpanRuler` adds labeled spans from patterns you write, following spaCy 3.8.14's `SpanRuler` (the `span_ruler` pipeline component). It stores its matches as a [span group](SPAN_GROUPS.md), a named list of spans that may overlap, and can also write them as named entities. Use it to mark phrases for later processing, to collect candidate spans that overlap, or, with entity annotation turned on, as spaCy's rule-based alternative to the [EntityRuler](ENTITY_RULER.md). A pattern is either a [token pattern](TOKEN_MATCHER.md), which describes a sequence of tokens, or a phrase, which matches an exact sequence of token values like the [PhraseMatcher](PHRASE_MATCHER.md). Each pattern has a label and may have an ID, which the ruler writes to the spans and entities it adds. This guide uses the Rust API; Node provides the same ruler as [`SpanRuler`](NODE.md#add-spans-with-rules), with options named in camel case and filters given short forms of spaCy's registered names, such as `'first_longest'` for `spacy.first_longest_spans_filter.v1`.
+`SpanRuler` adds labeled spans from patterns you write, following spaCy 3.8.14's `SpanRuler` (the `span_ruler` pipeline component). It stores its matches as a [span group](SPAN_GROUPS.md), a named list of spans that may overlap, and can also write them as named entities. Use it to mark phrases for later processing, to collect candidate spans that overlap, or, with entity annotation turned on, as spaCy's rule-based alternative to the [EntityRuler](ENTITY_RULER.md). A pattern is either a [token pattern](TOKEN_MATCHER.md), which describes a sequence of tokens, or a phrase, which matches an exact sequence of token values like the [PhraseMatcher](PHRASE_MATCHER.md). Each pattern has a label and may have an ID, which the ruler writes to the spans and entities it adds. This guide describes the Rust API, and its example has a Node.js tab; Node provides the same ruler as [`SpanRuler`](NODE.md#add-spans-with-rules), with options named in camel case and filters given short forms of spaCy's registered names, such as `'first_longest'` for `spacy.first_longest_spans_filter.v1`.
 
 The ruler annotates documents you have already processed. To write entities without the recognizer's predictions, process text with `Model::process_until` and a stage before `Stage::Ner`, such as `Stage::Tokenizer`. The ruler itself needs no model, except for lexical flag conditions and flag phrase attributes. The example below processes text first, so it needs the `en_core_web_md` export at `assets/en_core_web_md-3.8.0`, relative to the repository root, from the [development setup](DEVELOPMENT.md) or the [model installer](MODEL_INSTALLATION.md).
+
+::: code-group
 
 ```rust
 use spars::{Model, Predicate, Repetition, SpanFilter, SpanPattern, SpanPatternKind, SpanRuler,
     SpanRulerOptions, TokenAttribute, TokenConstraint, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load the model once. It holds everything SpaRs learned about English.
     let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // Read the sentence. The model splits it into tokens (words and punctuation
+    // marks) and its recognizer finds the entities: stretches of tokens that name
+    // a real-world thing. A token index is a token's position, counting from 0.
+    // The tokens are:
+    // Tim(0) Cook(1) opened(2) Apple(3) Park(4) in(5) Cupertino(6) .(7)
     let doc = nlp.process("Tim Cook opened Apple Park in Cupertino.")?;
 
     // Phrase patterns are documents processed like the documents the ruler annotates.
+    // The first phrase matches the two tokens "Apple Park" exactly. The second
+    // matches the single token "Park", which lies inside the first match.
     let campus = nlp.process("Apple Park")?;
     let park = nlp.process("Park")?;
+
+    // A token pattern describes tokens by their properties instead. This one is a
+    // single token whose lowercase text is "cupertino", so "Cupertino" and
+    // "CUPERTINO" both fit.
     let city = TokenPattern { tokens: vec![TokenPatternItem {
         constraints: vec![TokenConstraint {
             attribute: TokenAttribute::Lower,
@@ -21,6 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }],
         repetition: Repetition::Once,
     }] };
+
+    // Pair each pattern with the label its matches should get. A label says what
+    // kind of thing a match is; FAC is the label for facilities such as buildings.
+    // The "Apple Park" phrase also gets the ID "apple-park", a name you choose for
+    // the exact thing. The other two patterns have no ID.
     let patterns = [
         SpanPattern {
             label: "FAC".into(),
@@ -33,39 +54,169 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // By default every match, overlapping or not, goes to the span group "ruler", and the
     // entities are left alone.
+    // A span is a run of tokens with a label, and a span group is a named list of
+    // spans stored in the document. Build a ruler with the default settings and
+    // give it the patterns.
     let mut ruler = SpanRuler::new(SpanRulerOptions::default());
     ruler.add(&patterns)?;
+
+    // `annotated` returns an annotated copy and leaves `doc` as it was.
     let annotated = ruler.annotated(&doc)?;
+
+    // Read the "ruler" group from the copy and list each span as four values:
+    // its start token index, its end token index, its label and its ID.
     let spans: Vec<(usize, usize, &str, Option<&str>)> = annotated.span_groups().get("ruler")
         .unwrap().spans.iter()
         .map(|s| (s.start.0, s.end.0, s.label.as_str(), s.id.as_deref())).collect();
+
+    // All three patterns matched. The end index is exclusive, so 3 to 5 covers
+    // tokens 3 and 4, "Apple Park". "Park" (4 to 5) overlaps it and is kept too.
+    // "Cupertino" is 6 to 7.
     assert_eq!(spans, [
         (3, 5, "FAC", Some("apple-park")), (4, 5, "PLACE", None), (6, 7, "CITY", None),
     ]);
+
+    // The copy has the same entities as the document the recognizer produced.
     assert_eq!(annotated.entities(), doc.entities());
 
     // Write entities instead of a span group. Keep the recognizer's entities (`overwrite` off) and
     // let matches replace those they overlap (`PrioritizeNew`); with the default first-longest
     // filter, the recognizer's FAC entity, which has no ID, would win the tie. A shorter match
     // inside a longer one is dropped.
+    // Setting `spans_key` to `None` means no span group is written.
     let mut options = SpanRulerOptions::default();
     options.spans_key = None;
     options.annotate_entities = true;
     options.entities_filter = SpanFilter::PrioritizeNew;
     options.overwrite = false;
+
+    // Build a second ruler with these settings and the same patterns.
     let mut ruler = SpanRuler::new(options);
     ruler.add(&patterns)?;
+
+    // `annotate` changes the document itself, so the document must be mutable.
     let mut doc = doc;
     ruler.annotate(&mut doc)?;
+
+    // List every entity in the document as a pair: its label and its ID.
     let entities: Vec<(&str, Option<&str>)> = doc.entities().unwrap().iter()
         .map(|e| (e.label.as_str(), e.id.as_deref())).collect();
+
+    // "Tim Cook" matched no pattern and stays a PERSON. "Apple Park" is the
+    // ruler's FAC entity with its ID. "Cupertino" has the ruler's CITY label.
+    // The shorter "Park" match was dropped, so there is no PLACE entity.
     assert_eq!(entities, [("PERSON", None), ("FAC", Some("apple-park")), ("CITY", None)]);
+
+    // No span group was written to the document.
     assert!(doc.span_groups().is_empty());
+
     Ok(())
 }
 ```
 
-`annotate` changes a document you own; `annotated` returns an annotated copy and leaves the original unchanged. `find_matches` returns the matches before any filtering.
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, SpanRuler } from '@spars/node';
+import type { SpanPattern, TokenPattern } from '@spars/node';
+
+// Load the model once. It holds everything SpaRs learned about English.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// Read the sentence. The model splits it into tokens (words and punctuation
+// marks) and its recognizer finds the entities: stretches of tokens that name
+// a real-world thing. A token index is a token's position, counting from 0.
+// `processDocument` returns a native document, the kind a ruler can annotate.
+// The tokens are:
+// Tim(0) Cook(1) opened(2) Apple(3) Park(4) in(5) Cupertino(6) .(7)
+const doc = await nlp.processDocument('Tim Cook opened Apple Park in Cupertino.');
+
+// Phrase patterns are documents processed like the documents the ruler annotates.
+// The first phrase matches the two tokens "Apple Park" exactly. The second
+// matches the single token "Park", which lies inside the first match.
+const campus = await nlp.processDocument('Apple Park');
+const park = await nlp.processDocument('Park');
+
+// A token pattern describes tokens by their properties instead. This one is a
+// single token whose lowercase text is "cupertino", so "Cupertino" and
+// "CUPERTINO" both fit.
+const city: TokenPattern = {
+  tokens: [{
+    constraints: [{ attribute: 'lower', predicate: { kind: 'equals', value: 'cupertino' } }],
+    repetition: { kind: 'once' },
+  }],
+};
+
+// Pair each pattern with the label its matches should get. A label says what
+// kind of thing a match is; FAC is the label for facilities such as buildings.
+// The "Apple Park" phrase also gets the ID "apple-park", a name you choose for
+// the exact thing. The other two patterns have no ID.
+const patterns: SpanPattern[] = [
+  { label: 'FAC', id: 'apple-park', phrase: campus },
+  { label: 'PLACE', phrase: park },
+  { label: 'CITY', tokens: city },
+];
+
+// By default every match, overlapping or not, goes to the span group "ruler",
+// and the entities are left alone.
+// A span is a run of tokens with a label, and a span group is a named list of
+// spans stored in the document. Build a ruler with the default settings and
+// give it the patterns.
+const ruler = new SpanRuler();
+ruler.add(patterns);
+
+// `annotate` returns an annotated copy and leaves `doc` as it was. `toObject`
+// copies a document into plain JavaScript values that are easy to read.
+const annotated = (await ruler.annotate(doc)).toObject();
+
+// Read the "ruler" group from the copy and list each span as four values:
+// its start token index, its end token index, its label and its ID.
+// A span without an ID reports ''.
+const group = annotated.spanGroups.find((entry) => entry.key === 'ruler');
+assert.ok(group);
+const spans = group.spans.map((span) => [span.start, span.end, span.label, span.id]);
+
+// All three patterns matched. The end index is exclusive, so 3 to 5 covers
+// tokens 3 and 4, "Apple Park". "Park" (4 to 5) overlaps it and is kept too.
+// "Cupertino" is 6 to 7.
+assert.deepEqual(spans, [[3, 5, 'FAC', 'apple-park'], [4, 5, 'PLACE', ''], [6, 7, 'CITY', '']]);
+
+// The copy has the same entities as the document the recognizer produced.
+assert.deepEqual(annotated.entities, doc.toObject().entities);
+
+// Write entities instead of a span group. Keep the recognizer's entities
+// (`overwrite` off) and let matches replace those they overlap
+// ('prioritize_new'); with the default first-longest filter, the recognizer's
+// FAC entity, which has no ID, would win the tie. A shorter match inside a
+// longer one is dropped.
+// Setting `spansKey` to `null` means no span group is written.
+// Build a second ruler with these settings and the same patterns.
+const entityWriter = new SpanRuler({
+  spansKey: null,
+  annotateEntities: true,
+  entitiesFilter: 'prioritize_new',
+  overwrite: false,
+});
+entityWriter.add(patterns);
+
+// A native document never changes, so keep the copy that `annotate` returns.
+const rewritten = (await entityWriter.annotate(doc)).toObject();
+
+// List every entity in the document as a pair: its label and its ID, which
+// is '' when the entity has none.
+const entities = (rewritten.entities ?? []).map((entity) => [entity.label, entity.id]);
+
+// "Tim Cook" matched no pattern and stays a PERSON. "Apple Park" is the
+// ruler's FAC entity with its ID. "Cupertino" has the ruler's CITY label.
+// The shorter "Park" match was dropped, so there is no PLACE entity.
+assert.deepEqual(entities, [['PERSON', ''], ['FAC', 'apple-park'], ['CITY', '']]);
+
+// No span group was written to the document.
+assert.equal(rewritten.spanGroups.length, 0);
+```
+
+:::
+
+`annotate` changes a document you own; `annotated` returns an annotated copy and leaves the original unchanged. In Node.js, documents cannot be changed, so `annotate` always returns a copy and there is no `annotated`. `find_matches` returns the matches before any filtering.
 
 ## Options
 

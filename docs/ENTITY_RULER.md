@@ -1,21 +1,40 @@
 # Add entities with rules
 
-`EntityRuler` adds named entities from patterns you write, following spaCy 3.8.14's `EntityRuler` (the `entity_ruler` pipeline component). Use it to add entities the statistical recognizer misses, to correct its labels, to give entities stable IDs, or to recognize entities with rules alone. A pattern is either a [token pattern](TOKEN_MATCHER.md), which describes a sequence of tokens, or a phrase, which matches an exact sequence of token values like the [PhraseMatcher](PHRASE_MATCHER.md). Each pattern has a label and may have an ID, which the ruler writes to the entities it adds as described in [entity IDs](ENTITIES.md#entity-ids). This guide uses the Rust API; Node has the same ruler, reporting a missing ID as `''`, described in [the Node guide](NODE.md#add-entities-with-rules).
+`EntityRuler` adds named entities from patterns you write, following spaCy 3.8.14's `EntityRuler` (the `entity_ruler` pipeline component). Use it to add entities the statistical recognizer misses, to correct its labels, to give entities stable IDs, or to recognize entities with rules alone. A pattern is either a [token pattern](TOKEN_MATCHER.md), which describes a sequence of tokens, or a phrase, which matches an exact sequence of token values like the [PhraseMatcher](PHRASE_MATCHER.md). Each pattern has a label and may have an ID, which the ruler writes to the entities it adds as described in [entity IDs](ENTITIES.md#entity-ids). This guide describes the Rust API, and its example has a Node.js tab; Node has the same ruler, reporting a missing ID as `''`, described in [the Node guide](NODE.md#add-entities-with-rules).
 
 The ruler annotates documents you have already processed, like spaCy's ruler placed after the recognizer in a pipeline. To use it without the recognizer, process text with `Model::process_until` and a stage before `Stage::Ner`, such as `Stage::Tokenizer`. The ruler itself needs no model, except for lexical flag conditions and flag phrase attributes. The example below processes text first, so it needs the `en_core_web_md` export at `assets/en_core_web_md-3.8.0`, relative to the repository root, from the [development setup](DEVELOPMENT.md) or the [model installer](MODEL_INSTALLATION.md).
+
+::: code-group
 
 ```rust
 use spars::{EntityPattern, EntityPatternKind, EntityRuler, EntityRulerOptions, Model, Predicate,
     Repetition, TokenAttribute, TokenConstraint, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load the model once. It holds everything SpaRs learned about English.
     let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // Read the sentence. The model splits it into tokens (words and punctuation
+    // marks) and its recognizer finds the entities: stretches of tokens that name
+    // a real-world thing. A token index is a token's position, counting from 0.
+    // The tokens are:
+    // Tim(0) Cook(1) opened(2) Apple(3) Park(4) in(5) Cupertino(6) .(7)
     let doc = nlp.process("Tim Cook opened Apple Park in Cupertino.")?;
+
+    // A small helper that lists every entity in a document as a pair: its label
+    // and its ID. The label says what kind of thing the entity names. The ID is an
+    // optional name you choose for the exact thing, and `None` means it has none.
     let entities = |doc: &spars::Doc| -> Vec<(String, Option<String>)> {
         doc.entities().unwrap().iter().map(|e| (e.label.clone(), e.id.clone())).collect()
     };
 
     // Phrase patterns are documents processed like the documents the ruler annotates.
+    // This phrase matches the two tokens "Apple Park" exactly.
     let campus = nlp.process("Apple Park")?;
+
+    // A token pattern describes tokens by their properties instead. This one is a
+    // single token whose lowercase text is "cupertino", so "Cupertino" and
+    // "CUPERTINO" both fit.
     let city = TokenPattern { tokens: vec![TokenPatternItem {
         constraints: vec![TokenConstraint {
             attribute: TokenAttribute::Lower,
@@ -23,6 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }],
         repetition: Repetition::Once,
     }] };
+
+    // Pair each pattern with the label its matches should get. FAC is the label
+    // for facilities such as buildings and airports. The phrase also gets the ID
+    // "apple-park". The city pattern gets the label CITY and no ID.
     let patterns = [
         EntityPattern {
             label: "FAC".into(),
@@ -34,31 +57,120 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The recognizer already labeled Apple Park FAC and Cupertino GPE. By default the ruler skips
     // matches on tokens that belong to an entity, so both matches are skipped.
+    // GPE is the label for countries, cities and states.
+    // Build a ruler with the default settings and give it the patterns.
     let mut ruler = EntityRuler::new(EntityRulerOptions::default())?;
     ruler.add(&patterns)?;
+
+    // `annotated` returns an annotated copy and leaves `doc` as it was. The copy
+    // has the same three entities the recognizer found, and none has an ID.
     assert_eq!(entities(&ruler.annotated(&doc)?), [
         ("PERSON".to_owned(), None), ("FAC".to_owned(), None), ("GPE".to_owned(), None),
     ]);
 
     // With overwriting, matches replace the entities they overlap.
+    // Build a second ruler with that setting turned on and the same patterns.
     let mut options = EntityRulerOptions::default();
     options.overwrite_entities = true;
     let mut ruler = EntityRuler::new(options)?;
     ruler.add(&patterns)?;
+
+    // `annotate` changes the document itself, so the document must be mutable.
     let mut doc = doc;
     ruler.annotate(&mut doc)?;
+
+    // "Tim Cook" matched no pattern and stays a PERSON. "Apple Park" is FAC again,
+    // but this time it comes from the ruler and carries the ID. "Cupertino" has
+    // the ruler's CITY label in place of GPE.
     assert_eq!(entities(&doc), [
         ("PERSON".to_owned(), None),
         ("FAC".to_owned(), Some("apple-park".to_owned())),
         ("CITY".to_owned(), None),
     ]);
+
     // Token 3, "Apple", carries the ID of its entity.
     assert_eq!(doc.tokens()[3].entity_id.as_deref(), Some("apple-park"));
+
     Ok(())
 }
 ```
 
-`annotate` changes a document you own; `annotated` returns an annotated copy and leaves the original unchanged. `find_matches` returns the candidate matches before any filtering.
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, EntityRuler } from '@spars/node';
+import type { EntityPattern, NativeDocument, TokenPattern } from '@spars/node';
+
+// Load the model once. It holds everything SpaRs learned about English.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// Read the sentence. The model splits it into tokens (words and punctuation
+// marks) and its recognizer finds the entities: stretches of tokens that name
+// a real-world thing. A token index is a token's position, counting from 0.
+// `processDocument` returns a native document, the kind a ruler can annotate.
+// The tokens are:
+// Tim(0) Cook(1) opened(2) Apple(3) Park(4) in(5) Cupertino(6) .(7)
+const doc = await nlp.processDocument('Tim Cook opened Apple Park in Cupertino.');
+
+// A small helper that lists every entity in a document as a pair: its label
+// and its ID. The label says what kind of thing the entity names. The ID is an
+// optional name you choose for the exact thing, and '' means it has none.
+// `toObject` copies the document into plain JavaScript values.
+const entities = (document: NativeDocument): [string, string][] =>
+  (document.toObject().entities ?? []).map((entity) => [entity.label, entity.id]);
+
+// Phrase patterns are documents processed like the documents the ruler annotates.
+// This phrase matches the two tokens "Apple Park" exactly.
+const campus = await nlp.processDocument('Apple Park');
+
+// A token pattern describes tokens by their properties instead. This one is a
+// single token whose lowercase text is "cupertino", so "Cupertino" and
+// "CUPERTINO" both fit.
+const city: TokenPattern = {
+  tokens: [{
+    constraints: [{ attribute: 'lower', predicate: { kind: 'equals', value: 'cupertino' } }],
+    repetition: { kind: 'once' },
+  }],
+};
+
+// Pair each pattern with the label its matches should get. FAC is the label
+// for facilities such as buildings and airports. The phrase also gets the ID
+// "apple-park". The city pattern gets the label CITY and no ID.
+const patterns: EntityPattern[] = [
+  { label: 'FAC', id: 'apple-park', phrase: campus },
+  { label: 'CITY', tokens: city },
+];
+
+// The recognizer already labeled Apple Park FAC and Cupertino GPE. By default the
+// ruler skips matches on tokens that belong to an entity, so both are skipped.
+// GPE is the label for countries, cities and states.
+// Build a ruler with the default settings and give it the patterns.
+const ruler = new EntityRuler();
+ruler.add(patterns);
+
+// `annotate` returns an annotated copy and leaves `doc` as it was. The copy
+// has the same three entities the recognizer found, and none has an ID.
+assert.deepEqual(entities(await ruler.annotate(doc)), [['PERSON', ''], ['FAC', ''], ['GPE', '']]);
+
+// With overwriting, matches replace the entities they overlap.
+// Build a second ruler with that setting turned on and the same patterns.
+const overwriting = new EntityRuler({ overwriteEntities: true });
+overwriting.add(patterns);
+
+// A native document never changes, so keep the copy that `annotate` returns.
+const annotated = await overwriting.annotate(doc);
+
+// "Tim Cook" matched no pattern and stays a PERSON. "Apple Park" is FAC again,
+// but this time it comes from the ruler and carries the ID. "Cupertino" has
+// the ruler's CITY label in place of GPE.
+assert.deepEqual(entities(annotated), [['PERSON', ''], ['FAC', 'apple-park'], ['CITY', '']]);
+
+// Token 3, "Apple", carries the ID of its entity.
+assert.equal(annotated.token(3).annotations().entityId, 'apple-park');
+```
+
+:::
+
+`annotate` changes a document you own; `annotated` returns an annotated copy and leaves the original unchanged. In Node.js, documents cannot be changed, so `annotate` always returns a copy and there is no `annotated`. `find_matches` returns the candidate matches before any filtering.
 
 ## How matches become entities
 

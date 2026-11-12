@@ -155,7 +155,7 @@ fn updates_match_spacy_set_ents() {
 #[test]
 #[ignore = "requires official export; mandatory acceptance"]
 fn model_predictions_equal_the_recorded_initial_state() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let fixture = fixture();
     let case = fixture.cases.iter().find(|c| c.id == "after-ner").unwrap();
     let text: String = case
@@ -164,7 +164,7 @@ fn model_predictions_equal_the_recorded_initial_state() {
         .zip(&case.spaces)
         .map(|(w, s)| format!("{w}{}", if *s { " " } else { "" }))
         .collect();
-    let mut document = model.process(&text).unwrap();
+    let mut document = nlp.process(&text).unwrap();
     assert_state(&document, &case.initial, "model prediction");
     // Everything except entity annotation is unchanged, including the contextual tensor.
     let without_entities = |doc: &Doc| {

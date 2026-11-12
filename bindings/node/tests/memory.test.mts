@@ -65,10 +65,10 @@ test('native document memory is reported to V8 and released on collection', asyn
 });
 
 test('documents from inference are reported and released', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   await collect();
   const before = reportedNativeMemory();
-  let doc: NativeDocument | null = await model.processDocument('Alice visits London. '.repeat(500));
+  let doc: NativeDocument | null = await nlp.processDocument('Alice visits London. '.repeat(500));
   const reported = reportedNativeMemory() - before;
   assert.ok(reported >= 2000 * PER_TOKEN.min && reported <= 2000 * PER_TOKEN.max * 4, `reported ${reported} bytes`);
   assert.ok(doc.utf16Length > 0);

@@ -3,8 +3,8 @@ import { before, test } from 'node:test';
 import { loadModel, Model, NativeDocument } from '../index.js';
 import { array, modelPath, readJson, record, root } from './fixtures.mts';
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 function number(value: unknown): number { assert.equal(typeof value, 'number'); assert.ok(typeof value === 'number'); return value; }
 function string(value: unknown): string { assert.ok(typeof value === 'string'); return value; }
@@ -18,7 +18,7 @@ test('all frozen dependency traversals match pinned spaCy order and sentence bou
   let count = 0;
   for (const value of cases) {
     const expected = record(value);
-    const doc = await model.processDocument(string(expected.text));
+    const doc = await nlp.processDocument(string(expected.text));
     const saved = doc.toSnapshot();
     const tokens = array(expected.tokens);
     assert.equal(doc.length, tokens.length);
@@ -39,7 +39,7 @@ test('all frozen dependency traversals match pinned spaCy order and sentence bou
 });
 
 test('views preserve text, annotations and lifetime without permitting mutation', async () => {
-  let doc: NativeDocument | undefined = await model.processDocument('😀 Café e\u0301.  ');
+  let doc: NativeDocument | undefined = await nlp.processDocument('😀 Café e\u0301.  ');
   const output = doc.toObject();
   assert.equal(doc.text, output.text);
   assert.deepEqual(doc.tokens().map(t => t.text), output.tokens.map(t => t.text));
@@ -64,7 +64,7 @@ test('views preserve text, annotations and lifetime without permitting mutation'
 });
 
 test('bounds reject fractions, negative numbers, wrapping, infinities and NaN', async () => {
-  const doc = await model.processDocument('A B', 'Tokenizer');
+  const doc = await nlp.processDocument('A B', 'Tokenizer');
   for (const invalid of [-1, 0.5, Number.NaN, Infinity, -Infinity, 2 ** 32, Number.MAX_SAFE_INTEGER]) {
     assert.throws(() => doc.token(invalid), { code: 'SPARS_BOUNDS' });
     assert.throws(() => doc.span(invalid, 1), { code: 'SPARS_BOUNDS' });
@@ -78,14 +78,14 @@ test('bounds reject fractions, negative numbers, wrapping, infinities and NaN', 
 });
 
 test('missing annotations remain distinct from empty results', async () => {
-  const doc = await model.processDocument('A B', 'Tokenizer');
+  const doc = await nlp.processDocument('A B', 'Tokenizer');
   assert.equal(doc.sentenceViews(), null);
   assert.equal(doc.token(0).head(), null);
   assert.throws(() => doc.token(0).sentence());
   for (const traversal of ['children', 'ancestors', 'subtree'] as const) {
     assert.throws(() => doc.token(0)[traversal]());
   }
-  const empty = await model.processDocument('');
+  const empty = await nlp.processDocument('');
   assert.deepEqual(empty.sentenceViews(), []);
   assert.deepEqual(empty.tokens(), []);
   assert.equal(empty.span(0, 0).text, '');
@@ -93,7 +93,7 @@ test('missing annotations remain distinct from empty results', async () => {
 });
 
 test('restored nonprojective and cyclic graphs preserve native traversal contracts', async () => {
-  const original = await model.processDocument('A B C D', 'Tokenizer');
+  const original = await nlp.processDocument('A B C D', 'Tokenizer');
   function withHeads(heads: number[]): NativeDocument {
     const saved = record(JSON.parse(original.toSnapshot()));
     const tokens = array(record(saved.document).tokens);

@@ -107,14 +107,14 @@ test('wrappers defer native invocation and reject saturation without reading bat
   const FakeModelNative = FakeModel.prototype.process;
   install({ Model: FakeModel });
   configureExecution({ maxActive: 1, maxQueued: 2 });
-  const model = new FakeModel();
-  const first = model.process('first');
-  const second = model.processBatch(['second']);
-  const third = model.process('third');
+  const nlp = new FakeModel();
+  const first = nlp.process('first');
+  const second = nlp.processBatch(['second']);
+  const third = nlp.process('third');
   assert.deepEqual(started, ['first']);
   const inaccessible = ['never'];
   Object.defineProperty(inaccessible, 0, { get() { throw new Error('must not copy a rejected batch'); } });
-  await assert.rejects(model.processBatch(inaccessible), { code: 'SPARS_BUSY' });
+  await assert.rejects(nlp.processBatch(inaccessible), { code: 'SPARS_BUSY' });
   assert.deepEqual(started, ['first']);
   const doc = (text: string): Document => ({ text, tokens: [], entities: null, sentences: null, nounChunks: null, spanGroups: [] });
   gates.get('first')?.resolve(doc('first'));
@@ -130,18 +130,18 @@ test('wrappers defer native invocation and reject saturation without reading bat
 
 
 test('reset restores default admission caps for subsequent submissions', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   configureExecution({ maxActive: 1, maxQueued: 0 });
-  const first = model.process('a', 'Tokenizer');
+  const first = nlp.process('a', 'Tokenizer');
   try {
-    await assert.rejects(model.process('b', 'Tokenizer'), { code: 'SPARS_BUSY' });
+    await assert.rejects(nlp.process('b', 'Tokenizer'), { code: 'SPARS_BUSY' });
     await first;
     configureExecution(null);
-    const accepted = Array.from({ length: 34 }, () => model.process('a', 'Tokenizer'));
+    const accepted = Array.from({ length: 34 }, () => nlp.process('a', 'Tokenizer'));
     const settled = Promise.allSettled(accepted);
-    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    await assert.rejects(nlp.process('overflow'), { code: 'SPARS_BUSY' });
     assert.ok((await settled).every(result => result.status === 'fulfilled'));
-    assert.equal((await model.process('recovered', 'Tokenizer')).text, 'recovered');
+    assert.equal((await nlp.process('recovered', 'Tokenizer')).text, 'recovered');
   } finally { await first; configureExecution(null); }
 });
 
@@ -171,33 +171,33 @@ test('native chunks run sequentially under one admission slot and stop on failur
     vector(): null { return null; }
   }
   install({ Model: FakeModel });
-  const model = new FakeModel();
+  const nlp = new FakeModel();
   configureExecution({ maxActive: 1, maxQueued: 0 });
   try {
     const texts = ['a', 'b', 'c', 'd', 'e'];
-    const result = model.processBatch(texts);
+    const result = nlp.processBatch(texts);
     texts[2] = 'changed';
     assert.deepEqual(chunks, [['a', 'b']]);
     gates[0]?.resolve(0);
     await new Promise<void>(resolve => setImmediate(resolve));
     assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
-    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    await assert.rejects(nlp.process('overflow'), { code: 'SPARS_BUSY' });
     gates[1]?.resolve(1);
     await new Promise<void>(resolve => setImmediate(resolve));
     assert.deepEqual(chunks, [['a', 'b'], ['c', 'd'], ['e']]);
-    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
+    await assert.rejects(nlp.process('overflow'), { code: 'SPARS_BUSY' });
     gates[2]?.resolve(2);
     assert.deepEqual((await result).map(item => item.text), ['a', 'b', 'c', 'd', 'e']);
     chunks.length = 0;
     gates = [deferred(), deferred(), deferred()];
-    const failure = model.processBatch(['a', 'b', 'c', 'd', 'e']);
+    const failure = nlp.processBatch(['a', 'b', 'c', 'd', 'e']);
     const rejected = assert.rejects(failure, /middle chunk failed/);
     gates[0]?.resolve(0);
     await new Promise<void>(resolve => setImmediate(resolve));
     gates[1]?.reject(new Error('middle chunk failed'));
     await rejected;
     assert.deepEqual(chunks, [['a', 'b'], ['c', 'd']]);
-    assert.equal((await model.process('recovered')).text, 'recovered');
+    assert.equal((await nlp.process('recovered')).text, 'recovered');
   } finally { configureExecution(null); }
 });
 

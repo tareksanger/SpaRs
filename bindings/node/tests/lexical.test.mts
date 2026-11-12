@@ -5,8 +5,8 @@ import { loadModel, Model } from '../index.js';
 import type { Lexeme } from '../index.js';
 import { array, modelPath, record, root } from './fixtures.mts';
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 function string(value: unknown): string { assert.ok(typeof value === 'string'); return value; }
 function boolean(value: unknown): boolean { assert.ok(typeof value === 'boolean'); return value; }
@@ -46,40 +46,40 @@ test('all lexical fields and exact uint64 hashes match the frozen official refer
     const text = string(entry.text);
     const expected = reference(entry.expected);
     if (expected.orth > BigInt(Number.MAX_SAFE_INTEGER)) largeIds++;
-    assert.deepEqual(model.lexeme(text), expected, JSON.stringify(text));
+    assert.deepEqual(nlp.lexeme(text), expected, JSON.stringify(text));
   }
   assert.ok(largeIds > 0, 'must exercise IDs outside the exact Number range');
 });
 
 test('Unicode, empty strings and embedded NUL retain lexical boundaries', () => {
   for (const text of ['', '😀', '👩‍🔬', 'Café', 'e\u0301', 'a\0b', '𰀀']) {
-    const lex = model.lexeme(text);
+    const lex = nlp.lexeme(text);
     const points = Array.from(text);
     assert.equal(lex.prefix, points.slice(0, 1).join(''));
     assert.equal(lex.suffix, points.slice(-3).join(''));
     assert.equal(typeof lex.orth, 'bigint');
-    assert.deepEqual(model.lexeme(text), lex);
+    assert.deepEqual(nlp.lexeme(text), lex);
   }
 });
 
 test('lexical queries reject malformed UTF-16 and non-string inputs', () => {
   for (const text of ['\ud800', '\udc00', 'a\ud800b', '\udc00\ud800']) {
-    assert.throws(() => model.lexeme(text), { code: 'SPARS_INVALID_TEXT' });
+    assert.throws(() => nlp.lexeme(text), { code: 'SPARS_INVALID_TEXT' });
   }
   for (const value of [undefined, null, 42, {}, ['word']]) {
-    assert.throws(() => Reflect.apply(model.lexeme, model, [value]));
+    assert.throws(() => Reflect.apply(nlp.lexeme, nlp, [value]));
   }
 });
 
 test('mutating an owned lexical result cannot affect repeated queries or inference', async () => {
-  const expected = model.lexeme('London');
-  const changed = model.lexeme('London');
+  const expected = nlp.lexeme('London');
+  const changed = nlp.lexeme('London');
   changed.orth = 0n;
   changed.norm = 'changed';
   changed.isAlpha = false;
-  assert.deepEqual(model.lexeme('London'), expected);
-  const pending = model.process('London is a city.');
-  for (let i = 0; i < 20; i++) assert.deepEqual(model.lexeme('London'), expected);
+  assert.deepEqual(nlp.lexeme('London'), expected);
+  const pending = nlp.process('London is a city.');
+  for (let i = 0; i < 20; i++) assert.deepEqual(nlp.lexeme('London'), expected);
   assert.equal((await pending).tokens[0]?.text, 'London');
-  assert.deepEqual(model.lexeme('London'), expected);
+  assert.deepEqual(nlp.lexeme('London'), expected);
 });

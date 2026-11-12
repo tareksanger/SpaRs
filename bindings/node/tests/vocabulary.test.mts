@@ -35,7 +35,7 @@ test('snapshots accept exactly the declared POS and IOB values', () => {
 });
 
 test('every declared token condition is accepted and read back by both matchers', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const conditions: TokenConstraint[] = [
     ...STRING_ATTRIBUTES.flatMap((attribute): TokenConstraint[] => [
       { attribute, predicate: { kind: 'equals', value: 'a' } },
@@ -50,8 +50,8 @@ test('every declared token condition is accepted and read back by both matchers'
     ...COMPARISONS.map((operator): TokenConstraint => ({ attribute: 'length', predicate: { kind: 'compare', operator, value: 2 } })),
     ...INTEGER_SET_KINDS.map((kind): TokenConstraint => ({ attribute: 'length', predicate: { kind, values: [2] } })),
   ];
-  const tokens = new TokenMatcher(model);
-  const dependencies = new DependencyMatcher(model);
+  const tokens = new TokenMatcher(nlp);
+  const dependencies = new DependencyMatcher(nlp);
   for (const [index, condition] of conditions.entries()) {
     const pattern: TokenPattern = { tokens: [{ constraints: [condition], repetition: { kind: 'once' } }] };
     tokens.add(`t${index}`, [pattern]);

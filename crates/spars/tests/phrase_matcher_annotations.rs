@@ -242,7 +242,7 @@ fn official_annotation_attributes_and_rule_lifecycle() {
 #[test]
 #[ignore = "requires official export; mandatory acceptance"]
 fn model_annotations_equal_the_recorded_pipeline_tokens() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let fixture: Fixture = serde_json::from_str(include_str!(
         "../../../fixtures/phrase-match-annotations-v1.expected.json"
     ))
@@ -266,7 +266,7 @@ fn model_annotations_equal_the_recorded_pipeline_tokens() {
             .iter()
             .map(|t| format!("{}{}", t.word, if t.space { " " } else { "" }))
             .collect();
-        let processed = model.process(&text).unwrap();
+        let processed = nlp.process(&text).unwrap();
         let present = |value: &Option<String>| value.clone().filter(|v| !v.is_empty());
         let actual: Vec<_> = processed
             .tokens()
