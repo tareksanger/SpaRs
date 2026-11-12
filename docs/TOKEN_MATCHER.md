@@ -6,13 +6,23 @@
 
 Complete the model setup in the [developer guide](DEVELOPMENT.md). This example matches the lemma “visit” followed by one or more proper nouns. It finds “visited New York” even though the text uses a different verb form.
 
+::: code-group
+
 ```rust
 use spars::{Model, Predicate, Repetition, TokenAttribute, TokenConstraint,
     TokenIndex, TokenMatcher, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It holds everything SpaRs learned about English.
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A matcher holds named rules. Each rule is a list of patterns to look for.
     let mut matcher = TokenMatcher::new();
+
+    // This pattern describes two tokens in a row.
     matcher.add("visit_place", vec![TokenPattern { tokens: vec![
+        // First token: any form of the verb "visit". The lemma is the dictionary
+        // form of a word, so "visits", "visited" and "visiting" all have the lemma "visit".
         TokenPatternItem {
             constraints: vec![TokenConstraint {
                 attribute: TokenAttribute::Lemma,
@@ -20,6 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }],
             repetition: Repetition::Once,
         },
+        // Then: one or more proper nouns. PROPN is the part-of-speech tag for names
+        // such as "New" and "York".
         TokenPatternItem {
             constraints: vec![TokenConstraint {
                 attribute: TokenAttribute::Pos,
@@ -28,15 +40,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             repetition: Repetition::OneOrMore,
         },
     ] }])?;
-    let doc = model.process("Alice visited New York.")?;
+
+    // Read the sentence. The tokens are: Alice(0) visited(1) New(2) York(3) .(4)
+    let doc = nlp.process("Alice visited New York.")?;
+
+    // Ask the matcher for every place the pattern fits.
     let matches = matcher.find_matches(&doc)?;
+
+    // One match starts at token 1 and stops before token 4. The end is exclusive,
+    // so the match covers tokens 1, 2 and 3.
     assert!(matches.iter().any(|m| m.rule == "visit_place"
         && m.start == TokenIndex(1) && m.end == TokenIndex(4)));
+
+    // Turn that match back into text.
     let complete = matches.iter().find(|m| m.end == TokenIndex(4)).unwrap();
     assert_eq!(doc.span_text(complete.start, complete.end)?, "visited New York");
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+
+// Load the model once. It holds everything SpaRs learned about English.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A matcher holds named rules. Each rule is a list of patterns to look for.
+const matcher = new TokenMatcher();
+
+// This pattern describes two tokens in a row.
+matcher.add('visit_place', [{ tokens: [
+  // First token: any form of the verb "visit". The lemma is the dictionary
+  // form of a word, so "visits", "visited" and "visiting" all have the lemma "visit".
+  {
+    constraints: [{ attribute: 'lemma', predicate: { kind: 'equals', value: 'visit' } }],
+    repetition: { kind: 'once' },
+  },
+  // Then: one or more proper nouns. PROPN is the part-of-speech tag for names
+  // such as "New" and "York".
+  {
+    constraints: [{ attribute: 'pos', predicate: { kind: 'equals', value: 'PROPN' } }],
+    repetition: { kind: 'one_or_more' },
+  },
+] }]);
+
+// Read the sentence. `processDocument` returns the kind of document a matcher
+// searches. The tokens are: Alice(0) visited(1) New(2) York(3) .(4)
+const doc = await nlp.processDocument('Alice visited New York.');
+
+// Ask the matcher for every place the pattern fits.
+const matches = await matcher.findMatches(doc);
+
+// One match starts at token 1 and stops before token 4. The end is exclusive,
+// so the match covers tokens 1, 2 and 3.
+assert.ok(matches.some((match) => match.rule === 'visit_place'
+  && match.start === 1 && match.end === 4));
+
+// Turn that match back into text.
+const complete = matches.find((match) => match.end === 4);
+assert.ok(complete);
+assert.equal(doc.span(complete.start, complete.end).text, 'visited New York');
+```
+
+:::
 
 The default returns overlapping matches, so “visited New” also matches this pattern. A pattern describes token conditions; it does not verify that a name is a place. Use entity annotations separately when that distinction matters.
 
@@ -44,11 +111,19 @@ The default returns overlapping matches, so “visited New” also matches this 
 
 `TokenAttribute::Lower` compares the lowercase form of each token's text, like spaCy's `LOWER`. This example finds “the Ritz” however it is capitalized.
 
+::: code-group
+
 ```rust
 use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
     TokenMatcher, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It splits text into tokens (words and punctuation marks).
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A small helper that builds one pattern item. The item matches a token whose
+    // lowercase text equals `value`, so "THE", "The" and "the" all match "the".
+    // The default repetition is "exactly one token".
     let lower = |value: &str| TokenPatternItem {
         constraints: vec![TokenConstraint {
             attribute: TokenAttribute::Lower,
@@ -56,15 +131,65 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }],
         repetition: Default::default(),
     };
+
+    // A matcher holds named rules. Each rule is a list of patterns to look for.
     let mut matcher = TokenMatcher::new();
+
+    // The rule "ritz" looks for two tokens in a row: "the", then "ritz".
+    // The values are written in lowercase because they are compared as written.
     matcher.add("ritz", vec![TokenPattern { tokens: vec![lower("the"), lower("ritz")] }])?;
-    let doc = model.process("THE RITZ is near the Ritz.")?;
+
+    // Read the sentence. A token index is a token's position, counting from 0.
+    // The tokens are: THE(0) RITZ(1) is(2) near(3) the(4) Ritz(5) .(6)
+    let doc = nlp.process("THE RITZ is near the Ritz.")?;
+
+    // Find every match and keep only where each one starts and ends.
     let found: Vec<_> = matcher.find_matches(&doc)?.iter()
         .map(|m| (m.start, m.end)).collect();
+
+    // Both spellings are found. The end is exclusive, meaning the match stops just
+    // before that token: (0, 2) covers tokens 0 and 1, and (4, 6) covers tokens 4 and 5.
     assert_eq!(found, [(TokenIndex(0), TokenIndex(2)), (TokenIndex(4), TokenIndex(6))]);
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+import type { TokenPatternItem } from '@spars/node';
+
+// Load the model once. It splits text into tokens (words and punctuation marks).
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A small helper that builds one pattern item. The item matches a token whose
+// lowercase text equals `value`, so "THE", "The" and "the" all match "the".
+// The repetition 'once' means "exactly one token".
+const lower = (value: string): TokenPatternItem => ({
+  constraints: [{ attribute: 'lower', predicate: { kind: 'equals', value } }],
+  repetition: { kind: 'once' },
+});
+
+// A matcher holds named rules. Each rule is a list of patterns to look for.
+const matcher = new TokenMatcher();
+
+// The rule "ritz" looks for two tokens in a row: "the", then "ritz".
+// The values are written in lowercase because they are compared as written.
+matcher.add('ritz', [{ tokens: [lower('the'), lower('ritz')] }]);
+
+// Read the sentence. A token index is a token's position, counting from 0.
+// The tokens are: THE(0) RITZ(1) is(2) near(3) the(4) Ritz(5) .(6)
+const doc = await nlp.processDocument('THE RITZ is near the Ritz.');
+
+// Find every match and keep only where each one starts and ends.
+const found = (await matcher.findMatches(doc)).map((match) => [match.start, match.end]);
+
+// Both spellings are found. The end is exclusive, meaning the match stops just
+// before that token: [0, 2] covers tokens 0 and 1, and [4, 6] covers tokens 4 and 5.
+assert.deepEqual(found, [[0, 2], [4, 6]]);
+```
+
+:::
 
 Pattern values are compared exactly as written; they are not lowercased. A value such as `"Ritz"` therefore never matches, because lowercasing always turns `R` into `r`. Write pattern values in lowercase. Lowercase mappings follow Python's Unicode 15.0.0 `str.lower()`. This includes the Greek final sigma rule: a capital `Σ` becomes `ς` only when a cased letter comes before it and no cased letter follows it, ignoring combining marks between them; otherwise it becomes `σ`. So `ΟΣ` becomes `ος`, while a lone `Σ` becomes `σ`. This is lowercasing, not case folding or Unicode normalization: `ß` does not become `ss`, and a single-character `é` stays distinct from an `e` followed by a separate combining accent. `Lower` needs only token text, not model annotations, and it differs from `Norm`, which can replace a word such as `Gon` with `going`. It uses the same pinned lowercase data as PhraseMatcher `LOWER`. `Lower` accepts `Equals`, `In`, `NotIn` and the set comparisons described in [Compare with a set of values](#compare-with-a-set-of-values); `MorphSuperset` and `MorphIntersects` apply only to `Morphology`.
 
@@ -72,26 +197,84 @@ Pattern values are compared exactly as written; they are not lowercased. A value
 
 Lexical flags are true/false properties computed from a token's text, such as whether it is alphabetic or a stop word, like spaCy's `IS_ALPHA` or `LIKE_URL`. All seventeen of spaCy's lexical flag attributes are supported: `IsAlpha`, `IsDigit`, `IsSpace`, `IsPunct`, `LikeNum`, `IsLower`, `IsUpper`, `IsTitle`, `IsAscii`, `IsCurrency`, `IsStop`, `IsBracket`, `IsQuote`, `IsLeftPunct`, `IsRightPunct`, `LikeUrl` and `LikeEmail`. Some depend on the language: English `LIKE_NUM` accepts number words such as “ten” and ordinals such as “3rd”. A matcher therefore needs the model's lexicon, its language data such as Unicode character tables and number words, just as spaCy creates a matcher from the model's vocabulary. The supported models are English, and `LikeNum` implements spaCy's English rule. This example finds a number followed by a word.
 
+::: code-group
+
 ```rust
 use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
     TokenMatcher, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It splits text into tokens (words and punctuation marks).
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A small helper that builds one pattern item. The item matches exactly one
+    // token for which the given flag (a true/false property of its text) is true.
     let flag = |attribute| TokenPatternItem {
         constraints: vec![TokenConstraint { attribute, predicate: Predicate::Flag { value: true } }],
         repetition: Default::default(),
     };
-    let mut matcher = TokenMatcher::with_lexicon(model.lexicon());
+
+    // Flags depend on the language. For example, English counts "ten" as a number.
+    // The lexicon is the model's language data, so the matcher is built with it.
+    let mut matcher = TokenMatcher::with_lexicon(nlp.lexicon());
+
+    // The rule "quantity" looks for two tokens in a row: something that looks like
+    // a number, then a token made only of letters.
     matcher.add("quantity", vec![TokenPattern {
         tokens: vec![flag(TokenAttribute::LikeNum), flag(TokenAttribute::IsAlpha)],
     }])?;
-    let doc = model.process("Ten people paid 1,000 dollars.")?;
+
+    // Read the sentence. A token index is a token's position, counting from 0.
+    // The tokens are: Ten(0) people(1) paid(2) 1,000(3) dollars(4) .(5)
+    let doc = nlp.process("Ten people paid 1,000 dollars.")?;
+
+    // Find every match and keep only where each one starts and ends.
     let found: Vec<_> = matcher.find_matches(&doc)?.iter()
         .map(|m| (m.start, m.end)).collect();
+
+    // Two matches: "Ten people" and "1,000 dollars". The end is exclusive, meaning
+    // the match stops just before that token, so (0, 2) covers tokens 0 and 1.
     assert_eq!(found, [(TokenIndex(0), TokenIndex(2)), (TokenIndex(3), TokenIndex(5))]);
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+import type { FlagAttribute, TokenPatternItem } from '@spars/node';
+
+// Load the model once. It splits text into tokens (words and punctuation marks).
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A small helper that builds one pattern item. The item matches exactly one
+// token for which the given flag (a true/false property of its text) is true.
+const flag = (attribute: FlagAttribute): TokenPatternItem => ({
+  constraints: [{ attribute, predicate: { kind: 'flag', value: true } }],
+  repetition: { kind: 'once' },
+});
+
+// Flags depend on the language. For example, English counts "ten" as a number.
+// The model carries that language data, so the matcher is built with the model.
+const matcher = new TokenMatcher(nlp);
+
+// The rule "quantity" looks for two tokens in a row: something that looks like
+// a number, then a token made only of letters.
+matcher.add('quantity', [{ tokens: [flag('like_num'), flag('is_alpha')] }]);
+
+// Read the sentence. A token index is a token's position, counting from 0.
+// The tokens are: Ten(0) people(1) paid(2) 1,000(3) dollars(4) .(5)
+const doc = await nlp.processDocument('Ten people paid 1,000 dollars.');
+
+// Find every match and keep only where each one starts and ends.
+const found = (await matcher.findMatches(doc)).map((match) => [match.start, match.end]);
+
+// Two matches: "Ten people" and "1,000 dollars". The end is exclusive, meaning
+// the match stops just before that token, so [0, 2] covers tokens 0 and 1.
+assert.deepEqual(found, [[0, 2], [3, 5]]);
+```
+
+:::
 
 It finds “Ten people” (tokens 0–2) and “1,000 dollars” (tokens 3–5). “Ten” is an English number word, and the comma in “1,000” is ignored. `IsAlpha` requires letters only, so “1,000” itself is not a word.
 
@@ -101,25 +284,84 @@ The case flags follow Python's string methods: `IsLower`, `IsUpper` and `IsTitle
 
 This example finds email addresses and links with two of these flags:
 
+::: code-group
+
 ```rust
 use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex,
     TokenMatcher, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It splits text into tokens (words and punctuation marks).
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A small helper that builds a whole pattern with a single item: exactly one
+    // token for which the given flag is true.
     let flag = |attribute| TokenPattern { tokens: vec![TokenPatternItem {
         constraints: vec![TokenConstraint { attribute, predicate: Predicate::Flag { value: true } }],
         repetition: Default::default(),
     }] };
-    let mut matcher = TokenMatcher::with_lexicon(model.lexicon());
+
+    // Flag conditions need the model's lexicon (its language data), so the matcher
+    // is built with it.
+    let mut matcher = TokenMatcher::with_lexicon(nlp.lexicon());
+
+    // Two rules with different names, so each match says which kind of thing it found.
+    // "email" matches a token that looks like an email address.
     matcher.add("email", vec![flag(TokenAttribute::LikeEmail)])?;
+    // "link" matches a token that looks like a web address (a URL).
     matcher.add("link", vec![flag(TokenAttribute::LikeUrl)])?;
-    let doc = model.process("Email a@b.com or visit https://spacy.io")?;
+
+    // Read the text. The address and the link each stay together as one token.
+    // The tokens are: Email(0) a@b.com(1) or(2) visit(3) https://spacy.io(4)
+    let doc = nlp.process("Email a@b.com or visit https://spacy.io")?;
+
+    // Find every match and keep the rule name and the index of the token it starts at.
     let found: Vec<_> = matcher.find_matches(&doc)?.iter()
         .map(|m| (m.rule.as_str().to_owned(), m.start)).collect();
+
+    // The "email" rule found token 1 and the "link" rule found token 4.
     assert_eq!(found, [("email".to_owned(), TokenIndex(1)), ("link".to_owned(), TokenIndex(4))]);
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+import type { FlagAttribute, TokenPattern } from '@spars/node';
+
+// Load the model once. It splits text into tokens (words and punctuation marks).
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A small helper that builds a whole pattern with a single item: exactly one
+// token for which the given flag is true.
+const flag = (attribute: FlagAttribute): TokenPattern => ({ tokens: [{
+  constraints: [{ attribute, predicate: { kind: 'flag', value: true } }],
+  repetition: { kind: 'once' },
+}] });
+
+// Flag conditions need the model's language data, so the matcher is built with
+// the model.
+const matcher = new TokenMatcher(nlp);
+
+// Two rules with different names, so each match says which kind of thing it found.
+// "email" matches a token that looks like an email address.
+matcher.add('email', [flag('like_email')]);
+// "link" matches a token that looks like a web address (a URL).
+matcher.add('link', [flag('like_url')]);
+
+// Read the text. The address and the link each stay together as one token.
+// The tokens are: Email(0) a@b.com(1) or(2) visit(3) https://spacy.io(4)
+const doc = await nlp.processDocument('Email a@b.com or visit https://spacy.io');
+
+// Find every match and keep the rule name and the index of the token it starts at.
+const found = (await matcher.findMatches(doc)).map((match) => [match.rule, match.start]);
+
+// The "email" rule found token 1 and the "link" rule found token 4.
+assert.deepEqual(found, [['email', 1], ['link', 4]]);
+```
+
+:::
 
 Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. In JSON the predicate is `{"kind": "flag", "value": true}`; strings, numbers and `null` are rejected. spaCy's pattern validation (`validate=True`) rejects strings and numbers for these attributes, and spaCy raises an error for `null` when the pattern is added. Flags are computed from token text, so they need no model annotations. `TokenMatcher::new()` still works for all other conditions; registering a flag condition on it returns a pattern error. The lexicon handle is cheap to clone and stays valid after the model is dropped. Token-level attributes such as `IS_SENT_START` and `SPACY` are not lexical flags and are not supported.
 
@@ -127,15 +369,26 @@ Flag attributes accept only `Predicate::Flag { value }` with `true` or `false`. 
 
 `TokenAttribute::Length` compares the number of characters (Unicode code points) in a token, like spaCy's `LENGTH`. This example finds words of at least seven characters.
 
+::: code-group
+
 ```rust
 use spars::{Comparison, FiniteNumber, Model, Predicate, TokenAttribute, TokenConstraint,
     TokenIndex, TokenMatcher, TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It splits text into tokens (words and punctuation marks).
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // Length comes from the token text alone, so a plain matcher is enough.
     let mut matcher = TokenMatcher::new();
+
+    // The rule "long_word" has one pattern with one item: a single token whose
+    // length is 7 characters or more.
     matcher.add("long_word", vec![TokenPattern { tokens: vec![TokenPatternItem {
         constraints: vec![TokenConstraint {
             attribute: TokenAttribute::Length,
+            // Compare the length with a number. `FiniteNumber` refuses values that
+            // are not ordinary numbers (NaN and infinity), so building one can fail.
             predicate: Predicate::Compare {
                 operator: Comparison::GreaterOrEqual,
                 value: FiniteNumber::new(7.0).ok_or("not finite")?,
@@ -143,13 +396,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }],
         repetition: Default::default(),
     }] }])?;
-    let doc = model.process("Internationalization is complicated.")?;
+
+    // Read the sentence. A token index is a token's position, counting from 0.
+    // The tokens are: Internationalization(0) is(1) complicated(2) .(3)
+    let doc = nlp.process("Internationalization is complicated.")?;
+
+    // Find every match and keep only where each one starts and ends.
     let found: Vec<_> = matcher.find_matches(&doc)?.iter()
         .map(|m| (m.start, m.end)).collect();
+
+    // Tokens 0 and 2 are long enough; "is" and "." are too short. The end is
+    // exclusive, meaning the match stops just before it, so (0, 1) is token 0 alone.
     assert_eq!(found, [(TokenIndex(0), TokenIndex(1)), (TokenIndex(2), TokenIndex(3))]);
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+
+// Load the model once. It splits text into tokens (words and punctuation marks).
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// Length comes from the token text alone, so a plain matcher is enough.
+const matcher = new TokenMatcher();
+
+// The rule "long_word" has one pattern with one item: a single token whose
+// length is 7 characters or more.
+matcher.add('long_word', [{ tokens: [{
+  constraints: [{
+    attribute: 'length',
+    // Compare the length with a number. The value must be an ordinary number:
+    // `add` throws an error for NaN (not a number) and for infinity.
+    predicate: { kind: 'compare', operator: '>=', value: 7 },
+  }],
+  repetition: { kind: 'once' },
+}] }]);
+
+// Read the sentence. A token index is a token's position, counting from 0.
+// The tokens are: Internationalization(0) is(1) complicated(2) .(3)
+const doc = await nlp.processDocument('Internationalization is complicated.');
+
+// Find every match and keep only where each one starts and ends.
+const found = (await matcher.findMatches(doc)).map((match) => [match.start, match.end]);
+
+// Tokens 0 and 2 are long enough; "is" and "." are too short. The end is
+// exclusive, meaning the match stops just before it, so [0, 1] is token 0 alone.
+assert.deepEqual(found, [[0, 1], [2, 3]]);
+```
+
+:::
 
 It finds “Internationalization” (20 characters) and “complicated” (11), but not “is” or the final period.
 
@@ -169,18 +466,33 @@ The operators are `==`, `!=`, `>=`, `<=`, `>` and `<`. The value may be a whole 
 
 spaCy's `IS_SUBSET`, `IS_SUPERSET` and `INTERSECTS` compare a token with a list of values. SpaRs supports them on every string attribute (`Text`, `Lower`, `Norm`, `Lemma`, `Pos`, `Tag`, `Dep` and `Morphology`) and on `Length`. Annotation attributes such as `Morphology` read the document's annotations, so use a document processed by the model. For tokens without the annotation, see [Missing annotations](#missing-annotations). `Length` needs only the token text. This example finds plural words of three or four characters.
 
+::: code-group
+
 ```rust
 use spars::{Model, Predicate, TokenAttribute, TokenConstraint, TokenIndex, TokenMatcher,
     TokenPattern, TokenPatternItem};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
+    // Load the model once. It splits text into tokens and works out the grammar
+    // of each one.
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A matcher holds named rules. Each rule is a list of patterns to look for.
     let mut matcher = TokenMatcher::new();
+
+    // The rule "short_plural" has one pattern with one item. The item has two
+    // conditions, and a token must pass both of them.
     matcher.add("short_plural", vec![TokenPattern { tokens: vec![TokenPatternItem {
         constraints: vec![
+            // Condition 1: the token is plural. Morphology is the list of grammar
+            // features of a word, such as "Number=Plur" for a plural. `IsSuperset`
+            // passes when the token has every feature listed here.
             TokenConstraint {
                 attribute: TokenAttribute::Morphology,
                 predicate: Predicate::IsSuperset { values: vec!["Number=Plur".into()] },
             },
+            // Condition 2: the token is 3 or 4 characters long. `IsSubsetIntegers`
+            // passes when the token's length is one of the listed numbers.
             TokenConstraint {
                 attribute: TokenAttribute::Length,
                 predicate: Predicate::IsSubsetIntegers { values: vec![3, 4] },
@@ -188,13 +500,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         repetition: Default::default(),
     }] }])?;
-    let doc = model.process("Two cats and three dogs were here.")?;
+
+    // Read the sentence. A token index is a token's position, counting from 0.
+    // The tokens are: Two(0) cats(1) and(2) three(3) dogs(4) were(5) here(6) .(7)
+    let doc = nlp.process("Two cats and three dogs were here.")?;
+
+    // Find every match and keep only where each one starts and ends.
     let found: Vec<_> = matcher.find_matches(&doc)?.iter()
         .map(|m| (m.start, m.end)).collect();
+
+    // Only "cats" (token 1) and "dogs" (token 4) are both plural and short. The end
+    // is exclusive, meaning the match stops just before it, so (1, 2) is token 1 alone.
     assert_eq!(found, [(TokenIndex(1), TokenIndex(2)), (TokenIndex(4), TokenIndex(5))]);
     Ok(())
 }
 ```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+
+// Load the model once. It splits text into tokens and works out the grammar
+// of each one.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A matcher holds named rules. Each rule is a list of patterns to look for.
+const matcher = new TokenMatcher();
+
+// The rule "short_plural" has one pattern with one item. The item has two
+// conditions, and a token must pass both of them.
+matcher.add('short_plural', [{ tokens: [{
+  constraints: [
+    // Condition 1: the token is plural. Morphology is the list of grammar
+    // features of a word, such as "Number=Plur" for a plural. `is_superset`
+    // passes when the token has every feature listed here.
+    { attribute: 'morphology', predicate: { kind: 'is_superset', values: ['Number=Plur'] } },
+    // Condition 2: the token is 3 or 4 characters long. `is_subset_integers`
+    // passes when the token's length is one of the listed numbers.
+    { attribute: 'length', predicate: { kind: 'is_subset_integers', values: [3, 4] } },
+  ],
+  repetition: { kind: 'once' },
+}] }]);
+
+// Read the sentence. A token index is a token's position, counting from 0.
+// The tokens are: Two(0) cats(1) and(2) three(3) dogs(4) were(5) here(6) .(7)
+const doc = await nlp.processDocument('Two cats and three dogs were here.');
+
+// Find every match and keep only where each one starts and ends.
+const found = (await matcher.findMatches(doc)).map((match) => [match.start, match.end]);
+
+// Only "cats" (token 1) and "dogs" (token 4) are both plural and short. The end
+// is exclusive, meaning the match stops just before it, so [1, 2] is token 1 alone.
+assert.deepEqual(found, [[1, 2], [4, 5]]);
+```
+
+:::
 
 It finds “cats” and “dogs”, whose morphology includes `Number=Plur`, but not the numbers or “were”.
 

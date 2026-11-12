@@ -85,15 +85,15 @@ fn official_more_lexical_flag_conditions() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn reused_flag_matcher_keeps_documents_independent() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let pattern: DependencyPattern = serde_json::from_str(
         r#"{"nodes":[{"id":"n","constraints":[{"attribute":"like_num","predicate":{"kind":"flag","value":true}}],"link":null}]}"#,
     )
     .unwrap();
-    let mut matcher = DependencyMatcher::with_lexicon(model.lexicon());
+    let mut matcher = DependencyMatcher::with_lexicon(nlp.lexicon());
     matcher.add("number", vec![pattern]).unwrap();
     let found = |text: &str| {
-        let doc = model.process(text).unwrap();
+        let doc = nlp.process(text).unwrap();
         matcher
             .find_matches(&doc)
             .unwrap()

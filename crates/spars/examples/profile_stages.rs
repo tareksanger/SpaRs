@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if rounds == 0 {
         return Err("rounds must be positive".into());
     }
-    let model = Model::load(&args[1])?;
+    let nlp = Model::load(&args[1])?;
     let corpus: Corpus = serde_json::from_slice(&std::fs::read(&args[2])?)?;
     let texts: Vec<&str> = corpus
         .cases
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("empty profile".into());
     }
     for text in &texts {
-        black_box(model.process(text)?);
+        black_box(nlp.process(text)?);
     }
     let stages = [
         ("tokenizer", Stage::Tokenizer),
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let index = (round + offset) % stages.len();
             for text in &texts {
                 let start = Instant::now();
-                let doc = black_box(model.process_until(black_box(text), stages[index].1)?);
+                let doc = black_box(nlp.process_until(black_box(text), stages[index].1)?);
                 times[index] += start.elapsed().as_secs_f64();
                 black_box(doc);
             }
@@ -73,13 +73,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let docs = texts
         .iter()
-        .map(|text| model.tokenize(text))
+        .map(|text| nlp.tokenize(text))
         .collect::<spars::Result<Vec<_>>>()?;
     let mut shared_encoder_seconds = 0.;
     for _ in 0..rounds {
         for doc in &docs {
             let start = Instant::now();
-            let encoded = black_box(model.tok2vec(black_box(doc)));
+            let encoded = black_box(nlp.tok2vec(black_box(doc)));
             shared_encoder_seconds += start.elapsed().as_secs_f64();
             black_box(encoded);
         }

@@ -13,12 +13,12 @@ async function main(): Promise<void> {
   const selection = process.env.SPARS_MODEL
     ?? fileURLToPath(new URL('../../../../assets/en_core_web_sm-3.8.0', import.meta.url));
   console.log('Loading SpaRs model…');
-  const model = await loadModel(selection);
+  const nlp = await loadModel(selection);
   console.log('Ready. Native Rust inference through @spars/node.');
 
   async function analyze(text: string): Promise<void> {
     const start = performance.now();
-    const doc = await model.process(text);
+    const doc = await nlp.process(text);
     console.log(`\n${JSON.stringify(doc.text)} (${(performance.now() - start).toFixed(1)} ms)`);
     console.table(doc.tokens.map(token => ({
       index: token.index, text: token.text, lemma: token.lemma,

@@ -225,11 +225,11 @@ fn official_entity_ruler_outcomes() {
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn lexical_flags_use_the_ruler_lexicon_and_survive_clear() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
-    let doc = model.process("Hi 42 there").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let doc = nlp.process("Hi 42 there").unwrap();
     // IS_ALPHA is false for the phrase "1", so it matches the number; the token pattern matches
     // alphabetic tokens.
-    let digits = model.process("1").unwrap();
+    let digits = nlp.process("1").unwrap();
     let alpha: TokenPattern = serde_json::from_value(serde_json::json!({"tokens": [{
         "constraints": [{"attribute": "is_alpha", "predicate": {"kind": "flag", "value": true}}],
         "repetition": {"kind": "once"},
@@ -254,7 +254,7 @@ fn lexical_flags_use_the_ruler_lexicon_and_survive_clear() {
         .unwrap()
         .add(&patterns)
         .is_err());
-    let mut ruler = EntityRuler::with_lexicon(options, model.lexicon()).unwrap();
+    let mut ruler = EntityRuler::with_lexicon(options, nlp.lexicon()).unwrap();
     let entities = |ruler: &EntityRuler| -> Vec<(usize, String, Option<String>)> {
         let annotated = ruler.annotated(&doc).unwrap();
         annotated

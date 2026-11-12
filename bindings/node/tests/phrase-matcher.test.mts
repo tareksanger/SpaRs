@@ -304,7 +304,7 @@ function storedValue(attribute: string, key: number): string {
 }
 
 test('PhraseMatcher lexical flags and LENGTH match the pinned reference', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const cases = array(fixture('phrase-match-lexical-v1.expected.json').cases);
   assert.equal(cases.length, 36);
   let states = 0;
@@ -314,7 +314,7 @@ test('PhraseMatcher lexical flags and LENGTH match the pinned reference', async 
     const attribute = member(LEXICAL, item.attribute);
     const input = doc(array(item.words).map(string), array(item.spaces).map(boolean));
     // LENGTH needs no model; the flags use the model's language rules.
-    const matcher = attribute === 'LENGTH' ? new PhraseMatcher(attribute) : new PhraseMatcher(attribute, model);
+    const matcher = attribute === 'LENGTH' ? new PhraseMatcher(attribute) : new PhraseMatcher(attribute, nlp);
     const operations = array(item.operations).map(record);
     const expectedStates = array(item.states).map(record);
     assert.equal(operations.length, expectedStates.length);

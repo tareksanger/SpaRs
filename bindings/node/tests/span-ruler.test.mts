@@ -310,14 +310,14 @@ test('SpanRuler annotates copies and rejects rule changes while searches are pen
 });
 
 test('SpanRuler lexical flags use the model and survive clear', async () => {
-  const model = await loadModel(modelPath);
-  const input = await model.processDocument('Hi 42 there');
-  const digits = await model.processDocument('1');
+  const nlp = await loadModel(modelPath);
+  const input = await nlp.processDocument('Hi 42 there');
+  const digits = await nlp.processDocument('1');
   const word: TokenPattern = { tokens: [{ constraints: [{ attribute: 'is_alpha', predicate: { kind: 'flag', value: true } }], repetition: { kind: 'once' } }] };
   const patterns: SpanPattern[] = [{ label: 'WORD', tokens: word }, { label: 'NUMBER', id: 'n', phrase: digits }];
   const options: SpanRulerOptions = { phraseAttribute: 'IS_ALPHA' };
   assert.throws(() => new SpanRuler(options).add(patterns), hasCode('SPARS_INVALID_PATTERN'));
-  const ruler = new SpanRuler(options, model);
+  const ruler = new SpanRuler(options, nlp);
   const expected = [
     { start: 0, end: 1, label: 'WORD', id: '' }, { start: 1, end: 2, label: 'NUMBER', id: 'n' }, { start: 2, end: 3, label: 'WORD', id: '' },
   ];
@@ -330,14 +330,14 @@ test('SpanRuler lexical flags use the model and survive clear', async () => {
 });
 
 test('SpanRuler searches share admission, protect queued rules and validate their input', async () => {
-  const model = await loadModel(modelPath);
-  const input = await model.processDocument('Acme Corp', 'Tokenizer');
+  const nlp = await loadModel(modelPath);
+  const input = await nlp.processDocument('Acme Corp', 'Tokenizer');
   for (const method of ['findMatches', 'annotate'] as const) {
     const ruler = new SpanRuler();
     const add = () => ruler.add([{ label: 'ORG', id: 'acme', tokens: acme }]);
     add();
     configureExecution({ maxActive: 1, maxQueued: 1 });
-    const active = model.processDocument('Alice visits London.');
+    const active = nlp.processDocument('Alice visits London.');
     // Queued in JavaScript, so only the wrapper, not the native handle, can reject changes.
     const queued = ruler[method](input);
     const settled = Promise.allSettled([active, queued]);

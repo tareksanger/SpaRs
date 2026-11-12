@@ -3,8 +3,8 @@ import { before, test } from 'node:test';
 import { loadModel, Model, NativeDocument } from '../index.js';
 import { array, modelPath, readJson, record, root } from './fixtures.mts';
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 test('contextual similarity checks dimensions after identity and zero-vector shortcuts', async () => {
   const small = await loadModel(`${root}assets/en_core_web_sm-3.8.0`);
@@ -40,11 +40,11 @@ test('document and span similarities match frozen official reference', async () 
   const fixture = record(readJson(`${root}fixtures/vectors.expected.json`));
   for (const value of array(fixture.similarities)) {
     const entry = record(value);
-    const a = await model.processDocument(string(entry.a), 'Tokenizer');
-    const b = await model.processDocument(string(entry.b), 'Tokenizer');
+    const a = await nlp.processDocument(string(entry.a), 'Tokenizer');
+    const b = await nlp.processDocument(string(entry.b), 'Tokenizer');
     const expected = number(entry.expected);
-    assert.ok(Math.abs(model.similarity(a, b) - expected) < 2e-6);
-    assert.ok(Math.abs(model.spanSimilarity(a, 0, a.toObject().tokens.length,
+    assert.ok(Math.abs(nlp.similarity(a, b) - expected) < 2e-6);
+    assert.ok(Math.abs(nlp.spanSimilarity(a, 0, a.toObject().tokens.length,
       b, 0, b.toObject().tokens.length) - expected) < 2e-6);
   }
 });
@@ -59,15 +59,15 @@ test('static token and singleton document/span vectors agree with frozen word ve
       text, tokens: [{ start: 0, end: Buffer.byteLength(text), idx: 0, whitespace: false, norm: text }],
       entities: null, sentences: null, noun_chunks: null, tensor: [],
     } }));
-    const actual = model.tokenVector(doc, 0);
+    const actual = nlp.tokenVector(doc, 0);
     if (entry.has_vector === false) { assert.equal(actual, null); continue; }
     assert.equal(entry.has_vector, true);
     assert.ok(actual);
     close(actual, vector(entry.vector));
-    close(model.documentVector(doc), vector(entry.vector));
-    close(model.spanVector(doc, 0, 1), vector(entry.vector));
+    close(nlp.documentVector(doc), vector(entry.vector));
+    close(nlp.spanVector(doc, 0, 1), vector(entry.vector));
     actual.fill(42);
-    const repeated = model.tokenVector(doc, 0);
+    const repeated = nlp.tokenVector(doc, 0);
     assert.ok(repeated);
     close(repeated, vector(entry.vector));
   }
@@ -112,34 +112,34 @@ test('small-model contextual vectors and restored snapshots match independent re
 });
 
 test('indices reject coercion, unsafe integers and invalid intervals', async () => {
-  const doc = await model.processDocument('dog cat', 'Tokenizer');
+  const doc = await nlp.processDocument('dog cat', 'Tokenizer');
   for (const index of [-1, 0.5, NaN, Infinity, 2 ** 32, Number.MAX_SAFE_INTEGER + 1]) {
-    assert.throws(() => model.tokenVector(doc, index));
-    assert.throws(() => model.spanVector(doc, index, 2));
-    assert.throws(() => model.spanVector(doc, 0, index));
-    assert.throws(() => model.spanSimilarity(doc, index, 2, doc, 0, 2));
-    assert.throws(() => model.spanSimilarity(doc, 0, 2, doc, 0, index));
+    assert.throws(() => nlp.tokenVector(doc, index));
+    assert.throws(() => nlp.spanVector(doc, index, 2));
+    assert.throws(() => nlp.spanVector(doc, 0, index));
+    assert.throws(() => nlp.spanSimilarity(doc, index, 2, doc, 0, 2));
+    assert.throws(() => nlp.spanSimilarity(doc, 0, 2, doc, 0, index));
   }
-  assert.throws(() => model.tokenVector(doc, 2), { code: 'SPARS_BOUNDS' });
-  assert.throws(() => model.spanVector(doc, 2, 1), { code: 'SPARS_BOUNDS' });
+  assert.throws(() => nlp.tokenVector(doc, 2), { code: 'SPARS_BOUNDS' });
+  assert.throws(() => nlp.spanVector(doc, 2, 1), { code: 'SPARS_BOUNDS' });
   for (const index of ['0', null, undefined, true]) {
-    assert.throws(() => Reflect.apply(model.tokenVector, model, [doc, index]));
+    assert.throws(() => Reflect.apply(nlp.tokenVector, nlp, [doc, index]));
   }
-  assert.equal(model.spanSimilarity(doc, 0, 0, doc, 1, 1), 1);
+  assert.equal(nlp.spanSimilarity(doc, 0, 0, doc, 1, 1), 1);
 });
 
 test('receiving model selects static vectors, while small models consume document tensors', async () => {
   const small = await loadModel(`${root}assets/en_core_web_sm-3.8.0`);
   const doc = await small.processDocument('dog');
-  const staticVector = model.vector('dog');
+  const staticVector = nlp.vector('dog');
   assert.ok(staticVector);
-  close(model.documentVector(doc), Array.from(staticVector));
+  close(nlp.documentVector(doc), Array.from(staticVector));
   const synthetic = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 2, document: {
     text: 'dog', tokens: [{ start: 0, end: 3, idx: 0, whitespace: false, norm: 'dog' }],
     entities: null, sentences: null, noun_chunks: null, tensor: [[3, 4]],
   } }));
   close(small.documentVector(synthetic), [3, 4]);
-  close(model.documentVector(synthetic), Array.from(staticVector));
+  close(nlp.documentVector(synthetic), Array.from(staticVector));
 });
 
 test('large-model document vectors match the frozen reference', async () => {

@@ -152,8 +152,8 @@ fn official_length_phrases_need_no_lexicon() {
 #[test]
 #[ignore = "requires official export; mandatory acceptance"]
 fn official_lexical_flag_phrases_use_the_model_lexicon() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
-    let lexicon = model.lexicon();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let lexicon = nlp.lexicon();
     let counts = check(Some(&lexicon), true);
     assert_eq!(counts, (34, 170, 11760));
     eprintln!("PhraseMatcher lexical flags: {counts:?} cases / states / ordered matches");
@@ -207,10 +207,10 @@ fn rules_with_reserved_spacy_keys_are_removed_normally() {
 #[test]
 #[ignore = "requires official export; mandatory acceptance"]
 fn flag_rules_are_removed_normally() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let words: Vec<String> = ["Hello", "123", "x"].map(String::from).into();
     let input = doc(&words, &[true, true, false]);
-    let mut matcher = PhraseMatcher::with_lexicon(PhraseAttribute::IsAlpha, model.lexicon());
+    let mut matcher = PhraseMatcher::with_lexicon(PhraseAttribute::IsAlpha, nlp.lexicon());
     matcher
         .add("alpha", &[&doc(&words[..1], &[false])])
         .unwrap();

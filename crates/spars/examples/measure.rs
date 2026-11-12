@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("rounds must be positive and profile must be load, short, or long".into());
     }
     let start = Instant::now();
-    let model = Model::load(&args[1])?;
+    let nlp = Model::load(&args[1])?;
     let load_seconds = start.elapsed().as_secs_f64();
     if args[3] == "load" {
         println!("{}", json!({"load_seconds":load_seconds}));
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for _ in 0..warmup {
         for text in &texts {
-            black_box(model.process(text)?);
+            black_box(nlp.process(text)?);
         }
     }
     let mut latencies = Vec::new();
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for _ in 0..rounds {
         for text in &texts {
             let start = Instant::now();
-            let doc = black_box(model.process(black_box(text))?);
+            let doc = black_box(nlp.process(black_box(text))?);
             let seconds = start.elapsed().as_secs_f64();
             elapsed += seconds;
             latencies.push(seconds);

@@ -17,7 +17,7 @@ assert.ok(Number.isSafeInteger(batchSize) && batchSize > 0);
 assert.ok(stageArg === undefined || stageArg === 'Tokenizer' || stageArg === 'Ner');
 const stage: Stage = stageArg ?? 'Ner';
 const start = performance.now();
-const model = await loadModel(path);
+const nlp = await loadModel(path);
 const loadSeconds = (performance.now() - start) / 1000;
 const cases = array(record(readJson(corpusPath)).cases).map(record);
 const texts = cases.filter(c => (c.category === 'long') === (profile === 'long')).map(c => {
@@ -43,7 +43,7 @@ async function run(): Promise<void> {
     if (mode === 'single') {
       for (const text of group) {
         const submitted = performance.now();
-        const task = model.process(text, stage);
+        const task = nlp.process(text, stage);
         maximumSubmissionMs = Math.max(maximumSubmissionMs, performance.now() - submitted);
         const doc = await task;
         elapsed += (performance.now() - submitted) / 1000;
@@ -51,7 +51,7 @@ async function run(): Promise<void> {
       }
     } else {
       const submitted = performance.now();
-      const task = mode === 'batch' ? model.processBatch(group, stage) : Promise.all(group.map(text => model.process(text, stage)));
+      const task = mode === 'batch' ? nlp.processBatch(group, stage) : Promise.all(group.map(text => nlp.process(text, stage)));
       maximumSubmissionMs = Math.max(maximumSubmissionMs, performance.now() - submitted);
       const docs = await task;
       elapsed += (performance.now() - submitted) / 1000;

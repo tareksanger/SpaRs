@@ -6,8 +6,8 @@
 //! ```no_run
 //! use spars::{Model, TokenIndex};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let model = Model::load("assets/en_core_web_md-3.8.0")?;
-//! let doc = model.process("Alice works in London.")?;
+//! let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+//! let doc = nlp.process("Alice works in London.")?;
 //! assert_eq!(doc.token(TokenIndex(0))?.text(), "Alice");
 //! assert!(doc.entities().is_some());
 //! # Ok(())
