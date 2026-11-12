@@ -26,7 +26,7 @@ fn check(split: &str) {
         &std::fs::read(format!("../../fixtures/{split}.expected.json")).unwrap(),
     )
     .unwrap();
-    let model = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let cases = fixture["cases"].as_array().unwrap();
     assert!(!cases.is_empty(), "empty parity suite");
     assert_eq!(fixture["model"], "en_core_web_md 3.8.0");
@@ -60,7 +60,7 @@ fn check(split: &str) {
         count.0 += 1;
         tokens += case["tokens"].as_array().unwrap().len();
         let before = differences.len();
-        match model.process(case["text"].as_str().unwrap()) {
+        match nlp.process(case["text"].as_str().unwrap()) {
             Err(error) => differences
                 .push(json!({"id":case["id"], "text":case["text"], "error":error.to_string()})),
             Ok(doc) => {
@@ -70,7 +70,7 @@ fn check(split: &str) {
                         differences.push(json!({"id":case["id"], "text":case["text"], "field":field, "actual":actual[field], "expected":case[field]}));
                     }
                 }
-                let vector = model.document_vector(&doc);
+                let vector = nlp.document_vector(&doc);
                 let expected = case["vector"].as_array().unwrap();
                 assert_eq!(vector.len(), expected.len());
                 for (i, (a, b)) in vector.iter().zip(expected).enumerate() {

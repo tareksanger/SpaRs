@@ -40,39 +40,39 @@ fn contextual_token_and_span_vectors_match_independent_reference() {
     )
     .unwrap();
     assert_eq!(fixture.vector_model, "en_core_web_sm 3.8.0");
-    let model = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
+    let nlp = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
     assert_eq!(fixture.vector_cases.len(), 4);
     for case in fixture.vector_cases {
-        let doc = model.process(&case.text).unwrap();
+        let doc = nlp.process(&case.text).unwrap();
         assert_eq!(doc.tokens().len(), case.tokens.len());
         for (i, expected) in case.tokens.iter().enumerate() {
             close(
-                model
+                nlp
                     .token_vector(doc.token(TokenIndex(i)).unwrap())
                     .unwrap(),
                 expected,
                 &case.text,
             );
         }
-        close(&model.document_vector(&doc), &case.document, &case.text);
+        close(&nlp.document_vector(&doc), &case.document, &case.text);
         let count = doc.tokens().len();
         close(
-            &model
+            &nlp
                 .span_vector(&doc, TokenIndex(1.min(count)), TokenIndex(3.min(count)))
                 .unwrap(),
             &case.span,
             &case.text,
         );
         close(
-            &model
+            &nlp
                 .span_vector(&doc, TokenIndex(0), TokenIndex(0))
                 .unwrap(),
             &case.empty_span,
             &case.text,
         );
-        assert_eq!(model.similarity(&doc, &doc), 1.0);
+        assert_eq!(nlp.similarity(&doc, &doc), 1.0);
         if !doc.tokens().is_empty() {
-            assert_eq!(model.similarity(&doc, &model.process("").unwrap()), 0.0);
+            assert_eq!(nlp.similarity(&doc, &nlp.process("").unwrap()), 0.0);
         }
     }
 }
@@ -90,7 +90,7 @@ fn close(actual: &[f32], expected: &[f32], context: &str) {
 #[ignore = "requires official sm/lg exports; mandatory acceptance test"]
 fn official_small_and_large_pipeline_parity() {
     for size in ["sm", "lg"] {
-        let model = Model::load(format!("../../assets/en_core_web_{size}-3.8.0")).unwrap();
+        let nlp = Model::load(format!("../../assets/en_core_web_{size}-3.8.0")).unwrap();
         let fixture: Fixture = serde_json::from_slice(
             &fs::read(format!("../../fixtures/model-{size}-v1.expected.json")).unwrap(),
         )
@@ -100,7 +100,7 @@ fn official_small_and_large_pipeline_parity() {
         assert_eq!(fixture.versions["thinc"], "8.3.13");
         assert_eq!(fixture.cases.len(), 98);
         for case in fixture.cases {
-            let doc = model.process(&case.text).unwrap();
+            let doc = nlp.process(&case.text).unwrap();
             assert_eq!(doc.tokens(), case.tokens, "{size}: {} tokens", case.id);
             assert_eq!(
                 doc.entities(),
@@ -121,13 +121,13 @@ fn official_small_and_large_pipeline_parity() {
                 case.id
             );
             close(
-                &model.document_vector(&doc),
+                &nlp.document_vector(&doc),
                 &case.vector,
                 &format!("{size}: {}", case.id),
             );
             let restored = Doc::from_json(&doc.to_json().unwrap()).unwrap();
             assert_eq!(doc, restored);
-            close(&model.document_vector(&restored), &case.vector, &case.id);
+            close(&nlp.document_vector(&restored), &case.vector, &case.id);
         }
     }
 }
@@ -135,29 +135,29 @@ fn official_small_and_large_pipeline_parity() {
 #[test]
 #[ignore = "requires official sm export; mandatory acceptance test"]
 fn contextual_vectors_preserve_empty_and_unavailable_states() {
-    let model = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
-    assert!(model.vector("hello").is_none());
-    let raw = model.tokenize("hello world").unwrap();
-    assert!(model.document_vector(&raw).is_empty());
-    assert!(model
+    let nlp = Model::load("../../assets/en_core_web_sm-3.8.0").unwrap();
+    assert!(nlp.vector("hello").is_none());
+    let raw = nlp.tokenize("hello world").unwrap();
+    assert!(nlp.document_vector(&raw).is_empty());
+    assert!(nlp
         .token_vector(raw.token(TokenIndex(0)).unwrap())
         .is_none());
-    let doc = model.process("hello world").unwrap();
-    let shared = model.tok2vec(&raw);
+    let doc = nlp.process("hello world").unwrap();
+    let shared = nlp.tok2vec(&raw);
     assert_eq!(shared.len(), 2);
     for (i, row) in shared.iter().enumerate() {
         assert_eq!(
-            model.token_vector(doc.token(TokenIndex(i)).unwrap()),
+            nlp.token_vector(doc.token(TokenIndex(i)).unwrap()),
             Some(row.as_slice())
         );
     }
-    assert_eq!(model.document_vector(&doc).len(), 96);
-    assert!(model
+    assert_eq!(nlp.document_vector(&doc).len(), 96);
+    assert!(nlp
         .span_vector(&doc, TokenIndex(1), TokenIndex(1))
         .unwrap()
         .is_empty());
-    assert!(model
-        .document_vector(&model.process("").unwrap())
+    assert!(nlp
+        .document_vector(&nlp.process("").unwrap())
         .is_empty());
 }
 

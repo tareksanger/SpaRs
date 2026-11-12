@@ -2,8 +2,8 @@
 use spars::{Model, TokenIndex};
 
 fn main() -> spars::Result<()> {
-    let model = Model::load("assets/en_core_web_md-3.8.0")?;
-    let doc = model.process("Alice works in London.")?;
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+    let doc = nlp.process("Alice works in London.")?;
     let verb = doc.token(TokenIndex(1))?;
     println!("Sentence: {}", verb.sentence()?.text());
     for child in verb.children()? {

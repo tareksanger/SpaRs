@@ -540,7 +540,7 @@ fn snapshots_reject_entities_spacy_would_not_read_from_the_tags() {
 #[test]
 #[ignore = "requires official export; mandatory acceptance"]
 fn long_unicode_and_alternating_calls_preserve_results() {
-    let model = Model::load(ASSETS).unwrap();
+    let nlp = Model::load(ASSETS).unwrap();
     let texts = [
         "Alice met Bob in London. ".repeat(200),
         "😀 e\u{301}\t\r\n\u{a0} café 👩\u{200d}💻! ".repeat(32),
@@ -549,7 +549,7 @@ fn long_unicode_and_alternating_calls_preserve_results() {
     ];
     let expected: Vec<_> = texts
         .iter()
-        .map(|text| model.process(text).unwrap())
+        .map(|text| nlp.process(text).unwrap())
         .collect();
     assert!(expected[0].tokens().len() > 1_000);
     for doc in &expected {
@@ -561,11 +561,11 @@ fn long_unicode_and_alternating_calls_preserve_results() {
     }
     for _ in 0..3 {
         for i in (0..texts.len()).rev() {
-            assert_eq!(model.process(&texts[i]).unwrap(), expected[i]);
+            assert_eq!(nlp.process(&texts[i]).unwrap(), expected[i]);
         }
     }
     assert_eq!(
-        model
+        nlp
             .pipe(texts.iter().map(String::as_str))
             .collect::<Result<Vec<_>, _>>()
             .unwrap(),
@@ -575,8 +575,8 @@ fn long_unicode_and_alternating_calls_preserve_results() {
         let jobs: Vec<_> = (0..8)
             .map(|i| {
                 let text = &texts[i % texts.len()];
-                let model = &model;
-                scope.spawn(move || model.process(text).unwrap())
+                let nlp = &nlp;
+                scope.spawn(move || nlp.process(text).unwrap())
             })
             .collect();
         for (i, job) in jobs.into_iter().enumerate() {

@@ -1,8 +1,8 @@
 use spars::{Doc, Model, TokenIndex};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = Model::load(std::env::args().nth(1).expect("model directory"))?;
+    let nlp = Model::load(std::env::args().nth(1).expect("model directory"))?;
     let text = "Alice works at Microsoft in New York.";
-    let doc = model.process(text)?;
+    let doc = nlp.process(text)?;
     assert_eq!(doc.text(), text);
     assert_eq!(doc.tokens().len(), 8);
     assert!(doc.tokens().iter().all(|t| t.tag.is_some()
@@ -16,11 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(doc.entities().is_some());
     assert!(doc.sentences().is_some());
     assert!(doc.noun_chunks().is_some());
-    let vector = model.document_vector(&doc);
+    let vector = nlp.document_vector(&doc);
     assert!(!vector.is_empty());
     assert!(vector.iter().all(|value| value.is_finite()));
     assert_eq!(
-        model.token_vector(doc.token(TokenIndex(3))?).unwrap().len(),
+        nlp.token_vector(doc.token(TokenIndex(3))?).unwrap().len(),
         vector.len()
     );
     assert_eq!(Doc::from_json(&doc.to_json()?)?, doc);

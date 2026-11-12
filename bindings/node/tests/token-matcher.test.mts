@@ -102,7 +102,7 @@ for (const [filename, cases, rules, matches, untyped] of [
 const FLAG_RULES = 51;
 const FLAG_MATCHES = 442;
 test('TokenMatcher lexical flags match the frozen official suite with a model lexicon', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const parsed: unknown = JSON.parse(readFileSync(new URL('../../../fixtures/token-match-flags-v1.expected.json', import.meta.url), 'utf8'));
   const items = array(record(parsed).cases).map(record);
   assert.equal(items.length, 3);
@@ -110,7 +110,7 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
   let outOfVocabulary = 0;
   let matchCount = 0;
   for (const item of items) {
-    const matcher = new TokenMatcher(model);
+    const matcher = new TokenMatcher(nlp);
     const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { ...item, entities: entitiesFromTags(referenceTokens(item.tokens)) } }));
     for (const raw of array(item.rules)) {
       const rule = record(raw);
@@ -130,7 +130,7 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
   const plain = new TokenMatcher();
   const flag = (value: boolean): TokenPattern => ({ tokens: [{ constraints: [{ attribute: 'is_digit', predicate: { kind: 'flag', value } }], repetition: { kind: 'once' } }] });
   assert.throws(() => plain.add('digit', [flag(true)]), hasCode('SPARS_INVALID_PATTERN'));
-  const withModel = new TokenMatcher(model);
+  const withModel = new TokenMatcher(nlp);
   for (const predicate of [{ kind: 'flag', value: 'true' }, { kind: 'flag' }, { kind: 'equals', value: true }, { kind: 'flag', value: true, values: [] }]) {
     assert.throws(() => addMalformed(withModel, 'bad', [untypedItem('is_digit', predicate)]), hasCode('SPARS_INVALID_PATTERN'));
   }
@@ -148,7 +148,7 @@ test('TokenMatcher lexical flags match the frozen official suite with a model le
 });
 
 test('TokenMatcher remaining lexical flags match the frozen official suite', async () => {
-  const model = await loadModel(modelPath);
+  const nlp = await loadModel(modelPath);
   const parsed: unknown = JSON.parse(readFileSync(new URL('../../../fixtures/token-match-more-flags-v1.expected.json', import.meta.url), 'utf8'));
   const items = array(record(parsed).cases).map(record);
   assert.equal(items.length, 3);
@@ -156,7 +156,7 @@ test('TokenMatcher remaining lexical flags match the frozen official suite', asy
   let outOfVocabulary = 0;
   let matchCount = 0;
   for (const item of items) {
-    const matcher = new TokenMatcher(model);
+    const matcher = new TokenMatcher(nlp);
     const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { ...item, entities: entitiesFromTags(referenceTokens(item.tokens)) } }));
     for (const raw of array(item.rules)) {
       const rule = record(raw);
@@ -177,7 +177,7 @@ test('TokenMatcher remaining lexical flags match the frozen official suite', asy
   for (const attribute of ['is_lower', 'is_upper', 'is_title', 'is_ascii', 'is_currency', 'is_stop', 'is_bracket', 'is_quote', 'is_left_punct', 'is_right_punct', 'like_url', 'like_email'] as const) {
     const item: TokenPattern = { tokens: [{ constraints: [{ attribute, predicate: { kind: 'flag', value: false } }], repetition: { kind: 'once' } }] };
     assert.throws(() => plain.add(attribute, [item]), hasCode('SPARS_INVALID_PATTERN'), attribute);
-    const withModel = new TokenMatcher(model);
+    const withModel = new TokenMatcher(nlp);
     withModel.add(attribute, [item]);
     assert.deepStrictEqual(withModel.get(attribute), [item]);
   }

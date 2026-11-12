@@ -137,15 +137,15 @@ const FLAG_MATCHES: usize = 442;
 #[test]
 #[ignore = "requires official export; mandatory CI"]
 fn reused_flag_matcher_keeps_documents_independent() {
-    let model = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = spars::Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let pattern: TokenPattern = serde_json::from_str(
         r#"{"tokens":[{"constraints":[{"attribute":"like_num","predicate":{"kind":"flag","value":true}}],"repetition":{"kind":"once"}}]}"#,
     )
     .unwrap();
-    let mut matcher = TokenMatcher::with_lexicon(model.lexicon());
+    let mut matcher = TokenMatcher::with_lexicon(nlp.lexicon());
     matcher.add("number", vec![pattern]).unwrap();
     let found = |text: &str| {
-        let doc = model.process(text).unwrap();
+        let doc = nlp.process(text).unwrap();
         matcher
             .find_matches(&doc)
             .unwrap()

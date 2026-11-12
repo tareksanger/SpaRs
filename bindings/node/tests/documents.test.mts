@@ -4,22 +4,22 @@ import { configureExecution, configureInputLimits, loadModel, Model, NativeDocum
 import type { Stage } from '../index.js';
 import { array, corpus, modelPath, record, root, snapshot } from './fixtures.mts';
 
-let model: Model;
-before(async () => { model = await loadModel(modelPath); });
+let nlp: Model;
+before(async () => { nlp = await loadModel(modelPath); });
 
 test('retained documents share admission, settings protection and input limits', async () => {
   configureExecution({ maxActive: 1, maxQueued: 0 });
   try {
-    const pending = model.processDocument('Alice visits London.');
+    const pending = nlp.processDocument('Alice visits London.');
     const done = Promise.allSettled([pending]);
-    await assert.rejects(model.process('overflow'), { code: 'SPARS_BUSY' });
-    assert.throws(() => { model.maxLength = 50; }, /idle/);
+    await assert.rejects(nlp.process('overflow'), { code: 'SPARS_BUSY' });
+    assert.throws(() => { nlp.maxLength = 50; }, /idle/);
     await done;
     assert.equal((await pending).toObject().text, 'Alice visits London.');
     configureInputLimits({ maxTextLength: 1, maxBatchSize: 1, maxBatchTextLength: 1 });
-    await assert.rejects(model.processDocument('😀'), { code: 'SPARS_INPUT_LIMIT' });
-    assert.throws(() => Reflect.apply(model.processDocument, model, [42]), TypeError);
-    assert.throws(() => Reflect.apply(model.processDocument, model, ['x', 'invalid']), TypeError);
+    await assert.rejects(nlp.processDocument('😀'), { code: 'SPARS_INPUT_LIMIT' });
+    assert.throws(() => Reflect.apply(nlp.processDocument, nlp, [42]), TypeError);
+    assert.throws(() => Reflect.apply(nlp.processDocument, nlp, ['x', 'invalid']), TypeError);
   } finally { configureExecution(null); configureInputLimits(null); }
 });
 
@@ -27,7 +27,7 @@ test('native document output matches all frozen official inference documents', a
   let count = 0;
   for (const suite of ['development', 'holdout', 'regression', 'evaluation-v1', 'tokenizer-boundaries-v1', 'unseen-v1']) {
     for (const expected of corpus(suite)) {
-      const doc = await model.processDocument(expected.text);
+      const doc = await nlp.processDocument(expected.text);
       assert.ok(doc instanceof NativeDocument);
       assert.deepEqual(snapshot(doc.toObject()), expected);
       assert.deepEqual(NativeDocument.fromSnapshot(doc.toSnapshot()).toObject(), doc.toObject());
@@ -41,8 +41,8 @@ test('native documents preserve stage availability, Unicode and empty inputs', a
   const stages: Stage[] = ['Tokenizer', 'Tagger', 'Parser', 'AttributeRuler', 'Lemmatizer', 'Ner'];
   for (const stage of stages) {
     for (const text of ['', '😀 Café e\u0301.  ', '\r\n\t A\u00a0B 👩‍🔬!', 'a\0b']) {
-      const doc = await model.processDocument(text, stage);
-      assert.deepEqual(doc.toObject(), await model.process(text, stage));
+      const doc = await nlp.processDocument(text, stage);
+      assert.deepEqual(doc.toObject(), await nlp.process(text, stage));
       assert.deepEqual(NativeDocument.fromSnapshot(doc.toSnapshot()).toObject(), doc.toObject());
     }
   }
@@ -80,7 +80,7 @@ test('small-model snapshots retain every contextual vector value', async () => {
 test('snapshots reject malformed JSON, unsupported versions, offsets, indices and tensors', async () => {
   assert.throws(() => NativeDocument.fromSnapshot('{'), { code: 'SPARS_INVALID_MODEL' });
   assert.throws(() => NativeDocument.fromSnapshot('\ud800'), { code: 'SPARS_INVALID_TEXT' });
-  const doc = await model.processDocument('😀 A', 'Tokenizer');
+  const doc = await nlp.processDocument('😀 A', 'Tokenizer');
   const encoded = doc.toSnapshot();
   const mutations: Array<(value: Record<string, unknown>) => void> = [
     value => { value.format_version = 99; },
@@ -107,7 +107,7 @@ test('snapshots reject malformed JSON, unsupported versions, offsets, indices an
 });
 
 test('snapshots keep and validate span groups written by Rust documents', async () => {
-  const doc = await model.processDocument('New York City', 'Tokenizer');
+  const doc = await nlp.processDocument('New York City', 'Tokenizer');
   const saved = record(JSON.parse(doc.toSnapshot()));
   saved.format_version = 4;
   const groups = [
@@ -137,7 +137,7 @@ test('snapshots keep and validate span groups written by Rust documents', async 
 });
 
 test('native processing preserves text validation and code-point limits', async () => {
-  await assert.rejects(model.processDocument('\ud800'), { code: 'SPARS_INVALID_TEXT' });
+  await assert.rejects(nlp.processDocument('\ud800'), { code: 'SPARS_INVALID_TEXT' });
   const local = await loadModel(modelPath);
   local.maxLength = 1;
   assert.equal((await local.processDocument('😀', 'Tokenizer')).toObject().text, '😀');

@@ -43,10 +43,10 @@ fn traversal_matches_official_spacy() {
             .collect::<String>()
     );
     assert_eq!(fixture.cases.len(), 98);
-    let model = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
+    let nlp = Model::load("../../assets/en_core_web_md-3.8.0").unwrap();
     let mut tokens = 0;
     for case in fixture.cases {
-        let doc = model.process(&case.text).unwrap();
+        let doc = nlp.process(&case.text).unwrap();
         assert_eq!(doc.tokens().len(), case.tokens.len(), "{}", case.id);
         let snapshot = doc.to_json().unwrap();
         for expected in case.tokens {
