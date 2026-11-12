@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from subprocess import CompletedProcess
-from check_docs import rust_examples, run_checks, check_documents
+from check_docs import rust_examples, rust_library, run_checks, check_documents
 from node_docs import examples, run_example
 
 
@@ -65,8 +65,31 @@ class DocumentationInstallationTests(unittest.TestCase):
             self.assertTrue(stale.is_dir())
             self.assertTrue(all(not store.exists() for store in seen))
 
+    def test_library_and_dependencies_are_located_from_cargo_messages(self) -> None:
+        def artifact(name: str, *filenames: str) -> str:
+            listed = ','.join(f'"{filename}"' for filename in filenames)
+            return f'{{"reason":"compiler-artifact","target":{{"name":"{name}"}},"filenames":[{listed}]}}'
+
+        # Each dependency in a folder of its own, and none of them in target/release/deps.
+        messages = '\n'.join([
+            artifact('serde', 'build/serde/1a/out/libserde-1a.rlib', 'build/serde/1a/out/libserde-1a.rmeta'),
+            '{"reason":"build-script-executed","package_id":"serde"}',
+            'warning: text that is not a message',
+            artifact('spars', 'out/libspars.rlib', 'build/spars/2b/out/libspars-2b.rmeta'),
+            '{"reason":"build-finished","success":true}',
+        ])
+        library = rust_library(messages)
+        self.assertEqual(library.rlib, Path('out/libspars.rlib'))
+        self.assertEqual(library.dependency_directories,
+                         (Path('build/serde/1a/out'), Path('out'), Path('build/spars/2b/out')))
+        with self.assertRaisesRegex(RuntimeError, 'did not report an rlib for the spars library'):
+            rust_library(artifact('serde', 'deps/libserde.rlib'))
+        with self.assertRaisesRegex(ValueError, 'without a list of file names'):
+            rust_library('{"reason":"compiler-artifact","target":{"name":"spars"}}')
+
     def test_installer_failure_reports_diagnostic_before_examples(self) -> None:
-        replies = [CompletedProcess(['cargo'], 0, '', ''),
+        built = '{"reason":"compiler-artifact","target":{"name":"spars"},"filenames":["target/release/libspars.rlib"]}\n'
+        replies = [CompletedProcess(['cargo'], 0, built, ''),
                    CompletedProcess(['cargo'], 0, '', ''),
                    CompletedProcess(['spars'], 1, '', 'I/O: missing installation receipt')]
         with patch('check_docs.subprocess.run', side_effect=replies) as run:
