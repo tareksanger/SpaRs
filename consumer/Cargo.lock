@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "spars-nlp"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "fancy-regex",
  "matrixmultiply",
