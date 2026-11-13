@@ -283,6 +283,28 @@ export interface SpanPhrasePattern extends SpanPatternBase {
 }
 `;
 
+const tokenMatcherTypes = `
+/**
+ * How a rule chooses among its own overlapping matches, set through \`TokenRuleOptions.greedy\` in \`TokenMatcher.add\`; the values of spaCy's \`greedy\` argument of \`Matcher.add\`.
+ * The rule's matches are taken in the value's order of preference, and a match is kept when none of its tokens belongs to a match kept before it, so no token belongs to two matches of the rule. Matches of different rules never compete.
+ * - \`'FIRST'\`: prefer the match that starts earliest, then the longer one.
+ * - \`'LONGEST'\`: prefer the longest match, then the one that starts earliest.
+ */
+export type Greedy = 'FIRST' | 'LONGEST'
+/**
+ * Options for one rule, passed as the third argument of \`TokenMatcher.add\` in place of the keyword arguments of spaCy's \`Matcher.add\`. \`greedy\` is the only option: any other property, including spaCy's \`on_match\`, throws \`InvalidArg\`.
+ * Each \`add\` call replaces the options of the whole rule.
+ */
+export interface TokenRuleOptions {
+  /** spaCy's \`greedy\`. Omitted, \`undefined\` or \`null\` (the default) reports every match of the rule, overlapping ones included. Any other well-formed string throws \`SPARS_INVALID_PATTERN\`, and a string with an unpaired surrogate throws \`SPARS_INVALID_TEXT\`; a value that is not a string throws \`InvalidArg\`. */
+  greedy?: Greedy | null
+}
+`;
+
+export function addTokenMatcherTypes(source: string): string {
+  return source.includes('export interface TokenRuleOptions ') ? source : source + tokenMatcherTypes;
+}
+
 export function addSpanRulerTypes(source: string): string {
   return source.includes('export type SpanPattern ') ? source : source + spanRulerTypes;
 }
@@ -323,7 +345,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   for (const name of ['Model', 'NativeDocument', 'NativeToken', 'NativeSpan']) declarations = restrictConstructor(declarations, name);
   for (const { name, fields, replacement } of replacements) declarations = replaceInterface(declarations, name, fields, replacement);
   const vocabulary = readFileSync(new URL('./vocabulary.d.ts', import.meta.url), 'utf8');
-  writeFileSync(path, addVocabularyTypes(addSpanRulerTypes(addSpanGroupTypes(addEntityPatternTypes(addExecutionTypes(declarations)))), vocabulary));
+  writeFileSync(path, addVocabularyTypes(addTokenMatcherTypes(addSpanRulerTypes(addSpanGroupTypes(addEntityPatternTypes(addExecutionTypes(declarations))))), vocabulary));
   const loader = new URL('../index.js', import.meta.url);
   let source = addExecutionLoader(readFileSync(loader, 'utf8'));
   source = addMatcherLoaders(source);

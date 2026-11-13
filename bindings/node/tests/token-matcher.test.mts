@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { loadModel, NativeDocument, TokenMatcher } from '../index.js';
 import { entitiesFromTags, modelPath, referenceTokens } from './fixtures.mts';
-import type { TokenPattern, TokenConstraint, TokenRepetition } from '../index.js';
-import { recordedConstraint, repetition } from './vocabulary.mts';
+import type { Greedy, TokenPattern, TokenConstraint, TokenRepetition, TokenRuleOptions } from '../index.js';
+import { GREEDY, member, recordedConstraint, repetition } from './vocabulary.mts';
 import type { Recorded } from './vocabulary.mts';
 function record(value: unknown): Record<string, unknown> {
   assert.ok(value !== null && typeof value === 'object' && !Array.isArray(value));
@@ -27,18 +27,23 @@ function pattern(value: unknown): Recorded<TokenPattern> {
   return { typed: false, pattern: { tokens: tokens.map(t => ({ constraints: t.constraints.map(c => c.constraint), repetition: t.repetition })) } };
 }
 /** Add recorded patterns, using an untyped call only for values the declarations deliberately exclude. */
-function addRecorded(matcher: TokenMatcher, rule: string, patterns: Recorded<TokenPattern>[]): number {
+function addRecorded(matcher: TokenMatcher, rule: string, patterns: Recorded<TokenPattern>[], options?: TokenRuleOptions): number {
   const typed = patterns.flatMap(p => p.typed ? [p.pattern] : []);
   if (typed.length === patterns.length) {
-    matcher.add(rule, typed);
+    if (options === undefined) matcher.add(rule, typed);
+    else matcher.add(rule, typed, options);
     return 0;
   }
-  addMalformed(matcher, rule, patterns.map(p => p.pattern));
+  addMalformed(matcher, rule, patterns.map(p => p.pattern), options);
   return 1;
 }
-/** Pass a deliberately malformed pattern past the declared types. */
-function addMalformed(matcher: TokenMatcher, rule: string, patterns: unknown[]): void {
-  Reflect.apply(matcher.add, matcher, [rule, patterns]);
+/** Pass deliberately malformed patterns or options past the declared types. */
+function addMalformed(matcher: TokenMatcher, rule: string, patterns: unknown[], options?: unknown): void {
+  Reflect.apply(matcher.add, matcher, options === undefined ? [rule, patterns] : [rule, patterns, options]);
+}
+/** The options of a recorded `Matcher.add` call: spaCy's `greedy` value, when the call passed one. */
+function recordedOptions(rule: Record<string, unknown>): TokenRuleOptions | undefined {
+  return rule.greedy === undefined || rule.greedy === null ? undefined : { greedy: member(GREEDY, rule.greedy) };
 }
 /** A one-item pattern with an untyped condition, for malformed-input tests. */
 function untypedItem(attribute: unknown, predicate: unknown, repetition: unknown = { kind: 'once' }): unknown {
@@ -67,6 +72,7 @@ for (const [filename, cases, rules, matches, untyped] of [
   ['token-match-lower-v1.expected.json', 4, 172, 280, 0],
   ['token-match-length-v1.expected.json', 3, 105, 386, 0],
   ['token-match-sets-v1.expected.json', 3, 558, 653, 9],
+  ['token-match-greedy-v1.expected.json', 40, 4242, 4357, 0],
 ] as const) {
   test(`TokenMatcher preserves frozen ordered reference corpus ${filename}`, async () => {
     const parsed: unknown = JSON.parse(readFileSync(new URL(`../../../fixtures/${filename}`, import.meta.url), 'utf8'));
@@ -80,7 +86,7 @@ for (const [filename, cases, rules, matches, untyped] of [
       const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { ...item, entities: entitiesFromTags(referenceTokens(item.tokens)) } }));
       for (const raw of array(item.rules)) {
         const rule = record(raw);
-        outOfVocabulary += addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern));
+        outOfVocabulary += addRecorded(matcher, string(rule.name), array(rule.patterns).map(pattern), recordedOptions(rule));
         ruleCount++;
       }
       const expected = array(item.expected).map(value => {
@@ -287,6 +293,110 @@ test('TokenMatcher lifecycle, ownership, and pending mutation', async () => {
   assert.equal(matcher.contains('a'), false);
   assert.throws(() => matcher.remove('a'), hasCode('SPARS_INVALID_PATTERN'));
   assert.deepEqual(await matcher.findMatches(plainDoc('x')), [{ rule: 'b', start: 0, end: 1 }]);
+});
+
+/**
+ * The greedy fixture case `greedy-rules-runs`: the document `a a b a a a`, the pattern `a+`, and
+ * spaCy's spans for it without `greedy` and under each value, taken from the recorded results of
+ * the rules `run_longest` (registered with LONGEST) and `run_first` (FIRST).
+ */
+function runCase(): { doc: NativeDocument; run: TokenPattern; every: Array<[number, number]>; kept: Record<Greedy, Array<[number, number]>> } {
+  const parsed: unknown = JSON.parse(readFileSync(new URL('../../../fixtures/token-match-greedy-v1.expected.json', import.meta.url), 'utf8'));
+  const item = array(record(parsed).cases).map(record).find(value => value.id === 'greedy-rules-runs');
+  assert.ok(item !== undefined);
+  assert.equal(item.text, 'a a b a a a');
+  const doc = NativeDocument.fromSnapshot(JSON.stringify({ format_version: 1, document: { ...item, entities: entitiesFromTags(referenceTokens(item.tokens)) } }));
+  const spansOf = (matches: unknown, rule: string): Array<[number, number]> =>
+    array(matches).map(record).filter(match => match.rule === rule).map(match => [number(match.start), number(match.end)]);
+  const rule = array(item.rules).map(record).find(value => value.name === 'run_longest');
+  assert.ok(rule !== undefined);
+  const [recorded] = array(rule.patterns).map(pattern);
+  assert.ok(recorded !== undefined && recorded.typed);
+  const kept = { FIRST: spansOf(item.expected, 'run_first'), LONGEST: spansOf(item.expected, 'run_longest') };
+  const every = spansOf(item.unfiltered, 'run_longest');
+  // The three results differ, so a check cannot pass by getting the wrong one.
+  assert.notDeepEqual(kept.FIRST, kept.LONGEST);
+  assert.notDeepEqual(kept.FIRST, every);
+  assert.notDeepEqual(kept.LONGEST, every);
+  return { doc, run: recorded.pattern, every, kept };
+}
+
+test('TokenMatcher greedy option follows spaCy Matcher.add', async () => {
+  // Expected spans come from the frozen greedy fixture; the rejected values, rejected
+  // registrations and removals are checked against spaCy 3.8.14 by
+  // GreedyRegistrationReferenceTests in tools/test_token_match_reference.py.
+  const { doc, run, every, kept } = runCase();
+  const empty: TokenPattern = { tokens: [] };
+  const spans = async (matcher: TokenMatcher): Promise<Array<[number, number]>> => (await matcher.findMatches(doc)).map(m => [m.start, m.end]);
+  for (const greedy of GREEDY) {
+    const matcher = new TokenMatcher();
+    matcher.add('r', [run], { greedy });
+    assert.deepEqual(await spans(matcher), kept[greedy], greedy);
+  }
+  // Without a value the rule reports every match, and a later call replaces the rule's filter.
+  for (const options of [undefined, null, {}, { greedy: null }, { greedy: undefined }]) {
+    const cleared = new TokenMatcher();
+    cleared.add('r', [run], { greedy: 'LONGEST' });
+    addMalformed(cleared, 'r', [], options);
+    assert.deepEqual(await spans(cleared), every, JSON.stringify(options));
+  }
+  const matcher = new TokenMatcher();
+  matcher.add('r', [run]);
+  matcher.add('r', [], { greedy: 'FIRST' });
+  assert.deepEqual(await spans(matcher), kept.FIRST);
+  matcher.add('r', []);
+  assert.deepEqual(await spans(matcher), every);
+  // A rejected call leaves the rule's filter and patterns as they were.
+  matcher.add('r', [], { greedy: 'LONGEST' });
+  assert.throws(() => matcher.add('r', [empty]), hasCode('SPARS_INVALID_PATTERN'));
+  assert.throws(() => matcher.add('r', [empty], { greedy: 'FIRST' }), hasCode('SPARS_INVALID_PATTERN'));
+  assert.throws(() => addMalformed(matcher, 'r', [run], { greedy: 'first' }), hasCode('SPARS_INVALID_PATTERN'));
+  assert.throws(() => addMalformed(matcher, 'r', [run], { greedy: 'FIRST', on_match: null }), hasCode('InvalidArg'));
+  assert.throws(() => addMalformed(matcher, 'r', [run], { greedy: 0 }), hasCode('InvalidArg'));
+  assert.deepEqual(await spans(matcher), kept.LONGEST);
+  assert.equal(matcher.get('r')?.length, 1);
+  // After removal the next call decides the filter, and other rules keep theirs.
+  matcher.remove('r');
+  matcher.add('r', [run]);
+  assert.deepEqual(await spans(matcher), every);
+  matcher.remove('r');
+  matcher.add('r', [run], { greedy: 'FIRST' });
+  assert.deepEqual(await spans(matcher), kept.FIRST);
+  const several = new TokenMatcher();
+  several.add('longest', [run], { greedy: 'LONGEST' });
+  several.add('first', [run], { greedy: 'FIRST' });
+  several.remove('longest');
+  assert.deepEqual(await spans(several), kept.FIRST);
+  // An empty pattern list registers a new rule with options and no patterns.
+  const created = new TokenMatcher();
+  created.add('new', [], { greedy: 'FIRST' });
+  assert.equal(created.contains('new'), true);
+  assert.equal(created.size, 1);
+  assert.deepEqual(created.get('new'), []);
+  assert.deepEqual(await spans(created), []);
+  // spaCy rejects every other string, and checks the value before it looks at the patterns: the
+  // pattern here would otherwise be reported as invalid text.
+  const surrogate = untypedItem('text', { kind: 'equals', value: '\ud800' });
+  const fresh = new TokenMatcher();
+  assert.throws(() => addMalformed(fresh, 'r', [surrogate], { greedy: 'LONGEST' }), hasCode('SPARS_INVALID_TEXT'));
+  for (const value of ['GREEDY', 'first', 'longest', 'First', '']) {
+    assert.throws(() => addMalformed(fresh, 'r', [surrogate], { greedy: value }), hasCode('SPARS_INVALID_PATTERN'), value);
+    assert.throws(() => addMalformed(fresh, 'r', [run], { greedy: value }), hasCode('SPARS_INVALID_PATTERN'), value);
+  }
+  assert.throws(() => addMalformed(fresh, 'r', [run], { greedy: '\ud800' }), hasCode('SPARS_INVALID_TEXT'));
+  // Accepted difference: napi-rs rejects a pattern field of the wrong type while it converts the
+  // arguments, before `greedy` is read; spaCy would report E947 first.
+  const mistyped = { tokens: [{ constraints: [], repetition: { kind: 5 } }] };
+  assert.throws(() => addMalformed(fresh, 'r', [mistyped], { greedy: 'GREEDY' }), hasCode('StringExpected'));
+  // Unknown options, such as spaCy's own `on_match`, values that are not strings and arrays are rejected.
+  for (const options of [{ on_match: null }, { Greedy: 'FIRST' }, { greedy: 1 }, { greedy: true }, { greedy: false }, { greedy: {} }, { greedy: ['FIRST'] }, [], ['FIRST']]) {
+    assert.throws(() => addMalformed(fresh, 'r', [run], options), hasCode('InvalidArg'), JSON.stringify(options));
+  }
+  // So are options that are not objects, including falsy ones.
+  for (const options of ['FIRST', '', 0, 1, false, true, (): void => undefined]) {
+    assert.throws(() => addMalformed(fresh, 'r', [run], options), hasCode('InvalidArg'), String(options));
+  }
+  assert.equal(fresh.size, 0);
 });
 
 test('TokenMatcher rejects malformed patterns atomically and reports unavailable annotations', async () => {
