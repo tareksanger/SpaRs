@@ -36,7 +36,7 @@ Inside a `::: code-group` block, a `rust` example and a `typescript` example are
 
 The published site holds one copy of the guides per release, chosen from a version menu. `node tools/site/build-versions.mjs` builds and checks them all: it unpacks each release tag that contains that builder, builds it with the site settings and tools the release shipped with, and writes it under its tag, such as `target/site/v1.2.3/`. The latest release is also written to the root of `target/site`, and the current checkout is written under `next`. Until a release contains the builder, the root holds the current checkout and there is no version menu. To build one copy by hand, set `SPARS_SITE_VERSION` to `next` or a release tag before the build and check commands above.
 
-The [documentation workflow](../.github/workflows/docs.yml) runs the builder for pull requests that change the site, and publishes the result to GitHub Pages on a push to the main branch and when a release tag is created. Publishing needs the repository's Pages source set to GitHub Actions.
+The [documentation workflow](../.github/workflows/docs.yml) runs the builder for pull requests that change the site, and publishes the result to GitHub Pages on a push to the main branch. The [release workflow](../.github/workflows/release.yml) also starts it on the main branch after it creates each release, so the new release's copy is published. Publishing needs the repository's Pages source set to GitHub Actions, and its `github-pages` environment must allow deployments from the main branch.
 
 ## Cargo workspace
 

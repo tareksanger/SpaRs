@@ -54,7 +54,7 @@ When the checks pass and the PR is ready:
 gh pr merge "$release_pr" --squash
 ```
 
-GitHub waits for CI to pass on the exact merge commit, then creates its `vX.Y.Z` tag and GitHub Release. This does not upload anything to crates.io.
+GitHub waits for CI to pass on the exact merge commit, then creates its `vX.Y.Z` tag and GitHub Release, and starts the documentation workflow on the default branch to publish the release's documentation. This does not upload anything to crates.io.
 
 ## 3. Fetch and check out the release tag
 
