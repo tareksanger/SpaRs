@@ -1,10 +1,11 @@
 use crate::{
     document::NativeDocument,
+    entity_ruler::known_fields,
     errors,
     matcher_types::{invalid, TokenConstraint},
 };
 use napi::{
-    bindgen_prelude::{AsyncTask, Utf16String},
+    bindgen_prelude::{AsyncTask, JsObjectValue, Object, Utf16String},
     Env, Result, Task,
 };
 use napi_derive::napi;
@@ -125,6 +126,34 @@ impl TokenPattern {
     }
 }
 
+/// The value of spaCy's `greedy` argument with this spelling. Like spaCy's error E947, any other
+/// string is an error.
+fn greedy(name: &str) -> errors::Result<spars::Greedy> {
+    match name {
+        "FIRST" => Ok(spars::Greedy::First),
+        "LONGEST" => Ok(spars::Greedy::Longest),
+        _ => Err(invalid(&format!(
+            "[E947] greedy must be \"FIRST\" or \"LONGEST\", not {name:?}"
+        ))),
+    }
+}
+
+/// Read the `options` argument of `TokenMatcher.add`; omitted, `undefined` and `null` give the
+/// defaults.
+fn rule_options(env: Env, options: Option<Object>) -> Result<spars::TokenRuleOptions> {
+    let mut native = spars::TokenRuleOptions::default();
+    let Some(options) = options else {
+        return Ok(native);
+    };
+    known_fields(&options, "TokenMatcher rule option", &["greedy"])?;
+    native.greedy = options
+        .get_named_property::<Option<Utf16String>>("greedy")?
+        .map(|name| greedy(&errors::text(&name)?))
+        .transpose()
+        .map_err(|error| error.into_napi(env))?;
+    Ok(native)
+}
+
 /// Finds token sequences described by per-token conditions, like spaCy's `Matcher`.
 #[napi]
 pub struct TokenMatcher {
@@ -162,21 +191,40 @@ impl TokenMatcher {
             .get(&rule)
             .map(|patterns| patterns.iter().map(TokenPattern::from_native).collect()))
     }
-    /// Append patterns to `rule`; all are validated before the matcher changes. Throws
-    /// `SPARS_INVALID_PATTERN` for an empty pattern, invalid predicates or repetition bounds, a
-    /// pattern expanding beyond 4096 token positions, or flag conditions without a model, and
+    /// Append patterns to `rule`, like spaCy `Matcher.add`; everything is validated before the
+    /// matcher changes. `options` applies to the whole rule (only `greedy` is available; spaCy's
+    /// `on_match` is not): each call replaces the options of earlier calls for `rule`, so a call
+    /// without `greedy` returns the rule to reporting every match. An empty `patterns` adds no
+    /// pattern but still sets the options, and registers `rule` if it is new. Throws
+    /// `SPARS_INVALID_PATTERN` for a pattern object of the wrong shape, an unknown `greedy`
+    /// string, an empty pattern, invalid predicates or repetition bounds, a pattern expanding
+    /// beyond 4096 token positions, or flag conditions without a model, checking the shape first
+    /// and `greedy` second; `StringExpected` or `NumberExpected` for a pattern field of the wrong
+    /// type, after the shape and before `greedy`; `SPARS_INVALID_TEXT` for a `greedy` string with an unpaired
+    /// surrogate; `InvalidArg` for an unknown option or a `greedy` that is not a string; and
     /// `SPARS_BUSY` while `findMatches` is pending.
-    #[napi(strict)]
-    pub fn add(&mut self, env: Env, rule: Utf16String, patterns: Vec<TokenPattern>) -> Result<()> {
+    #[napi(
+        strict,
+        ts_args_type = "rule: string, patterns: Array<TokenPattern>, options?: TokenRuleOptions | undefined | null"
+    )]
+    pub fn add(
+        &mut self,
+        env: Env,
+        rule: Utf16String,
+        patterns: Vec<TokenPattern>,
+        options: Option<Object>,
+    ) -> Result<()> {
         let rule = errors::text(&rule).map_err(|error| error.into_napi(env))?;
         let matcher = Arc::get_mut(&mut self.inner).ok_or_else(|| errors::busy().into_napi(env))?;
+        // spaCy checks `greedy` before it looks at any pattern.
+        let options = rule_options(env, options)?;
         let patterns = patterns
             .into_iter()
             .map(TokenPattern::into_native)
             .collect::<errors::Result<_>>()
             .map_err(|error| error.into_napi(env))?;
         matcher
-            .add(rule, patterns)
+            .add_with(rule, patterns, options)
             .map_err(|error| errors::BindingError::from(error).into_napi(env))
     }
     /// Throws `SPARS_INVALID_PATTERN` for an unregistered rule and `SPARS_BUSY` while `findMatches` is pending.
@@ -188,8 +236,12 @@ impl TokenMatcher {
             .remove(&rule)
             .map_err(|error| errors::BindingError::from(error).into_napi(env))
     }
-    /// All matches on Node's worker pool, overlapping ones included, each rule, start and end once,
-    /// in spaCy `Matcher` order rather than sorted by `start`. Rejects with `SPARS_INFERENCE` when an
+    /// Matches, found on Node's worker pool, each rule, start and end once, in spaCy `Matcher`
+    /// order rather than sorted by `start`: every match, overlapping ones included, of each rule
+    /// without `greedy`. A rule added with `greedy` reports only matches that share no token with
+    /// each other; as in spaCy, those come after the matches of every rule without `greedy`, one
+    /// rule after another in the order in which the search first finds a match of each rule, and
+    /// most preferred first within a rule (see `Greedy`). Rejects with `SPARS_INFERENCE` when an
     /// `equals` condition on `lemma`, `pos`, `tag`, `dep` or `morphology` meets a nonempty document
     /// in which no token has that annotation, for example `pos` before `AttributeRuler`, like
     /// spaCy's error E155. `''` counts as missing except for `morphology`. Other predicates never

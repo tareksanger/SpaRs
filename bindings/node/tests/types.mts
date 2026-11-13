@@ -4,7 +4,7 @@ import type { Document, Token, TokenAnnotations, Span, Stage, NativeDocument, Le
   DependencyLink, DependencyLabel, DependencyPattern, DependencyRelation, EntityIob, EntityLabel, EntityLabels, EntityInput, FineGrainedTag, ModelName,
   PhraseAttribute, SparsError, SparsErrorCode, TokenConstraint, TokenPattern, UniversalPos, EntityMatch, EntityPattern, RulerPattern,
   EntityRulerOptions, JsonInput, JsonValue, SpanGroup, SpanGroupAttrs, SpanGroupInput, SpanGroupKey, SpanInput, SpanLabel,
-  SpanFilter, SpanPattern, SpanRulerOptions, SpanRulerPattern } from '../index.js';
+  SpanFilter, SpanPattern, SpanRulerOptions, SpanRulerPattern, Greedy, TokenRuleOptions } from '../index.js';
 import type { ByteOffset, CodePointOffset, Utf16Offset, TokenIndex } from '../units.js';
 
 type Assert<T extends true> = T;
@@ -75,6 +75,10 @@ export type Contracts = [
   Assert<Equal<Parameters<ModelStore['register']>[0], ModelName>>,
   Assert<Equal<SparsError['code'], SparsErrorCode>>,
   Assert<Equal<ReturnType<TokenMatcher['get']>, TokenPattern[] | null>>,
+  // TokenMatcher.add takes spaCy's keyword arguments as an optional object, with spaCy's spelling of `greedy`.
+  Assert<Equal<Greedy, 'FIRST' | 'LONGEST'>>,
+  Assert<Equal<Parameters<TokenMatcher['add']>, [rule: string, patterns: TokenPattern[], options?: TokenRuleOptions | null]>>,
+  Assert<Equal<TokenRuleOptions['greedy'], Greedy | null | undefined>>,
   Assert<Equal<ReturnType<DependencyMatcher['get']>, DependencyPattern[] | null>>,
   Assert<Equal<DependencyLink['relation'], DependencyRelation>>,
   Assert<Equal<EntityInput['label'], EntityLabel | ''>>,
@@ -189,6 +193,11 @@ export function rejected(link: DependencyLink, constraint: TokenConstraint, docu
   new TokenMatcher().add('r', [{ tokens: [{ constraints: [], repetition: { kind: 'once', min: 1 } }] }]);
   // @ts-expect-error a range needs its minimum
   new TokenMatcher().add('r', [{ tokens: [{ constraints: [], repetition: { kind: 'range', max: 1 } }] }]);
+  new TokenMatcher().add('r', [], { greedy: 'LONGEST' });
+  // @ts-expect-error greedy values are spaCy's uppercase names
+  new TokenMatcher().add('r', [], { greedy: 'longest' });
+  // @ts-expect-error greedy is an option of the rule, not a third positional value
+  new TokenMatcher().add('r', [], 'LONGEST');
   const ruler = new EntityRuler({ phraseAttribute: 'LOWER' });
   // @ts-expect-error phrase attribute names are uppercase
   void new EntityRuler({ phraseAttribute: 'lower' });

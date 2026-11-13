@@ -1,5 +1,6 @@
 //! Reusable patterns over contiguous tokens, with explicit repetition.
 mod engine;
+mod greedy;
 mod start_index;
 use crate::dependency_matcher::predicates::{
     compile_conditions, CompiledConditions, LengthChecks, LexicalTest,
@@ -46,6 +47,40 @@ pub struct TokenMatch {
     pub start: TokenIndex,
     pub end: TokenIndex,
 }
+/// How a rule chooses among its own overlapping matches, set through
+/// [`TokenRuleOptions::greedy`]; the values of spaCy's `greedy` argument of `Matcher.add`. The
+/// rule's matches are taken in the variant's order of preference, and a match is kept when none
+/// of its tokens belongs to a match kept before it, so no token belongs to two matches of the
+/// rule. Matches of different rules never compete.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Greedy {
+    /// spaCy's `"FIRST"`: prefer the match that starts earliest, then the longer one.
+    First,
+    /// spaCy's `"LONGEST"`: prefer the longest match, then the one that starts earliest.
+    Longest,
+}
+/// Settings for one rule, passed to [`TokenMatcher::add_with`]. Start from
+/// [`TokenRuleOptions::default`] and assign fields; code outside this crate cannot use a struct
+/// literal.
+///
+/// ```
+/// use spars::{Greedy, TokenMatcher, TokenRuleOptions};
+///
+/// let mut options = TokenRuleOptions::default();
+/// options.greedy = Some(Greedy::Longest);
+/// let mut matcher = TokenMatcher::new();
+/// matcher.add_with("run", Vec::new(), options)?;
+/// assert!(matcher.contains("run"));
+/// # Ok::<(), spars::Error>(())
+/// ```
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct TokenRuleOptions {
+    /// `None` (the default) returns every match of the rule, overlapping ones included. `Some`
+    /// keeps only matches that share no token, chosen as [`Greedy`] describes. Corresponds to
+    /// spaCy's `greedy` argument of `Matcher.add`.
+    pub greedy: Option<Greedy>,
+}
 #[derive(Clone, Copy)]
 enum Quantifier {
     One,
@@ -65,6 +100,8 @@ struct CompiledPattern {
 }
 struct Rule {
     patterns: Vec<TokenPattern>,
+    // Those of the latest registration of the rule; they apply to all of its patterns.
+    options: TokenRuleOptions,
 }
 /// Compile rules once and reuse them across independent document calls.
 #[derive(Default)]
@@ -103,8 +140,32 @@ impl TokenMatcher {
             .get(name)
             .map(|&i| self.rules[i].patterns.as_slice())
     }
-    /// Validate every pattern before modifying the matcher. Repeated names append patterns.
+    /// Register `patterns` under the rule `name`; a name that is already registered gets the
+    /// patterns appended. Every pattern is validated first, and a call that returns an error
+    /// changes nothing.
+    ///
+    /// This is [`TokenMatcher::add_with`] with the default options, so it also resets the options
+    /// of an existing rule: a rule registered with [`TokenRuleOptions::greedy`] goes back to
+    /// returning every match. See `add_with` for the errors.
     pub fn add(&mut self, name: impl Into<String>, patterns: Vec<TokenPattern>) -> Result<()> {
+        self.add_with(name, patterns, TokenRuleOptions::default())
+    }
+    /// [`TokenMatcher::add`] with options for the rule. As in spaCy, the options of the latest
+    /// registration of `name` replace the earlier ones and apply to every pattern of the rule,
+    /// those added before included. An empty `patterns` adds no pattern but still sets the
+    /// options, and registers `name` if it is new.
+    ///
+    /// Returns [`Error::Pattern`] when a pattern has no items, a `Range` has `max` below `min`, a
+    /// pattern expands beyond 4096 nodes, a condition is invalid (for example a numeric predicate
+    /// on an attribute other than `Length`), or a lexical flag condition is used on a matcher
+    /// created without [`TokenMatcher::with_lexicon`]. A registration that returns an error
+    /// leaves the rule's patterns and options as they were.
+    pub fn add_with(
+        &mut self,
+        name: impl Into<String>,
+        patterns: Vec<TokenPattern>,
+        options: TokenRuleOptions,
+    ) -> Result<()> {
         let name = name.into();
         self.check_lexicon(&patterns)?;
         let compiled = patterns
@@ -112,10 +173,12 @@ impl TokenMatcher {
             .map(|pattern| compile(&name, pattern))
             .collect::<Result<Vec<_>>>()?;
         if let Some(&i) = self.index.get(&name) {
-            self.rules[i].patterns.extend(patterns);
+            let rule = &mut self.rules[i];
+            rule.patterns.extend(patterns);
+            rule.options = options;
         } else {
             self.index.insert(name, self.rules.len());
-            self.rules.push(Rule { patterns });
+            self.rules.push(Rule { patterns, options });
         }
         // This order includes later additions to an already registered rule.
         for pattern in compiled {
@@ -205,8 +268,15 @@ impl TokenMatcher {
         self.compiled
             .retain(|pattern| !names.contains(pattern.name.as_str()));
     }
-    /// Return every match, overlapping ones included, in spaCy `Matcher` order rather than
-    /// sorted by start. A matcher without rules returns no matches and no error.
+    /// Return the matches in spaCy `Matcher` order rather than sorted by start: every match,
+    /// overlapping ones included, of each rule without [`TokenRuleOptions::greedy`]. A matcher
+    /// without rules returns no matches and no error.
+    ///
+    /// A rule registered with [`TokenRuleOptions::greedy`] returns only matches that share no
+    /// token with each other, chosen in the order of preference its [`Greedy`] value gives. As in
+    /// spaCy, the result then lists the matches of rules without the option first, followed by
+    /// the kept matches of each rule with it, one rule after another in the order in which the
+    /// search first finds a match of each rule, and most preferred first within a rule.
     ///
     /// Returns [`Error::MissingAnnotation`] when an `Equals` condition compares lemma, POS, tag,
     /// dependency label or morphology and no token of a nonempty `doc` has that annotation,
@@ -218,22 +288,54 @@ impl TokenMatcher {
     /// condition compares morphology and a token's morphology is not in spaCy's canonical
     /// `Field=Value|...` order.
     pub fn find_matches(&self, doc: &Doc) -> Result<Vec<TokenMatch>> {
-        engine::find(
+        let matches = engine::find(
             &self.compiled,
             engine::Starts::Indexed(&self.starts),
             doc,
             self.lexicon.as_ref(),
-        )
+        )?;
+        Ok(self.keep_greedy(matches))
+    }
+    /// Apply each rule's `greedy` option, in spaCy's result order: the matches of rules without
+    /// the option come first, in search order; the kept matches of each rule with the option
+    /// follow, rule by rule in the order of the rules' first matches.
+    fn keep_greedy(&self, matches: Vec<TokenMatch>) -> Vec<TokenMatch> {
+        if self.rules.iter().all(|rule| rule.options.greedy.is_none()) {
+            return matches;
+        }
+        let mut kept = Vec::with_capacity(matches.len());
+        let mut filtered: Vec<(Greedy, Vec<TokenMatch>)> = Vec::new();
+        // For each rule, where its matches are collected in `filtered`.
+        let mut position_of_rule: Vec<Option<usize>> = vec![None; self.rules.len()];
+        for found in matches {
+            // Every match names a registered rule.
+            let rule = self.index[&found.rule];
+            match self.rules[rule].options.greedy {
+                None => kept.push(found),
+                Some(greedy) => {
+                    let position = *position_of_rule[rule].get_or_insert_with(|| {
+                        filtered.push((greedy, Vec::new()));
+                        filtered.len() - 1
+                    });
+                    filtered[position].1.push(found);
+                }
+            }
+        }
+        for (greedy, candidates) in filtered {
+            kept.extend(greedy::keep_non_overlapping(greedy, candidates));
+        }
+        kept
     }
     /// The same search, starting every pattern at every token as spaCy does.
     #[cfg(test)]
     fn find_matches_unindexed(&self, doc: &Doc) -> Result<Vec<TokenMatch>> {
-        engine::find(
+        let matches = engine::find(
             &self.compiled,
             engine::Starts::All,
             doc,
             self.lexicon.as_ref(),
-        )
+        )?;
+        Ok(self.keep_greedy(matches))
     }
 }
 fn compile(name: &str, pattern: &TokenPattern) -> Result<CompiledPattern> {

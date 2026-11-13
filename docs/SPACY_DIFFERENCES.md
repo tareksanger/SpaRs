@@ -1,6 +1,6 @@
 # Accepted differences from spaCy
 
-SpaRs follows spaCy 3.8.14 by default, and a behavior that differs from it is normally a compatibility gap listed in [the compatibility inventory](COMPATIBILITY.md). This file lists the differences that are accepted as SpaRs's intended behavior instead. Each one exists because spaCy's behavior depends on Python internals that are impractical to emulate, is an upstream bug, leaves an object partly changed after an error, fails later than the setting that causes the failure, depends on internal state left behind by rules that were removed, relies on Python object identity or values that native snapshots cannot store, is a limitation of spaCy's offset-based copying or byte format, or concerns data that SpaRs does not store. The reference fixtures contain no case whose result these differences change; the tests named below check SpaRs's behavior.
+SpaRs follows spaCy 3.8.14 by default, and a behavior that differs from it is normally a compatibility gap listed in [the compatibility inventory](COMPATIBILITY.md). This file lists the differences that are accepted as SpaRs's intended behavior instead. Each one exists because spaCy's behavior depends on Python internals that are impractical to emulate, is an upstream bug, leaves an object partly changed after an error, fails later than the setting that causes the failure, depends on internal state left behind by rules that were removed, relies on Python object identity or values that native snapshots cannot store, is a limitation of spaCy's offset-based copying or byte format, or concerns data that SpaRs does not store. One difference changes only which error is reported for a call that is invalid in two ways. The reference fixtures contain no case whose result these differences change; the tests named below check SpaRs's behavior.
 
 Each entry gives spaCy's behavior, SpaRs's behavior, the reason, and the effect on callers.
 
@@ -42,15 +42,27 @@ These apply to the Rust [`EntityRuler`](ENTITY_RULER.md) and the Node [`EntityRu
 
 ## Token matchers
 
-These apply to the Rust and Node [Token Matcher](TOKEN_MATCHER.md), [DependencyMatcher](DEPENDENCY_MATCHER.md) and the token patterns of the [`EntityRuler`](ENTITY_RULER.md), which share one annotation check, described in [missing annotations](TOKEN_MATCHER.md#missing-annotations).
+These apply to the Rust and Node [Token Matcher](TOKEN_MATCHER.md), [DependencyMatcher](DEPENDENCY_MATCHER.md) and the token patterns of the [`EntityRuler`](ENTITY_RULER.md), except where an entry says otherwise.
 
 ### Annotations required by removed rules
+
+These matchers share one annotation check, described in [missing annotations](TOKEN_MATCHER.md#missing-annotations).
 
 - **spaCy:** `Matcher.add` records every attribute that a pattern compares with a direct value, such as `{"LEMMA": "x"}`, in an internal set that `Matcher.remove` never clears. Before matching, spaCy raises error E155 if any recorded tag, POS, morphology, lemma or dependency attribute is missing from every token of the document. After a rule is removed, its attributes therefore still require annotations, even when no remaining rule compares them, and even after every rule is removed. The DependencyMatcher checks its conditions through an internal `Matcher` with the same set. The EntityRuler's `remove` keeps it; its `clear` creates a new `Matcher` and so resets it. The [reproduction](#reproducing-the-removed-rule-check) below shows it.
 - **SpaRs:** checks only the conditions of the rules registered when matching runs, so removing a rule also removes the annotations it required.
 - **Reason:** the recorded set is stale state, not part of the documented matching contract: it makes a matcher's errors depend on rules it no longer has, and a removed rule cannot affect any match.
 - **Effect:** after `remove`, if a document lacks an annotation that only removed rules compared, SpaRs matches it against the current rules, while spaCy raises E155. Matches on documents that spaCy accepts are the same.
 - **Tests:** `removed_rules_do_not_require_annotations` in `crates/spars/src/token_matcher/tests.rs` and `crates/spars/src/dependency_matcher/tests.rs`, and `removed_token_patterns_do_not_require_annotations` in `crates/spars/src/entity_ruler/tests.rs`. Run them with `cargo test --offline -p spars-nlp --lib -- removed_rules_do_not_require_annotations removed_token_patterns_do_not_require_annotations`.
+
+### Node checks pattern shapes before `greedy`
+
+This applies only to the Node [`TokenMatcher`](NODE.md#token-matching); the Rust API takes `greedy` as a closed type and has no invalid value to report.
+
+- **spaCy:** `Matcher.add` checks that `patterns` is a list, then that `greedy` is `"FIRST"`, `"LONGEST"` or `None` (error E947), then each pattern. An invalid `greedy` is therefore reported before any problem inside a pattern.
+- **SpaRs:** `TokenMatcher.add` checks the patterns in two stages before it reads `greedy`. JavaScript first checks that every pattern object has the expected shape: arrays where arrays are expected and no unknown property names. Converting the arguments for the native code then checks that each pattern field has its declared JavaScript type, such as a string for `repetition.kind` or `attribute` and a number for `repetition.min`. Only then is `greedy` checked, followed by the remaining pattern rules, such as an empty pattern, an unknown repetition kind or invalid bounds. A `greedy` that is not a string, such as `1` or `true`, is rejected with `InvalidArg` when it is read, where spaCy raises E947.
+- **Reason:** the shape check runs before the native code receives the arguments, so that a misspelled property is never silently ignored, and napi-rs checks field types while it converts the arguments, before the native function runs. The same shape check serves the DependencyMatcher and the token patterns of the EntityRuler and SpanRuler, so every pattern is checked the same way before any option is read.
+- **Effect:** a call with an invalid `greedy` and a pattern with a misspelled property reports `SPARS_INVALID_PATTERN` for the pattern; with a pattern field of the wrong type, it reports napi-rs's `StringExpected` or `NumberExpected`. The matcher is unchanged after any of these errors. When the patterns have the declared shape and field types, which TypeScript callers get from the declarations, an invalid `greedy` string is reported before every other pattern error, as in spaCy.
+- **Tests:** `TokenMatcher greedy option follows spaCy Matcher.add` in `bindings/node/tests/token-matcher.test.mts` checks that an invalid `greedy` string is reported before a well-typed invalid pattern, that a pattern field of the wrong type is reported before it, and that a `greedy` of another type throws `InvalidArg`. No test tells apart the two errors of a call with a misspelled property and an invalid `greedy` string, because both have the code `SPARS_INVALID_PATTERN`; that order follows from `validatePatterns` in `bindings/node/execution.cjs` running before the native call. Run the test with `node --expose-gc --test --test-name-pattern "greedy option" tests/token-matcher.test.mts` in `bindings/node` after `npm run build`.
 
 ## Reproducing the remove bug
 

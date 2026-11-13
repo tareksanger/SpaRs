@@ -1,6 +1,8 @@
 """Freeze Token Matcher expectations from the pinned official spaCy runtime."""
 import argparse
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 import hashlib
 import json
 from itertools import product
@@ -76,6 +78,26 @@ class Fixture:
     cases: list[Case]
 
 
+class Greedy(StrEnum):
+    """The `greedy` values `Matcher.add` accepts, spelled as spaCy spells them."""
+    FIRST = 'FIRST'
+    LONGEST = 'LONGEST'
+
+
+@dataclass(frozen=True)
+class GreedyRule(Rule):
+    """One `Matcher.add` call. `greedy` is the filter passed to it; `None` passes none, which
+    also clears a filter that an earlier call set for the same name."""
+    greedy: Greedy | None
+
+
+@dataclass(frozen=True)
+class GreedyCase(Case):
+    """`expected` is the official result of the registrations in `rules`. `unfiltered` is the
+    official result of the same registrations made without `greedy`."""
+    unfiltered: list[Match]
+
+
 def official(pattern: Pattern) -> list[dict[str, OfficialValue]]:
     result: list[dict[str, OfficialValue]] = []
     for item in pattern.tokens:
@@ -131,8 +153,11 @@ def case(nlp: Language, case_id: str, text: str, doc: Doc, patterns: list[Rule] 
     matcher = Matcher(nlp.vocab, validate=True)
     for rule in patterns:
         matcher.add(rule.name, [official(pattern) for pattern in rule.patterns])
-    expected = [Match(nlp.vocab.strings[key], start, end) for key, start, end in matcher(doc)]
-    return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, expected)
+    return Case(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], patterns, named(nlp, matcher(doc)))
+
+
+def named(nlp: Language, matches: list[tuple[int, int, int]]) -> list[Match]:
+    return [Match(nlp.vocab.strings[key], start, end) for key, start, end in matches]
 
 
 def exhaustive_rules() -> list[Rule]:
@@ -302,22 +327,153 @@ def generate_sets(nlp: Language) -> Fixture:
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
+def noun_document(nlp: Language, words: list[str]) -> Doc:
+    """A document of single-space-separated words, each annotated as a noun attached to the first."""
+    length = len(words)
+    return make_doc(nlp.vocab, words=words, spaces=[index + 1 < length for index in range(length)],
+                    heads=[0] * length, deps=['ROOT' if index == 0 else 'dep' for index in range(length)],
+                    pos=['NOUN'] * length, tags=['NN'] * length, lemmas=words, morphs=[''] * length)
+
+
+def binary_words() -> Iterator[list[str]]:
+    """Every sequence of `a` and `b` up to four tokens long, shortest first."""
+    for length in range(5):
+        for sequence in product(('a', 'b'), repeat=length):
+            yield list(sequence)
+
+
 def generate_exhaustive(nlp: Language, branching: bool = False) -> Fixture:
     patterns = branching_rules() if branching else exhaustive_rules()
     cases: list[Case] = []
-    for length in range(5):
-        for sequence in product(('a', 'b'), repeat=length):
-            words: list[str] = list(sequence)
-            doc = make_doc(nlp.vocab, words=words, spaces=[index + 1 < length for index in range(length)],
-                           heads=[0] * length, deps=['ROOT' if index == 0 else 'dep' for index in range(length)],
-                           pos=['NOUN'] * length, tags=['NN'] * length, lemmas=words, morphs=[''] * length)
-            cases.append(case(nlp, 'binary-' + (''.join(words) or 'empty'), ' '.join(words), doc, patterns))
+    for words in binary_words():
+        cases.append(case(nlp, 'binary-' + (''.join(words) or 'empty'), ' '.join(words), noun_document(nlp, words), patterns))
+    source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
+    return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
+
+
+def greedy_sequence_rules() -> list[GreedyRule]:
+    """Every pattern of one or two items, the first on `a` and the second on `a` or `b`, with
+    each of the five basic repetition operators, registered once per filter. Then `a`, any
+    token and `b` with each operator: there a short span can start before a longer one that
+    overlaps it, so the two filters keep different spans."""
+    repetitions = [Repetition(kind) for kind in ('once', 'optional', 'zero_or_more', 'one_or_more', 'negated')]
+    # Each item is its repetition and the token text it requires; `None` accepts any token.
+    sequences: list[list[tuple[Repetition, str | None]]] = [[(first, 'a')] for first in repetitions]
+    sequences.extend([(first, 'a'), (second, text)] for first in repetitions for text in ('a', 'b') for second in repetitions)
+    sequences.extend([(Repetition(), 'a'), (Repetition(), None), (third, 'b')] for third in repetitions)
+    return [GreedyRule(greedy.value.lower() + ''.join(f'_{text or "any"}-{repeat.kind}' for repeat, text in sequence),
+                       [Pattern([Item([], repeat) if text is None else word(text, repeat) for repeat, text in sequence])], greedy)
+            for sequence in sequences for greedy in Greedy]
+
+
+def greedy_interaction_rules() -> list[GreedyRule]:
+    """Registrations in `Matcher.add` order that exercise how filtered and unfiltered rules
+    interact: result order, overlaps, ties, several patterns per rule and repeated registration."""
+    optional, star, plus, negated = Repetition('optional'), Repetition('zero_or_more'), Repetition('one_or_more'), Repetition('negated')
+    run = Pattern([word('a', plus)])
+    pair = Pattern([word('a'), word('a')])
+    result = [
+        # Rules without a filter sit between filtered rules: spaCy lists their matches first.
+        GreedyRule('run_longest', [run], Greedy.LONGEST),
+        GreedyRule('plain_a', [Pattern([word('a')])], None),
+        GreedyRule('run_first', [run], Greedy.FIRST),
+        GreedyRule('plain_b', [Pattern([word('b')])], None),
+        # The filter is applied per rule name, so another name keeps the same spans.
+        GreedyRule('run_longest_again', [run], Greedy.LONGEST),
+    ]
+    patterns: list[tuple[str, list[Pattern]]] = [
+        # Equally long overlapping spans: the earlier one wins under both filters.
+        ('pair', [pair]),
+        # A short span that starts first overlaps a longer one that starts later, so the two
+        # filters keep different spans.
+        ('early_short_late_long', [Pattern([word('a'), word('a'), word('b', star)])]),
+        ('chain', [Pattern([word('a'), word('b')]), Pattern([word('b'), word('c'), word('d')])]),
+        # On `a b d` spaCy finds `b d` before the equally long `a b`, which starts earlier:
+        # LONGEST prefers the earlier start, not the span found first.
+        ('found_late_start_first', [Pattern([word('a'), word('b', star), word('c', star)]), Pattern([word('b'), word('d')])]),
+        # Several patterns under one name compete in one filter pass.
+        ('nested', [Pattern([word('a')]), Pattern([word('a'), word('a'), word('a')])]),
+        ('touching', [Pattern([word('a'), word('b')]), Pattern([word('b'), word('a')])]),
+        ('duplicate_patterns', [pair, pair]),
+        ('range_1_2', [Pattern([word('a', Range(1, 2))])]),
+        ('range_2_open', [Pattern([word('a', Range(2, None))])]),
+        ('range_0_0_then_b', [Pattern([word('a', Range(0, 0)), word('b')])]),
+        # Patterns that can match no tokens: spaCy never returns the empty span.
+        ('optional_pair', [Pattern([word('a', optional), word('a', optional)])]),
+        ('star_pair', [Pattern([word('a', star), word('a', star)])]),
+        ('a_not_b', [Pattern([word('a'), word('b', negated)])]),
+        ('any', [Pattern([Item([])])]),
+        ('any_pair', [Pattern([Item([]), Item([])])]),
+        ('any_run', [Pattern([Item([], plus)])]),
+        ('never', [Pattern([word('missing', plus)])]),
+        ('proper_nouns', [Pattern([Item([Constraint('pos', Equals('PROPN'))], plus)])]),
+        ('proper_noun_then_any', [Pattern([Item([Constraint('pos', Equals('PROPN'))]), Item([], optional)])]),
+    ]
+    for name, alternatives in patterns:
+        result.extend(GreedyRule(f'{name}_{greedy.value.lower()}', alternatives, greedy) for greedy in Greedy)
+    # A later registration replaces the filter for every pattern of that name, earlier ones
+    # included. Its own patterns join the same filter pass: `a b a` and `a a b` add spans that
+    # displace spans of the earlier `a+`.
+    result.extend([
+        GreedyRule('filter_then_none', [run], Greedy.LONGEST),
+        GreedyRule('none_then_filter', [run], None),
+        GreedyRule('first_then_longest', [run], Greedy.FIRST),
+        GreedyRule('longest_then_first', [run], Greedy.LONGEST),
+        GreedyRule('empty_sets_filter', [run], None),
+        GreedyRule('empty_clears_filter', [run], Greedy.FIRST),
+        GreedyRule('three_registrations', [Pattern([word('a')])], Greedy.LONGEST),
+        GreedyRule('filter_then_none', [Pattern([word('b')])], None),
+        GreedyRule('none_then_filter', [Pattern([word('b', plus)])], Greedy.FIRST),
+        GreedyRule('first_then_longest', [Pattern([word('a'), word('b'), word('a')])], Greedy.LONGEST),
+        GreedyRule('longest_then_first', [Pattern([word('a'), word('a'), word('b')])], Greedy.FIRST),
+        # A registration without patterns still sets or clears the filter.
+        GreedyRule('empty_sets_filter', [], Greedy.LONGEST),
+        GreedyRule('empty_clears_filter', [], None),
+        GreedyRule('three_registrations', [Pattern([word('b')])], None),
+        GreedyRule('three_registrations', [pair], Greedy.FIRST),
+    ])
+    return result
+
+
+GREEDY_INTERACTION_WORDS: list[tuple[str, list[str]]] = [
+    ('runs', ['a', 'a', 'b', 'a', 'a', 'a']),
+    ('chain', ['a', 'b', 'c', 'd']),
+    ('discovery-order', ['a', 'b', 'd', 'a', 'b', 'd']),
+    ('late-long', ['a', 'a', 'a', 'b', 'b']),
+    ('ties', ['a', 'a', 'a', 'a', 'a']),
+    ('mixed', ['b', 'a', 'b', 'a', 'a', 'b', 'a', 'c', 'd']),
+    ('no-match', ['c', 'c', 'c']),
+    ('empty', []),
+]
+GREEDY_PIPELINE_TEXT = 'Alice Smith met Bob in New York City.'
+
+
+def greedy_case(nlp: Language, case_id: str, text: str, doc: Doc, registrations: list[GreedyRule]) -> GreedyCase:
+    filtered = Matcher(nlp.vocab, validate=True)
+    unfiltered = Matcher(nlp.vocab, validate=True)
+    for rule in registrations:
+        patterns = [official(pattern) for pattern in rule.patterns]
+        filtered.add(rule.name, patterns, greedy=rule.greedy)
+        unfiltered.add(rule.name, patterns)
+    rules: list[Rule] = [*registrations]
+    return GreedyCase(case_id, text, token_records(doc, text), span_records(doc.sents), [], [], rules,
+                      named(nlp, filtered(doc)), named(nlp, unfiltered(doc)))
+
+
+def generate_greedy(nlp: Language) -> Fixture:
+    sequences, interactions = greedy_sequence_rules(), greedy_interaction_rules()
+    cases: list[Case] = []
+    for words in binary_words():
+        cases.append(greedy_case(nlp, 'greedy-binary-' + (''.join(words) or 'empty'), ' '.join(words), noun_document(nlp, words), sequences))
+    for name, words in GREEDY_INTERACTION_WORDS:
+        cases.append(greedy_case(nlp, f'greedy-rules-{name}', ' '.join(words), noun_document(nlp, words), interactions))
+    cases.append(greedy_case(nlp, 'greedy-rules-pipeline', GREEDY_PIPELINE_TEXT, nlp(GREEDY_PIPELINE_TEXT), interactions))
     source = Path(spacy.__file__).parent / 'matcher' / 'matcher.pyx'
     return Fixture(Versions(spacy.__version__, thinc.__version__), 'en_core_web_md 3.8.0', hashlib.sha256(source.read_bytes()).hexdigest(), cases)
 
 
 def generate(exhaustive: bool = False, branching: bool = False, lower: bool = False, flags: bool = False,
-             length: bool = False, more_flags: bool = False, sets: bool = False) -> Fixture:
+             length: bool = False, more_flags: bool = False, sets: bool = False, greedy: bool = False) -> Fixture:
     if (spacy.__version__, thinc.__version__) != ('3.8.14', '8.3.13'):
         raise ValueError('Use the pinned reference environment')
     nlp = spacy.load('en_core_web_md')
@@ -333,6 +489,8 @@ def generate(exhaustive: bool = False, branching: bool = False, lower: bool = Fa
         return generate_more_flags(nlp)
     if sets:
         return generate_sets(nlp)
+    if greedy:
+        return generate_greedy(nlp)
     if exhaustive or branching:
         return generate_exhaustive(nlp, branching)
     cases: list[Case] = []
@@ -363,6 +521,7 @@ def main() -> None:
     modes.add_argument('--length', action='store_true')
     modes.add_argument('--more-flags', action='store_true')
     modes.add_argument('--sets', action='store_true')
+    modes.add_argument('--greedy', action='store_true')
     args = parser.parse_args()
     output: object = args.output
     if not isinstance(output, Path):
@@ -390,7 +549,14 @@ def main() -> None:
     set_mode: object = args.sets
     if not isinstance(set_mode, bool):
         raise TypeError('Sets flag must be boolean')
-    write_fixture(output, generate(exhaustive, branching, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode))
+    greedy_mode: object = args.greedy
+    if not isinstance(greedy_mode, bool):
+        raise TypeError('Greedy flag must be boolean')
+    fixture = generate(exhaustive, branching, lower_mode, flag_mode, length_mode, more_flag_mode, set_mode, greedy_mode)
+    write_fixture(output, fixture)
+    print(f'{output}: {len(fixture.cases)} cases, {sum(len(case.tokens) for case in fixture.cases)} tokens, '
+          f'{sum(len(case.rules) for case in fixture.cases)} rule registrations, '
+          f'{sum(len(case.expected) for case in fixture.cases)} matches')
 
 
 if __name__ == '__main__':

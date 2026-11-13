@@ -571,6 +571,128 @@ So on a single-valued attribute, `IsSubset` and `Intersects` behave like `In`, a
 
 String sets take strings and integer sets take whole numbers, as spaCy's pattern validation requires; SpaRs also limits integers to `i64` (see [Match by token length](#match-by-token-length)). Set predicates on lexical flags, string sets on `Length` and integer sets on string attributes return pattern errors. Apart from morphology normalization, values are compared as written; `Lower` values are not lowercased.
 
+## Keep matches that do not overlap
+
+By default a rule reports every match, including matches that share tokens. spaCy's `Matcher.add` has a `greedy` argument that makes a rule report only matches that share no token with each other, and SpaRs has the same option with the same two values. Both work the same way: the rule's matches are put in an order of preference, and each one in turn is kept unless it shares a token with a match already kept. It is called greedy because a kept match is never given up for a later one. `Greedy::First` orders matches by start, earliest first, and puts the longer match first when two start at the same token. `Greedy::Longest` orders them by length, longest first, and puts the earlier match first when two are equally long. In Rust, pass the option with `add_with`; in Node.js, pass it as the third argument of `add`. This example registers the same two patterns three times: without the option, with `First` and with `Longest`.
+
+::: code-group
+
+```rust
+use spars::{Greedy, Model, Predicate, TokenAttribute, TokenConstraint, TokenMatcher,
+    TokenPattern, TokenPatternItem, TokenRuleOptions};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load the model once. Here it only splits the text into tokens.
+    let nlp = Model::load("assets/en_core_web_md-3.8.0")?;
+
+    // A pattern that matches these exact words, one after another.
+    let phrase = |words: &[&str]| TokenPattern {
+        tokens: words.iter().map(|word| TokenPatternItem {
+            constraints: vec![TokenConstraint {
+                attribute: TokenAttribute::Text,
+                predicate: Predicate::Equals { value: (*word).into() },
+            }],
+            repetition: Default::default(),
+        }).collect(),
+    };
+    // Two patterns that overlap on the word "York".
+    let places = || vec![phrase(&["New", "York"]), phrase(&["York", "City", "Hall"])];
+
+    let mut matcher = TokenMatcher::new();
+
+    // A rule added with `add` reports every match.
+    matcher.add("every", places())?;
+
+    // `add_with` takes options for the rule. Start from the defaults and set `greedy`.
+    let mut first = TokenRuleOptions::default();
+    first.greedy = Some(Greedy::First);
+    matcher.add_with("first", places(), first)?;
+
+    let mut longest = TokenRuleOptions::default();
+    longest.greedy = Some(Greedy::Longest);
+    matcher.add_with("longest", places(), longest)?;
+
+    // The tokens are: They(0) met(1) at(2) New(3) York(4) City(5) Hall(6) .(7)
+    let doc = nlp.process("They met at New York City Hall.")?;
+
+    let found: Vec<_> = matcher.find_matches(&doc)?.into_iter()
+        .map(|m| (m.rule, m.start.0, m.end.0)).collect();
+
+    // "New York" is tokens 3 and 4; "York City Hall" is tokens 4, 5 and 6. They
+    // share token 4. The rule "first" keeps the one that starts earlier, and the
+    // rule "longest" keeps the longer one.
+    assert_eq!(found, [
+        ("every".to_string(), 3, 5),
+        ("every".to_string(), 4, 7),
+        ("first".to_string(), 3, 5),
+        ("longest".to_string(), 4, 7),
+    ]);
+    Ok(())
+}
+```
+
+```typescript
+import assert from 'node:assert/strict';
+import { loadModel, TokenMatcher } from '@spars/node';
+import type { TokenPattern } from '@spars/node';
+
+// Load the model once. Here it only splits the text into tokens.
+const nlp = await loadModel('assets/en_core_web_md-3.8.0');
+
+// A pattern that matches these exact words, one after another.
+const phrase = (words: string[]): TokenPattern => ({
+  tokens: words.map((word) => ({
+    constraints: [{ attribute: 'text', predicate: { kind: 'equals', value: word } }],
+    repetition: { kind: 'once' },
+  })),
+});
+// Two patterns that overlap on the word "York".
+const places = [phrase(['New', 'York']), phrase(['York', 'City', 'Hall'])];
+
+const matcher = new TokenMatcher();
+
+// Without options, `add` reports every match of the rule.
+matcher.add('every', places);
+
+// The third argument holds options for the rule, like the keyword arguments
+// of spaCy's `Matcher.add`.
+matcher.add('first', places, { greedy: 'FIRST' });
+matcher.add('longest', places, { greedy: 'LONGEST' });
+
+// The tokens are: They(0) met(1) at(2) New(3) York(4) City(5) Hall(6) .(7)
+const doc = await nlp.processDocument('They met at New York City Hall.');
+
+const found = (await matcher.findMatches(doc)).map((match) => [match.rule, match.start, match.end]);
+
+// "New York" is tokens 3 and 4; "York City Hall" is tokens 4, 5 and 6. They
+// share token 4. The rule "first" keeps the one that starts earlier, and the
+// rule "longest" keeps the longer one.
+assert.deepEqual(found, [
+  ['every', 3, 5],
+  ['every', 4, 7],
+  ['first', 3, 5],
+  ['longest', 4, 7],
+]);
+```
+
+:::
+
+The rule “every” reports both “New York” and “York City Hall”, which share the token “York”. The rule “first” keeps only “New York”, because it starts earlier, and the rule “longest” keeps only “York City Hall”, because it is longer.
+
+The option belongs to the rule, not to one pattern or one search, and it follows spaCy in three ways that are easy to miss:
+
+- **The latest registration decides.** Each `add` or `add_with` call sets the options for the whole rule, so they also apply to the patterns that earlier calls added. Calling plain `add` on a rule that has the option removes it, because `add` is `add_with` with the default options; this is what spaCy does when `Matcher.add` is called without `greedy`. On an existing rule, a call with an empty list of patterns changes only the options; with a new name, it registers a rule that has options and no patterns. A call that returns an error leaves the rule's patterns and options as they were; spaCy likewise keeps the earlier `greedy` value.
+- **Rules do not compete with each other.** The option removes overlaps among the matches of one rule. Two rules can still report matches that share tokens, as “first” and “longest” do above.
+- **Greedy rules come last in the result.** `find_matches` (`findMatches` in Node.js) first lists the matches of rules without the option, in the usual [discovery order](#reuse-ordering-and-errors). Then it lists the kept matches of each rule with the option, in the order in which those rules first matched, and within a rule the most preferred match first. With `Longest`, a long match late in the document comes before a shorter one earlier in it. Sort the result yourself if you need document order.
+
+Repetition is unchanged: `OneOrMore` and `ZeroOrMore` still produce every possible match, and the option then chooses among them. `Longest` on a `OneOrMore` item is the usual way to get each whole run of tokens once instead of every part of it. The option filters after matching: every match is still found first, so it reduces the result, not the matching time described in [Scope and cost](#scope-and-cost).
+
+| Rust | spaCy | Node.js | Keeps |
+|---|---|---|---|
+| `None` (default) | `None` or omitted | omitted or `null` | every match |
+| `Some(Greedy::First)` | `"FIRST"` | `'FIRST'` | the earliest start first, then the longer match |
+| `Some(Greedy::Longest)` | `"LONGEST"` | `'LONGEST'` | the longest match first, then the earliest start |
+
 ## Conditions and repetition
 
 All conditions on an item must match the same token. Empty conditions match any token. Token Matcher shares `TokenConstraint`, `TokenAttribute`, and `Predicate` with [DependencyMatcher](DEPENDENCY_MATCHER.md), including its morphology rules. Available attributes are `Text`, `Lower` (lowercase text), `Norm`, `Lemma`, `Pos`, `Tag`, `Dep`, `Morphology`, the seventeen lexical flags, and `Length`. Comparisons support equality, membership, exclusion, the set predicates subset, superset and intersection, true/false flags, and numeric comparisons, integer membership and integer set predicates for `Length`. Text equality is case-sensitive; to ignore capitalization in the document, use `Lower` with lowercase pattern values.
@@ -589,9 +711,9 @@ Negation consumes a token; it is not a check between tokens. Zero-length results
 
 ## Reuse, ordering, and errors
 
-`add` validates all supplied patterns before changing the matcher. Adding an existing rule appends its patterns. `get`, `contains`, `remove`, `len`, and `is_empty` manage rules. Calls use separate matching state, so registered matchers can be shared for concurrent read-only use. Matching does not invoke inference or access the network.
+`add` validates all supplied patterns before changing the matcher. Adding an existing rule appends its patterns. `add_with` does the same with the options you pass, and plain `add` returns the rule to the default options; see [Keep matches that do not overlap](#keep-matches-that-do-not-overlap). `get`, `contains`, `remove`, `len`, and `is_empty` manage rules. Calls use separate matching state, so registered matchers can be shared for concurrent read-only use. Matching does not invoke inference or access the network.
 
-Results preserve the pinned spaCy matcher's discovery order, including optional suffixes at the end of the document. They are not sorted by start position or grouped by rule. Identical `(rule, start, end)` results appear once, even when several patterns or repetition paths produce them. Different rule names can match the same span.
+Results preserve the pinned spaCy matcher's discovery order, including optional suffixes at the end of the document. They are not sorted by start position or grouped by rule, except that each rule registered with `greedy` has its matches listed together, after the matches of every rule without it. Identical `(rule, start, end)` results appear once, even when several patterns or repetition paths produce them. Different rule names can match the same span.
 
 Items with an exact zero count are discarded and do not require annotations. Text, lowercase, norm, lexical flag and length conditions do not require dependency heads or linguistic annotations. Invalid patterns and unsupported serialized enum values return errors.
 
@@ -605,7 +727,7 @@ spaCy keeps requiring an annotation that an `Equals` condition compared even aft
 
 ## Scope and cost
 
-This API implements the default overlapping-match behavior. Greedy `FIRST` and `LONGEST` selection, alignments, callbacks, regex and fuzzy predicates, custom extensions, token-level attributes such as `IS_SENT_START`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) matches token phrases by text, lowercase, norm, annotations, lexical flags or length.
+This API reports every match by default, overlapping ones included, and can keep only non-overlapping matches of a rule with greedy `FIRST` or `LONGEST` selection. Alignments, callbacks, regex and fuzzy predicates, custom extensions, token-level attributes such as `IS_SENT_START`, and span input are not exposed. It is a typed Rust API, not an importer for arbitrary spaCy pattern JSON. [PhraseMatcher](PHRASE_MATCHER.md) matches token phrases by text, lowercase, norm, annotations, lexical flags or length.
 
 Patterns are limited to 4,096 expanded nodes to keep registration bounded. `OneOrMore` uses two nodes; a bounded range uses its maximum count, and an unbounded range uses its minimum plus one. Larger patterns return an error.
 

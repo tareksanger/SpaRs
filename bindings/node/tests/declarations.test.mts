@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { restrictConstructor, addEntityPatternTypes, addSpanGroupTypes, addSpanRulerTypes, addMatcherLoaders, addExecutionLoader, addExecutionTypes, addVocabularyTypes, replaceInterface } from '../scripts/declarations.mts';
+import { restrictConstructor, addEntityPatternTypes, addSpanGroupTypes, addSpanRulerTypes, addTokenMatcherTypes, addMatcherLoaders, addExecutionLoader, addExecutionTypes, addVocabularyTypes, replaceInterface } from '../scripts/declarations.mts';
 
 test('declaration correction preserves methods and rejects unexpected generator changes', () => {
   const source = 'export declare class Model {\n  process(text: string): Promise<Document>\n}';
@@ -57,6 +57,13 @@ test('span ruler types are appended once', () => {
   assert.match(declaration, /export type SpanPattern = SpanTokenPattern \| SpanPhrasePattern/);
   assert.match(declaration, /export interface SpanRulerOptions/);
   assert.equal(addSpanRulerTypes(declaration), declaration);
+});
+
+test('token matcher types are appended once', () => {
+  const declaration = addTokenMatcherTypes('');
+  assert.match(declaration, /export type Greedy = 'FIRST' \| 'LONGEST'/);
+  assert.match(declaration, /export interface TokenRuleOptions/);
+  assert.equal(addTokenMatcherTypes(declaration), declaration);
 });
 
 test('interface replacement checks the generated fields and runs once', () => {

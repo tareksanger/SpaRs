@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type {
-  Comparison, DependencyRelation, EntityIob, FlagAttribute, IntegerSetKind, OfficialModelName, PhraseAttribute, SpanFilter,
+  Comparison, DependencyRelation, EntityIob, FlagAttribute, Greedy, IntegerSetKind, OfficialModelName, PhraseAttribute, SpanFilter,
   SparsErrorCode, StringAttribute, StringSetKind, TokenAttribute, TokenConstraint, TokenRepetition, UniversalPos,
 } from '../index.js';
 import { array, record } from './fixtures.mts';
@@ -30,6 +30,7 @@ export const ERROR_CODES = ['SPARS_IO', 'SPARS_INVALID_MODEL', 'SPARS_UNSUPPORTE
   'SPARS_BOUNDS', 'SPARS_INFERENCE', 'SPARS_INVALID_PATTERN', 'SPARS_BUSY', 'SPARS_INPUT_LIMIT', 'SPARS_NATIVE_INCOMPATIBLE'] as const;
 export const OFFICIAL_MODEL_NAMES = ['en_core_web_sm', 'en_core_web_md', 'en_core_web_lg'] as const;
 export const SPAN_FILTERS = ['first_longest', 'prioritize_new', 'prioritize_existing'] as const;
+export const GREEDY = ['FIRST', 'LONGEST'] as const;
 
 export type Exact = [
   Assert<Equal<(typeof PHRASE_ATTRIBUTES)[number], PhraseAttribute>>,
@@ -46,6 +47,7 @@ export type Exact = [
   Assert<Equal<(typeof ERROR_CODES)[number], SparsErrorCode>>,
   Assert<Equal<(typeof OFFICIAL_MODEL_NAMES)[number], OfficialModelName>>,
   Assert<Equal<(typeof SPAN_FILTERS)[number], SpanFilter>>,
+  Assert<Equal<(typeof GREEDY)[number], Greedy>>,
   Assert<Equal<TokenConstraint['attribute'], TokenAttribute>>,
   Assert<Equal<TokenConstraint['predicate']['kind'],
     'equals' | 'flag' | 'compare' | 'morph_superset' | 'morph_intersects' | StringSetKind | IntegerSetKind>>,

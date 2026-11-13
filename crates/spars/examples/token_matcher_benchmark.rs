@@ -1,16 +1,18 @@
 //! Token Matcher workloads with many rules: registration, matching, and removal are timed
 //! separately, and a hash of the ordered matches lets two builds be compared for identical output.
 //!
-//! Usage: `token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY]`. Patterns and documents
-//! use words from a vocabulary of `VOCABULARY` words (default 200); documents use at most the first
-//! 9,973 of them. Each pattern is registered as its own rule. `MIX` is `indexed` (every pattern
-//! starts with an exact `Text` or `Lower` value), `mixed` (half of the patterns start with an exact
-//! value) or `unindexed` (no pattern starts with an exact value). Matching reports the median,
-//! minimum and maximum of `REPEATS` calls after one warmup call; removal deletes every tenth rule.
+//! Usage: `token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY [GREEDY_RULES]]`.
+//! Patterns and documents use words from a vocabulary of `VOCABULARY` words (default 200);
+//! documents use at most the first 9,973 of them. Each pattern is registered as its own rule, and
+//! the first `GREEDY_RULES` rules (default 0) are registered with `Greedy::Longest`. `MIX` is
+//! `indexed` (every pattern starts with an exact `Text` or `Lower` value), `mixed` (half of the
+//! patterns start with an exact value) or `unindexed` (no pattern starts with an exact value).
+//! Matching reports the median, minimum and maximum of `REPEATS` calls after one warmup call;
+//! removal deletes every tenth rule.
 use serde::Serialize;
 use spars::{
-    ByteOffset, CodePointOffset, Doc, Predicate, Repetition, Token, TokenAttribute,
-    TokenConstraint, TokenMatch, TokenMatcher, TokenPattern, TokenPatternItem,
+    ByteOffset, CodePointOffset, Doc, Greedy, Predicate, Repetition, Token, TokenAttribute,
+    TokenConstraint, TokenMatch, TokenMatcher, TokenPattern, TokenPatternItem, TokenRuleOptions,
 };
 use std::{hint::black_box, sync::OnceLock, time::Instant};
 
@@ -173,14 +175,24 @@ fn fingerprint(matches: &[TokenMatch]) -> String {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let usage = "usage: token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY]";
-    let (length, count, mix, repeats, vocabulary) = match &args[..] {
-        [length, count, mix, repeats] => (length, count, mix, repeats, 200),
-        [length, count, mix, repeats, vocabulary] => {
-            (length, count, mix, repeats, vocabulary.parse()?)
-        }
-        _ => return Err(usage.into()),
-    };
+    let usage =
+        "usage: token_matcher_benchmark TOKENS PATTERNS MIX REPEATS [VOCABULARY [GREEDY_RULES]]";
+    let (length, count, mix, repeats, vocabulary, greedy_rules): (_, _, _, _, usize, usize) =
+        match &args[..] {
+            [length, count, mix, repeats] => (length, count, mix, repeats, 200, 0),
+            [length, count, mix, repeats, vocabulary] => {
+                (length, count, mix, repeats, vocabulary.parse()?, 0)
+            }
+            [length, count, mix, repeats, vocabulary, greedy_rules] => (
+                length,
+                count,
+                mix,
+                repeats,
+                vocabulary.parse()?,
+                greedy_rules.parse()?,
+            ),
+            _ => return Err(usage.into()),
+        };
     if vocabulary == 0 {
         return Err("VOCABULARY must be positive".into());
     }
@@ -213,8 +225,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start = Instant::now();
     let mut matcher = TokenMatcher::new();
-    for (name, pattern) in names.iter().zip(&patterns) {
-        matcher.add(name.clone(), vec![pattern.clone()])?;
+    for (i, (name, pattern)) in names.iter().zip(&patterns).enumerate() {
+        if i < greedy_rules {
+            let mut options = TokenRuleOptions::default();
+            options.greedy = Some(Greedy::Longest);
+            matcher.add_with(name.clone(), vec![pattern.clone()], options)?;
+        } else {
+            matcher.add(name.clone(), vec![pattern.clone()])?;
+        }
     }
     let add_ms = start.elapsed().as_secs_f64() * 1e3;
 
@@ -239,7 +257,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{}",
         serde_json::json!({
             "tokens": length, "patterns": count, "mix": args[2], "repeats": repeats,
-            "vocabulary": vocabulary,
+            "vocabulary": vocabulary, "greedy_rules": greedy_rules,
             "matches": matches.len(), "fingerprint": fingerprint(&matches),
             "matches_after_removal": after_removal.len(),
             "fingerprint_after_removal": fingerprint(&after_removal),
