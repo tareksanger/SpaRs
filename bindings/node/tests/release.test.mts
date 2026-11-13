@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stageRelease, targets } from '../scripts/release.mts';
 
+const homepage = 'https://example.test/docs/';
+
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'spars-release-'));
   for (const target of targets) {
@@ -16,7 +18,7 @@ function fixture(): string {
       'README.md': 'Usage', 'LICENSE': 'MIT', 'THIRD_PARTY_NOTICES.md': 'Notices',
       'DEPENDENCY_LICENSES.txt': 'Dependency notices',
       [`spars-node.${target.suffix}.node`]: 'binary',
-      'release.json': JSON.stringify({name:'@spars/node',version:'0.2.0',sha:'a'.repeat(40),target:target.suffix}),
+      'release.json': JSON.stringify({name:'@spars/node',version:'0.2.0',sha:'a'.repeat(40),target:target.suffix,homepage}),
     })) writeFileSync(join(dir, name), content);
     mkdirSync(join(dir, 'licenses'));
     writeFileSync(join(dir, 'licenses', 'spacy-MIT.txt'), 'upstream license');
@@ -35,6 +37,8 @@ test('stage creates a missing output directory with exact platform dependencies 
       '@spars/node-linux-x64-gnu':'0.2.0', '@spars/node-linux-arm64-gnu':'0.2.0', '@spars/node-darwin-arm64':'0.2.0', '@spars/node-win32-x64-msvc':'0.2.0', '@spars/node-darwin-x64':'0.2.0', '@spars/node-win32-arm64-msvc':'0.2.0',
       '@spars/node-linux-x64-musl':'0.2.0', '@spars/node-linux-arm64-musl':'0.2.0',
     });
+    assert.ok('homepage' in main);
+    assert.equal(main.homepage, homepage);
     assert.ok(!existsSync(join(out, 'main/spars-node.darwin-arm64.node')));
     assert.equal(readFileSync(join(out, 'main/execution.cjs'), 'utf8'), 'module.exports = {};');
     for (const target of targets) {
@@ -42,6 +46,7 @@ test('stage creates a missing output directory with exact platform dependencies 
       assert.ok(typeof manifest === 'object' && manifest !== null && 'os' in manifest && 'cpu' in manifest);
       assert.deepEqual(manifest.os, [target.os]);
       assert.deepEqual(manifest.cpu, [target.cpu]);
+      assert.equal('homepage' in manifest ? manifest.homepage : undefined, homepage);
       assert.deepEqual('libc' in manifest ? manifest.libc : undefined,target.libc ? [target.libc] : undefined);
       assert.ok(existsSync(join(out, target.suffix, 'DEPENDENCY_LICENSES.txt')));
     }
@@ -49,7 +54,7 @@ test('stage creates a missing output directory with exact platform dependencies 
   } finally { rmSync(root, {recursive:true,force:true}); }
 });
 
-for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wrong version', 'wrapper mismatch', 'missing scheduler', 'scheduler mismatch', 'missing notices']) {
+for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wrong version', 'wrapper mismatch', 'missing scheduler', 'scheduler mismatch', 'missing notices', 'missing homepage', 'homepage mismatch', 'insecure homepage']) {
   test(`staging rejects ${problem} before creating output`, () => {
     const root = fixture();
     try {
@@ -57,6 +62,10 @@ for (const problem of ['missing binary', 'extra binary', 'wrong revision', 'wron
       if (problem === 'missing binary') rmSync(join(dir, 'spars-node.darwin-arm64.node'));
       if (problem === 'extra binary') writeFileSync(join(dir, 'unexpected.node'), 'binary');
       if (problem === 'wrong revision' || problem === 'wrong version') writeFileSync(join(dir, 'release.json'), JSON.stringify({name:'@spars/node',version:problem === 'wrong version' ? '0.1.0' : '0.2.0',sha:(problem === 'wrong revision' ? 'b' : 'a').repeat(40),target:'darwin-arm64'}));
+      const identity = {name:'@spars/node',version:'0.2.0',sha:'a'.repeat(40),target:'darwin-arm64'};
+      if (problem === 'missing homepage') writeFileSync(join(dir, 'release.json'), JSON.stringify(identity));
+      if (problem === 'homepage mismatch') writeFileSync(join(dir, 'release.json'), JSON.stringify({...identity,homepage:'https://example.test/other/'}));
+      if (problem === 'insecure homepage') writeFileSync(join(dir, 'release.json'), JSON.stringify({...identity,homepage:'http://example.test/docs/'}));
       if (problem === 'wrapper mismatch') writeFileSync(join(dir, 'index.js'), 'different');
       if (problem === 'missing scheduler') rmSync(join(dir, 'execution.cjs'));
       if (problem === 'scheduler mismatch') writeFileSync(join(dir, 'execution.cjs'), 'different');
