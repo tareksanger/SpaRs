@@ -7,6 +7,12 @@
     "pyright": "1.1.414",
     "release-please": "17.11.2",
     "vitepress": "1.6.4",
-    "vitepress-plugin-llms": "1.14.0"
+    "vitepress-plugin-llms": "1.15.0"
+  },
+  "overrides": {
+    "vite": "6.4.6",
+    "@google-automations/git-file-utils": {
+      "minimatch": "11.0.8"
+    }
   }
 }
