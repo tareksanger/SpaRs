@@ -56,8 +56,9 @@ impl Wheel {
         let mut total = 0u64;
         for i in 0..archive.len() {
             let entry = archive.by_index(i)?;
-            valid_name(entry.name())?;
-            if !names.insert(entry.name().to_owned()) {
+            let name = entry.name()?;
+            valid_name(&name)?;
+            if !names.insert(name.into_owned()) {
                 return Err(invalid("duplicate archive destination"));
             }
             if entry
