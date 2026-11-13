@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.2](https://github.com/tareksanger/SpaRs/compare/v0.4.1...v0.4.2) (2026-11-13)
+
+
+### Features
+
+* **matcher:** add greedy FIRST and LONGEST selection to TokenMatcher ([#140](https://github.com/tareksanger/SpaRs/issues/140)) ([1b26790](https://github.com/tareksanger/SpaRs/commit/1b267901277d91ab1095f471b819afece59cb905))
+
+
+### Bug Fixes
+
+* **deps:** bump zip from 8.6.0 to 9.5.0 ([#128](https://github.com/tareksanger/SpaRs/issues/128)) ([e3e6917](https://github.com/tareksanger/SpaRs/commit/e3e69179f9bbe4abe67e72e438d2cae92fdf4c5e))
+* **matcher:** iterate dependency roots directly ([#137](https://github.com/tareksanger/SpaRs/issues/137)) ([3dcc767](https://github.com/tareksanger/SpaRs/commit/3dcc767d8d2e86120fc2b7030196d2a910ff54bf))
+* **tools:** locate the built library from Cargo's build messages ([#139](https://github.com/tareksanger/SpaRs/issues/139)) ([df5bf2a](https://github.com/tareksanger/SpaRs/commit/df5bf2ae84021430ee596e7b5a79e3cf6695c4ce))
+
+
+### Miscellaneous Chores
+
+* release 0.4.2 ([#142](https://github.com/tareksanger/SpaRs/issues/142)) ([8984b2d](https://github.com/tareksanger/SpaRs/commit/8984b2de2094e52de5aef4802a98189ac99069ec))
+
 ## [0.4.1](https://github.com/tareksanger/SpaRs/compare/v0.4.0...v0.4.1) (2026-10-21)
 
 
