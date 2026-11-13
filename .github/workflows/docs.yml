@@ -2,15 +2,15 @@ name: documentation-site
 # Build the documentation site from docs/ and publish it to GitHub Pages. The site holds one copy
 # per release, built from the release's tag, with the latest release at the root and main under
 # "next"; tools/site/build-versions.mjs builds and checks them all. Pull requests that change the
-# site build and check it, so a broken page or link shows as a failed check; only a push to main,
-# a new release tag, or a manual run on main publishes. The path filter means this check cannot
-# be a required one, and it does not apply to tags. After a failed deployment, start a manual run
-# on main: a later push publishes only when it changes the paths below. Guide examples are
-# executed by the acceptance run in ci.yml, not here.
+# site build and check it, so a broken page or link shows as a failed check; only a push to main
+# or a manual run on main publishes. The release workflow starts a manual run on main after it
+# creates a release, because the tag it pushes starts no workflows. The path filter means this
+# check cannot be a required one. After a failed deployment, start a manual run on main: a later
+# push publishes only when it changes the paths below. Guide examples are executed by the
+# acceptance run in ci.yml, not here.
 on:
   push:
     branches: [main]
-    tags: ['v*']
     paths: &site-paths
       - docs/**
       - tools/site/**
@@ -24,7 +24,7 @@ permissions:
   contents: read
 concurrency:
   # A newer push to a pull request replaces its running build. Runs that publish share one group,
-  # so a deployment in progress finishes and the newest waiting run, from main or a tag, follows it.
+  # so a deployment in progress finishes and the newest waiting run follows it.
   group: documentation-site-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
@@ -47,7 +47,7 @@ jobs:
         with:
           path: target/site
   deploy:
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

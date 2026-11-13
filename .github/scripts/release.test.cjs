@@ -25,7 +25,7 @@ function fixture(defaultBranch = 'main') {
       assert.equal(args.event, 'push'); assert.equal(args.branch, defaultBranch);
       assert.equal(args.status, undefined, 'Do not select an older successful run over a newer failure');
       return { data: { workflow_runs: [run] } };
-    } },
+    }, createWorkflowDispatch: record('docs') },
     repos: { listPullRequestsAssociatedWithCommit() {},
       getContent: async ({ path, ref }) => {
         assert.equal(ref, sha, 'Release inputs must come from the tested commit');
@@ -40,7 +40,7 @@ function fixture(defaultBranch = 'main') {
 test('publishes the exact tested commit and only its reviewed notes', async () => {
   const f = fixture();
   await publish(f);
-  assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release', 'add', 'remove']);
+  assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release', 'docs', 'add', 'remove']);
   assert.equal(f.calls[0].sha, f.sha);
   assert.equal(f.calls[1].target_commitish, f.sha);
   assert.equal(f.calls[1].tag_name, 'v0.1.0');
@@ -111,7 +111,7 @@ test('retry reuses tag and release, then repairs lifecycle labels', async () => 
   f.github.rest.git.getRef = async () => ({ data: { object: { type: 'commit', sha: f.sha } } });
   f.github.rest.repos.getReleaseByTag = async () => ({ data: { draft: false, body: '### Features\n\n- Native inference' } });
   await publish(f);
-  assert.deepEqual(f.calls.map(c => c.operation), ['add', 'remove']);
+  assert.deepEqual(f.calls.map(c => c.operation), ['docs', 'add', 'remove']);
   f.calls.length = 0;
   f.github.rest.repos.getReleaseByTag = async () => ({ data: { draft: true, body: 'Changed notes' } });
   await assert.rejects(publish(f), /differs/);
@@ -123,6 +123,21 @@ test('release API failure retains pending label for retry', async () => {
   f.github.rest.repos.createRelease = async () => { throw new Error('unavailable'); };
   await assert.rejects(publish(f), /unavailable/);
   assert.deepEqual(f.calls.map(c => c.operation), ['tag']);
+});
+
+test('publishes the documentation site from the default branch after the release exists', async () => {
+  const f = fixture();
+  await publish(f);
+  const docs = f.calls.find(c => c.operation === 'docs');
+  assert.deepEqual(docs, { operation: 'docs', owner: 'owner', repo: 'repo', workflow_id: 'docs.yml', ref: 'main' });
+  assert.ok(f.calls.indexOf(docs) > f.calls.findIndex(c => c.operation === 'release'));
+});
+
+test('documentation dispatch failure retains pending label for retry', async () => {
+  const f = fixture();
+  f.github.rest.actions.createWorkflowDispatch = async () => { throw new Error('dispatch unavailable'); };
+  await assert.rejects(publish(f), /dispatch unavailable/);
+  assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release']);
 });
 
 test('executes actual title workflow script against valid and invalid titles', () => {
@@ -172,7 +187,7 @@ test('label failure after publishing can be retried without another release', as
   f.github.rest.issues.removeLabel = remove;
   f.calls.length = 0;
   await publish(f);
-  assert.deepEqual(f.calls.map(c => c.operation), ['add', 'remove']);
+  assert.deepEqual(f.calls.map(c => c.operation), ['docs', 'add', 'remove']);
 });
 
 test('workflow prepares only on command and publishes only on release PR merge', () => {
@@ -193,9 +208,11 @@ test('workflow prepares only on command and publishes only on release PR merge',
   for (const job of Object.values(workflow.jobs)) {
     assert.deepEqual(job.concurrency, { group: 'release-default-branch', queue: 'max', 'cancel-in-progress': false });
   }
+  assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.equal(workflow.jobs.prepare.permissions, undefined, 'Preparing uses the App token, not workflow permissions');
   assert.deepEqual(workflow.jobs.publish.permissions, {
-    actions: 'read', contents: 'write', 'pull-requests': 'write', issues: 'write' },
-  'Publishing must be able to update the release PR labels');
+    actions: 'write', contents: 'write', 'pull-requests': 'write', issues: 'write' },
+  'Publishing must be able to update the release PR labels and start the documentation workflow');
   assert.ok(!workflow.jobs.publish.steps.some(step => step.uses?.startsWith('googleapis/release-please-action@')));
 });
 
@@ -239,7 +256,8 @@ test('publication follows a renamed default branch and rejects the former branch
   for (const branch of ['trunk', 'release/stable']) {
     const f = fixture(branch);
     await publish(f);
-    assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release', 'add', 'remove']);
+    assert.deepEqual(f.calls.map(c => c.operation), ['tag', 'release', 'docs', 'add', 'remove']);
+    assert.equal(f.calls[2].ref, branch);
     for (const change of [
       g => { g.context.payload.pull_request.base.ref = 'main'; },
       g => { g.pr.base.ref = 'main'; },

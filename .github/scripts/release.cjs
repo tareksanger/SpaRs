@@ -87,6 +87,10 @@ module.exports = async ({ github, context, core,
       name: tag, body, draft: false, prerelease: false });
   }
   if (pending) {
+    // Events made with this workflow's token start no workflows, so the tag push above does not
+    // publish the documentation site; a workflow dispatch is the exception. The site build reads
+    // every release tag, so a run on the default branch includes this release.
+    await github.rest.actions.createWorkflowDispatch({ ...repo, workflow_id: 'docs.yml', ref: defaultBranch });
     await github.rest.issues.addLabels({ ...repo, issue_number, labels: ['autorelease: tagged'] });
     await github.rest.issues.removeLabel({ ...repo, issue_number, name: 'autorelease: pending' });
   }

@@ -50,6 +50,7 @@
     "bin/*.mjs",
     "execution.cjs"
   ],
+  "homepage": "https://tareksanger.github.io/SpaRs/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tareksanger/SpaRs.git",

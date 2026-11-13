@@ -29,7 +29,7 @@ export function hostTarget(): typeof targets[number] {
 
 const commonFiles = ['index.js','index.d.ts','units.d.ts','execution.cjs','spars.mjs','README.md','LICENSE','THIRD_PARTY_NOTICES.md'] as const;
 const repository = {type:'git',url:'git+https://github.com/tareksanger/SpaRs.git',directory:'bindings/node'};
-interface ReleaseIdentity { name: string; version: string; sha: string; target: string }
+interface ReleaseIdentity { name: string; version: string; sha: string; target: string; homepage: string }
 interface CargoPackage {
   id: string;
   name: string;
@@ -62,10 +62,11 @@ function identity(path: string): ReleaseIdentity {
   const value = json(path);
   if (typeof value.name !== 'string' || !/^@[a-z0-9-]+\/[a-z0-9-]+$/.test(value.name) ||
       typeof value.version !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value.version) ||
-      typeof value.sha !== 'string' || !/^[a-f0-9]{40}$/.test(value.sha) || typeof value.target !== 'string') {
+      typeof value.sha !== 'string' || !/^[a-f0-9]{40}$/.test(value.sha) || typeof value.target !== 'string' ||
+      typeof value.homepage !== 'string' || !/^https:\/\/\S+$/.test(value.homepage)) {
     throw new Error('Invalid release identity');
   }
-  return {name:value.name,version:value.version,sha:value.sha,target:value.target};
+  return {name:value.name,version:value.version,sha:value.sha,target:value.target,homepage:value.homepage};
 }
 function writeJson(path: string, value: object): void { writeFileSync(path, JSON.stringify(value,null,2)+'\n'); }
 function create(path: string): void {
@@ -136,7 +137,7 @@ export function collect(root: string, suffix: string, output: string, sha: strin
   const manifest = json(join(binding,'package.json'));
   const notices = dependencyLicenses(root,target.triple);
   create(output);
-  writeJson(join(output,'release.json'),{name:manifest.name,version:manifest.version,sha,target:suffix});
+  writeJson(join(output,'release.json'),{name:manifest.name,version:manifest.version,sha,target:suffix,homepage:manifest.homepage});
   identity(join(output,'release.json'));
   for (const file of ['index.js','index.d.ts','units.d.ts','execution.cjs',`spars-node.${suffix}.node`]) cpSync(join(binding,file),join(output,file));
   cpSync(join(binding,'bin/spars.mjs'),join(output,'spars.mjs'));
@@ -151,7 +152,7 @@ export function stageRelease(input: string, output: string, sha: string, version
   for (const target of targets) {
     const dir = join(input,target.suffix);
     const current = identity(join(dir,'release.json'));
-    if (current.sha !== sha || current.version !== version || current.target !== target.suffix || (first && current.name !== first.name)) throw new Error('Release identity mismatch');
+    if (current.sha !== sha || current.version !== version || current.target !== target.suffix || (first && (current.name !== first.name || current.homepage !== first.homepage))) throw new Error('Release identity mismatch');
     first ??= current;
     const binaries = readdirSync(dir).filter(file => file.endsWith('.node'));
     if (binaries.length !== 1 || binaries[0] !== `spars-node.${target.suffix}.node`) throw new Error('Missing or unexpected native binary');
@@ -165,7 +166,7 @@ export function stageRelease(input: string, output: string, sha: string, version
   }
   if (!first || !previous) throw new Error('No artifacts');
   create(output);
-  const base = {version:first.version,license:'MIT',repository,engines:{node:'>=22'},publishConfig:{access:'public',registry:'https://registry.npmjs.org/'}};
+  const base = {version:first.version,license:'MIT',homepage:first.homepage,repository,engines:{node:'>=22'},publishConfig:{access:'public',registry:'https://registry.npmjs.org/'}};
   const main = join(output,'main');
   mkdirSync(join(main,'bin'),{recursive:true});
   for (const file of commonFiles) cpSync(join(previous,file),join(main,file === 'spars.mjs' ? 'bin/spars.mjs' : file));

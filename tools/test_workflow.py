@@ -95,11 +95,16 @@ class WorkflowTests(unittest.TestCase):
             self.assertLess(job.index('Swatinem/rust-cache@'), job.index('cargo fetch'))
             self.assertNotIn('cache-hit', job)
 
-    def test_documentation_site_publishes_only_from_main_and_release_tags(self) -> None:
+    def test_documentation_site_publishes_only_from_main(self) -> None:
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/docs.yml').read_text()
         build, deploy = workflow.split('\n  deploy:\n')
-        # Pull requests and pushes watch the same paths; only main and release tags are pushed.
-        self.assertIn("\n  push:\n    branches: [main]\n    tags: ['v*']\n    paths: &site-paths\n", build)
+        # Pull requests and pushes watch the same paths; only main is pushed. A tag created by the
+        # release workflow starts no run, so the release workflow dispatches this one on main.
+        self.assertIn('\n  push:\n    branches: [main]\n    paths: &site-paths\n', build)
+        triggers = build.split('\non:\n', 1)[1].split('\npermissions:\n', 1)[0]
+        self.assertEqual(re.findall(r'^  ([a-z_]+):', triggers, re.M), ['push', 'pull_request', 'workflow_dispatch'])
+        push = triggers.split('\n  pull_request:\n', 1)[0]
+        self.assertEqual(re.findall(r'^    ([a-z_-]+):', push, re.M), ['branches', 'paths'])
         self.assertIn('\n  pull_request:\n    paths: *site-paths\n', build)
         self.assertNotIn('pull_request_target', workflow)
         # The build job reads the repository and nothing more.
@@ -109,8 +114,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('          fetch-depth: 0\n', build)
         self.assertIn('run: node tools/site/build-versions.mjs', build)
         # Only the deploy job may publish, and it never runs for a pull request or another branch.
-        self.assertIn("    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || "
-                      "startsWith(github.ref, 'refs/tags/v'))\n", deploy)
+        self.assertEqual(re.findall(r'^ *if:.*$', deploy, re.M),
+                         ["    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"])
+        self.assertIn('    environment:\n      name: github-pages\n', deploy)
         self.assertIn('    needs: build\n', deploy)
         self.assertIn('    permissions:\n      pages: write\n      id-token: write\n', deploy)
 
