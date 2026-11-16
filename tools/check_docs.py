@@ -105,7 +105,7 @@ def check_documents(root: Path, store: Path) -> None:
         raise RuntimeError(portable_text(installed.stderr, root))
     os.environ['SPARS_MODEL_DIR'] = str(store)
     os.environ['SPARS_MODEL'] = str(root / 'assets/en_core_web_md-3.8.0')
-    docs = [root/'README.md', *sorted((root/'docs').glob('*.md'))]
+    docs = [root/'README.md', root/'bindings/node/README.md', *sorted((root/'docs').glob('*.md'))]
     results: list[DocumentationResult] = []
     for path in docs:
         count = rust_examples(path.read_text())
