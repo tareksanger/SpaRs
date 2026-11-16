@@ -1,10 +1,12 @@
 """Check TypeScript extraction, execution failures, and temporary-file cleanup."""
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 from subprocess import CompletedProcess
 from check_docs import rust_examples, rust_library, run_checks, check_documents
+from json_types import read_json
 from node_docs import examples, run_example
 
 
@@ -101,3 +103,24 @@ class DocumentationInstallationTests(unittest.TestCase):
                 'target/unused-test-store', '--archive',
                 'assets/en_core_web_sm-3.8.0-py3-none-any.whl',
             ])
+
+    def test_failing_npm_readme_example_fails_the_check_and_is_reported(self) -> None:
+        built = '{"reason":"compiler-artifact","target":{"name":"spars"},"filenames":["target/release/libspars.rlib"]}\n'
+        replies = [CompletedProcess(['cargo'], 0, built, ''),
+                   CompletedProcess(['cargo'], 0, '', ''),
+                   CompletedProcess(['spars'], 0, '', '')]
+        failed = CompletedProcess(['tsc'], 1, 'type diagnostic', '')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'docs').mkdir()
+            (root / 'bindings/node').mkdir(parents=True)
+            (root / 'README.md').write_text('# Project\n')
+            (root / 'bindings/node/README.md').write_text('```typescript\nconst count: number = "wrong";\n```\n')
+            with patch.dict(os.environ), \
+                    patch('check_docs.subprocess.run', side_effect=replies), \
+                    patch('check_docs.run_example', return_value=failed):
+                with self.assertRaises(SystemExit):
+                    check_documents(root, root / 'store')
+            report = read_json(root / 'target/reports/documentation.json')
+        self.assertEqual(report, [{'document': 'bindings/node/README.md', 'examples': 1, 'passed': False,
+                                   'stdout': 'type diagnostic', 'stderr': ''}])
